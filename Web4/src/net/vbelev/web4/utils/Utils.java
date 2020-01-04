@@ -2,7 +2,7 @@ package net.vbelev.web4.utils;
 
 import java.nio.charset.Charset;
 
-import com.sun.media.jfxmedia.track.Track.Encoding;
+//import com.sun.media.jfxmedia.track.Track.Encoding;
 
 public class Utils
 {
@@ -18,6 +18,25 @@ public class Utils
 		return null;
 	}
 
+	public static <T extends Enum<T>>T parseEnum(Class<T> c, String val)
+	{
+		//,c.ise
+		return Enum.valueOf(c, val);		
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends Enum<T>>T tryParseEnum(String val, T defaultVal)
+	{
+		try
+		{
+			return Enum.valueOf((Class<T>)defaultVal.getClass(), val);
+		}
+		catch (IllegalArgumentException e)
+		{
+			return defaultVal;
+		}
+	}
+	
 	public static <T extends Object>T NVL(T... vals)
 	{
 		for (T v : vals)
