@@ -4,7 +4,7 @@ import javax.xml.bind.*;
 import javax.xml.bind.annotation.*;
 
 import net.vbelev.web4.ui.*;
-import net.vbelev.web4.utils.Utils;
+import net.vbelev.web4.utils.*;
 
 @XmlRootElement(name = "web_user")
 public class WebUserXML {
