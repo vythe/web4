@@ -216,7 +216,7 @@ public class JerseyAPI
 	}
 	
 	@XmlRootElement
-	public class SetAffinity
+	public static class SetAffinity
 	{
 		public String moniker;
 		public String toMoniker;
