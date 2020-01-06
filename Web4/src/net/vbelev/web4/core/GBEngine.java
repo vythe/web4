@@ -1,6 +1,11 @@
 package net.vbelev.web4.core;
 
 import java.util.*;
+import java.io.*;
+
+import net.vbelev.web4.utils.*;
+import net.vbelev.web4.xml.GBGroupListXML;
+import net.vbelev.web4.xml.WebUserXML;
 
 /**
  * A coherent storage for profiles and groups
@@ -13,17 +18,102 @@ public class GBEngine {
 	
 	private GBGroup[] groups = new GBGroup[0];
 	
+	public final XMLiser xmliser;
+	
 	private GBEngine(String root)
 	{
+		//xmliser = new XMLiser("net.vbelev.web4.xml");
+		xmliser = new XMLiser(GBGroupListXML.class, WebUserXML.class);
 		dataFolder = root;
 	}
 	
 	public static GBEngine loadEngine(String root)
 	{
 		GBEngine res = new GBEngine(root);
+		File groupList = new File(root + "/" + GBGroupListXML.STORAGE_NAME);
+		if (!groupList.exists())
+		{
 		res.testSet();
-		
+		}
+		else if (!groupList.isFile())
+		{
+			throw new IllegalArgumentException("Failed to load engine, this is not a file: " + groupList.getAbsolutePath());
+		}
+		else
+		{
+			try(InputStream ioGroupList = new FileInputStream(groupList))
+			{
+				GBGroupListXML xml = res.xmliser.fromXML(GBGroupListXML.class, ioGroupList);
+				ioGroupList.close();
+				
+				xml.toEngine(res);
+				res.calculateAll();
+				
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load engine from lost file " + groupList.getAbsolutePath(), e);
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load engine from " + groupList.getAbsolutePath(), e);
+			}
+			finally
+			{
+			}
+		}
 		return res;
+	}
+	
+	public void save()
+	{
+		File groupList = new File(dataFolder + "/" + GBGroupListXML.STORAGE_NAME);
+		if (groupList.exists() && !groupList.isFile())
+		{
+			throw new IllegalArgumentException("Failed to save engine, this is not a file: " + groupList.getAbsolutePath());
+		}
+		
+		GBGroupListXML xml = new GBGroupListXML();
+		xml.fromEngine(this);
+		try(FileOutputStream ioGroupList = new FileOutputStream(groupList))
+		{
+			xmliser.toXML(ioGroupList, xml);
+			ioGroupList.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save engine, this is not a file: " + groupList.getAbsolutePath(), e);
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save engine to " + groupList.getAbsolutePath(), e);
+		}
+		finally
+		{
+		}
+	}
+	
+	public int getSize()
+	{
+		if (groups == null) return 0;
+		return groups.length;
+	}
+	
+	public void setSize(int size)
+	{
+		int copySize = (groups == null)? null 
+				: groups.length < size? groups.length 
+				: size
+		;
+	
+		GBGroup[] newGroups = new GBGroup[size];
+		for (int i = 0; i < copySize; i++)
+		{
+			newGroups[i] = groups[i];
+			newGroups[i].ID = i;
+		}
+		for (int i = copySize; i < size; i++)
+		{
+			newGroups[i] = new GBGroup();
+			newGroups[i].ID = i;
+		}
+		this.groups = newGroups;
 	}
 	
 	public void testSet()
@@ -74,6 +164,15 @@ public class GBEngine {
 		return false;
 	}
 	
+	public GBGroup getGroup(int ID)
+	{
+		if (groups == null || ID < 0 || ID >= groups.length)
+		{
+			return null;
+		}
+		return groups[ID];
+	}
+	
 	public GBGroup getGroup(String moniker)
 	{
 		if (moniker == null) return null;
@@ -86,7 +185,7 @@ public class GBEngine {
 
 	public String getGroupMoniker(int ID)
 	{
-		if (ID < 0 || ID >= groups.length)
+		if (groups == null || ID < 0 || ID >= groups.length)
 		{
 			return null;
 		}

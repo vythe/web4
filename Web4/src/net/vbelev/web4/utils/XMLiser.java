@@ -4,7 +4,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.*;
-import java.util.ArrayList;
+import java.util.*;
 
 import org.w3c.dom.*;
 
@@ -180,6 +180,65 @@ public class XMLiser
 			contextMarshaller = Context.createMarshaller();
 			contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
 			contextUnmarshaller = Context.createUnmarshaller();
+		}
+		catch  (Exception x)
+		{
+			throw new IllegalArgumentException("failed to initialize JAXB", x);
+		}
+	}
+
+	public static List<Class> getAllClasses(ClassLoader cc, String packageName)
+	{
+		ArrayList<Class> res = new ArrayList<Class>();
+		try
+		{
+			if (cc == null)
+			{
+				cc = Thread.currentThread().getContextClassLoader();
+			}
+		Enumeration<java.net.URL> allfiles = cc.getResources(packageName.replaceAll("\\.", "/") + "/*");
+		while (allfiles.hasMoreElements())
+		{
+			File fElem = new File(allfiles.nextElement().getFile());
+			if (fElem.isFile() && fElem.getName().endsWith(".class"))
+			{
+				try
+				{
+				Class<?> c = cc.loadClass(packageName + "." + fElem.getName().replaceFirst("\\.class$", ""));
+				res.add(c);
+				
+				}
+				catch (ClassNotFoundException cx)
+				{
+					System.out.println("getAllClasses failed on " + packageName + " - " + fElem.getName());
+				}
+			}
+		}
+		}
+		catch (IOException x)
+		{
+			throw new IllegalArgumentException("Failed to read package " + packageName, x);
+		}
+		return res;
+	}
+	
+	public XMLiser(String... packagesToBeBound)
+	{
+		try
+		{
+			String allNames = String.join(":", packagesToBeBound);
+			Context = JAXBContext.newInstance(allNames, null );
+			contextMarshaller = Context.createMarshaller();
+			contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+			contextUnmarshaller = Context.createUnmarshaller();
+			
+			//this.getClass().getClassLoader().
+			List<Class> allClasses = new ArrayList<Class>();
+			for (String p : packagesToBeBound)
+			{
+				allClasses.addAll(XMLiser.getAllClasses(null, p));
+			}
+			Classes = (Class[])allClasses.toArray();
 		}
 		catch  (Exception x)
 		{

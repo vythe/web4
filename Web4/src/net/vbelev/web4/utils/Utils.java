@@ -29,6 +29,8 @@ public class Utils
 	{
 		try
 		{
+			if (val == null || val.length() == 0) return defaultVal;
+			
 			return Enum.valueOf((Class<T>)defaultVal.getClass(), val);
 		}
 		catch (IllegalArgumentException e)

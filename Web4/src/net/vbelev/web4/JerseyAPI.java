@@ -257,6 +257,9 @@ public class JerseyAPI
 			aff = g.setAffinity(g2.ID,  args.value, GBAffinity.QualityEnum.SET);
 		}
 		engine.calculateAll();
+		
+		engine.save();
+		
 		aff = engine.getAffinity(g, g2.ID, false);
 		
 		GetAffinity res = new GetAffinity(aff, engine);

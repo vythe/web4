@@ -41,6 +41,11 @@ public class GBGroup {
 		return aff;
 	}
 	
+	public GBAffinity setAffinity(GBAffinity aff)
+	{
+		affinities.put(aff.toID(), aff);
+		return aff;
+	}
 	public GBAffinity setAffinity(int toGroup, double value)
 	{
 		return setAffinity(toGroup, value, GBAffinity.QualityEnum.SET);
