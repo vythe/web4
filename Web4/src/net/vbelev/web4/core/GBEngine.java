@@ -261,6 +261,43 @@ public class GBEngine {
 		return nom / denom;
 	}
 	
+	/**
+	 * returns an array of affinity values of group[forID] to all other groups.
+	 * values will be null for qualities NONE.
+	 * @return
+	 */
+	public Double[] getAffinitesFor(int forID)
+	{
+		Double[] res = new Double[groups.length];
+		GBGroup g = getGroup(forID);
+		
+		for(GBAffinity aff : g.getAffinities(true))
+		{
+			res[aff.toID()] = aff.value();
+		}	
+		
+		return res;
+	}
+	
+	/**
+	 * returns an array of affinity values of all groups to the group[forID].
+	 * values will be null for qualities NONE.
+	 * @return
+	 */
+	public Double[] getAffinitesTo(int toID)
+	{
+		Double[] res = new Double[groups.length];
+		for (GBGroup g : groups)
+		{
+		GBAffinity aff = g.getAffinity(toID);
+		if (aff != null && aff.quality() != GBAffinity.QualityEnum.NONE)
+		{
+			res[g.ID] = aff.value();
+		}	
+		}
+		return res;
+	}
+		
 	public GBAffinity getAffinity(GBGroup group, int toGroup, boolean forceRecalc)
 	{
 		//GBGroup toGroup = getGroup(toMoniker);
