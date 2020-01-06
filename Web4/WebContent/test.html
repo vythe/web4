@@ -18,7 +18,7 @@
 Moniker: <input id="moniker" type="text" value="g1"/><br/>
 To-moniker: <input id="toMoniker" type="text" value="g2"/><br/>
 Value: <input id="value" type="text" value="0.1"/><br/>
-<button id="aff_submit" >Submit me2</button>
+<button id="aff_submit" >Submit me</button>
 </fieldset>
 <div id="groups" style="border: solid;">
 Here be groups
@@ -49,7 +49,11 @@ $("#aff_submit").click(function(evt) {
 			    },
 			    method: "POST",
 			    body: JSON.stringify(args)
-			}).then(function(res) {
+			})
+			.then(function(res) {
+				return res.json();
+			})
+			.then(function(res) {
 				$("#groups").html("POST: " + JSON.stringify(res));
 				alert("POST: " + res);
 			});
