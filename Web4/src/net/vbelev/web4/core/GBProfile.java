@@ -21,6 +21,7 @@ public class GBProfile
 	 * Affinities only store the FORCED values, so they are bare numbers.
 	 */
 	public final Hashtable<Integer, Double> invAffinities = new Hashtable<Integer, Double>();
+	public final List<GBVote> votes = new ArrayList<GBVote>();
 	
 	public GBProfile()
 	{

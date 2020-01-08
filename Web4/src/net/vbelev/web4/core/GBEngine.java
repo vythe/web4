@@ -2,8 +2,11 @@ package net.vbelev.web4.core;
 
 import java.util.*;
 import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import net.vbelev.web4.utils.*;
+import net.vbelev.web4.xml.GBBillXML;
 import net.vbelev.web4.xml.GBGroupListXML;
 import net.vbelev.web4.xml.WebUserXML;
 
@@ -17,6 +20,7 @@ public class GBEngine {
 	private String dataFolder;
 	
 	private GBGroup[] groups = new GBGroup[0];
+	public final Hashtable<Integer, GBBill> bills = new Hashtable<Integer, GBBill>();
 	
 	public final XMLiser xmliser;
 	
@@ -30,10 +34,17 @@ public class GBEngine {
 	public static GBEngine loadEngine(String root)
 	{
 		GBEngine res = new GBEngine(root);
-		File groupList = new File(root + "/" + GBGroupListXML.STORAGE_NAME);
+		res.loadGroups();
+		return res;
+	}
+	
+	public void loadGroups()
+	{
+		//File groupList = new File(dataFolder + "/" + GBGroupListXML.STORAGE_NAME);
+		File groupList = Paths.get(dataFolder, GBGroupListXML.STORAGE_NAME).toFile();
 		if (!groupList.exists())
 		{
-		res.testSet();
+		this.testSet();
 		}
 		else if (!groupList.isFile())
 		{
@@ -43,11 +54,11 @@ public class GBEngine {
 		{
 			try(InputStream ioGroupList = new FileInputStream(groupList))
 			{
-				GBGroupListXML xml = res.xmliser.fromXML(GBGroupListXML.class, ioGroupList);
+				GBGroupListXML xml = this.xmliser.fromXML(GBGroupListXML.class, ioGroupList);
 				ioGroupList.close();
 				
-				xml.toEngine(res);
-				res.calculateAll();
+				xml.toEngine(this);
+				this.calculateAll();
 				
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
@@ -60,12 +71,11 @@ public class GBEngine {
 			{
 			}
 		}
-		return res;
 	}
 	
-	public void save()
+	public void saveGroups()
 	{
-		File groupList = new File(dataFolder + "/" + GBGroupListXML.STORAGE_NAME);
+		File groupList = Paths.get(dataFolder,  GBGroupListXML.STORAGE_NAME).toFile();
 		if (groupList.exists() && !groupList.isFile())
 		{
 			throw new IllegalArgumentException("Failed to save engine, this is not a file: " + groupList.getAbsolutePath());
@@ -89,6 +99,159 @@ public class GBEngine {
 		}
 	}
 	
+	/** 
+	 * for now, we'll load all bills at once and worry later.
+	 */
+	public void loadBills()
+	{
+		String errName = dataFolder;
+		try
+		{
+			this.bills.clear();
+		File billList = Paths.get(dataFolder, GBBillXML.STORAGE_FOLDER).toFile();
+		if (!billList.exists())
+		{
+		this.testSet();
+		}
+		else if (!billList.isDirectory())
+		{
+			throw new IllegalArgumentException("Failed to load bills, this is not a directory: " + billList.getAbsolutePath());
+		}
+		else
+		{
+			errName = billList.getAbsolutePath();
+			for (File billFile : billList.listFiles((d, s) -> (s.toLowerCase().matches("^\\d+\\.xml"))))
+			{
+				errName = billFile.getAbsolutePath();
+				
+				try(InputStream ioBill = new FileInputStream(billFile))
+				{
+					GBBillXML xml = this.xmliser.fromXML(GBBillXML.class, ioBill);
+					ioBill.close();
+					
+					GBBill bill = xml.toGBBill(this, null);
+					bill.calculateInvAffinities(this);
+					this.bills.put(bill.ID, bill);
+				}
+				finally
+				{
+				}
+			}
+		}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to load bill(s) from " + errName, e);
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to load bill(s) from " + errName, e);
+		}		
+	}
+
+	public GBBill loadBill(int billID)
+	{
+		File billFile = Paths.get(dataFolder, GBBillXML.STORAGE_FOLDER, billID + ".xml").toFile();
+		if (!billFile.exists() || !billFile.isFile())
+		{
+			return null;
+		}
+		else
+		{
+			try(InputStream ioBill = new FileInputStream(billFile))
+			{
+				GBBillXML xml = this.xmliser.fromXML(GBBillXML.class, ioBill);
+				ioBill.close();
+				
+				GBBill bill = xml.toGBBill(this, null);
+				bill.calculateInvAffinities(this);
+				//this.bills.put(bill.ID, bill);
+				return bill;
+				
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load bill from " + billFile.getAbsolutePath(), e);
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load bill from " + billFile.getAbsolutePath(), e);
+			}
+		}
+	}
+
+	public GBBill getBill(Integer billID, boolean forceReload)
+	{
+		if (billID == null) return null;
+		
+		GBBill bill = bills.getOrDefault(billID, null);
+		if (bill == null || forceReload)
+		{
+			bill = loadBill(billID.intValue());
+			if (bill == null)
+			{
+				bills.remove(billID);
+			}
+			else
+			{
+				bills.put(billID, bill);
+			}
+		}
+		return bill;
+	}
+	
+	public int getNewBillID(boolean createFile) {
+		
+		int newID = Utils.NVL(Utils.Max(this.bills.keys()), 0);
+		File f = Paths.get(dataFolder, GBBillXML.STORAGE_FOLDER).toFile();
+		if (!f.exists() || !f.isDirectory()) return newID;
+		
+		try
+		{
+		do
+		{
+			newID++;
+			f = Paths.get(dataFolder, GBBillXML.STORAGE_FOLDER, newID + ".xml").toFile();
+		}
+		while ((createFile && !f.createNewFile())
+				|| (!createFile && f.exists())
+		);
+		}
+		catch (IOException x)
+		{
+			throw new IllegalArgumentException("Failed to check for file " + f);
+		}
+		return newID;
+	}
+	
+	public void saveBill(GBBill bill) {
+		if (bill == null) return;
+		
+		if (bill.ID == null)
+		{
+			bill.ID = this.getNewBillID(true);
+		}
+		GBBillXML xml = new GBBillXML();
+		xml.fromGBBill(this, bill);
+		
+		File billFolder = Paths.get(dataFolder, GBBillXML.STORAGE_FOLDER).toFile();
+		if (!billFolder.exists())
+		{
+			billFolder.mkdirs();
+		}
+		File billFile = Paths.get(dataFolder, GBBillXML.STORAGE_FOLDER, xml.ID + ".xml").toFile();
+		try(FileOutputStream ioBill = new FileOutputStream(billFile))
+		{
+			xmliser.toXML(ioBill, xml);
+			ioBill.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save engine, this is not a file: " + billFile.getAbsolutePath(), e);
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save engine to " + billFile.getAbsolutePath(), e);
+		}
+		finally
+		{
+		}
+		
+	}
 	public int getSize()
 	{
 		if (groups == null) return 0;
@@ -238,6 +401,17 @@ public class GBEngine {
 	}
 	public Double calculateAffinity(GBGroup forGroup, int toGroup)
 	{
+		if (forGroup.ID == toGroup) return 1.;
+		
+		Double[] listFrom = this.getAffinitesFor(forGroup.ID);
+		Double[] listTo = this.getAffinitesTo(toGroup);
+		listFrom[forGroup.ID] = null; // exclude the "self" link
+		
+		return GBAffinity.calculateAffinity(listFrom, listTo);
+	}	
+	
+	public Double calculateAffinityOld(GBGroup forGroup, int toGroup)
+	{
 		double nom = 0;
 		double denom = 0;
 		for (GBAffinity aff : forGroup.getAffinities(true))
@@ -289,11 +463,11 @@ public class GBEngine {
 		Double[] res = new Double[groups.length];
 		for (GBGroup g : groups)
 		{
-		GBAffinity aff = g.getAffinity(toID);
-		if (aff != null && aff.quality() != GBAffinity.QualityEnum.NONE)
-		{
-			res[g.ID] = aff.value();
-		}	
+			GBAffinity aff = g.getAffinity(toID);
+			if (aff != null && aff.quality() != GBAffinity.QualityEnum.NONE)
+			{
+				res[g.ID] = aff.value();
+			}	
 		}
 		return res;
 	}

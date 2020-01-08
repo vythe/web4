@@ -1,5 +1,6 @@
 package net.vbelev.web4.utils;
 
+import java.util.*;
 import java.nio.charset.Charset;
 
 //import com.sun.media.jfxmedia.track.Track.Encoding;
@@ -116,5 +117,38 @@ public class Utils
 	        }	       
 	    }
 	    return out.toString();
+	}
+	
+	public static String formatDate(Date d)
+	{
+		if (d == null) return "";
+		return String.format("%td/%tm/%tY", d, d, d);		
+	}
+	
+	public static String formatDateTime(Date d)
+	{
+		if (d == null) return "";
+		return String.format("%td/%tm/%tY %tH %tM %tS", d, d, d, d, d, d);		
+	}
+	
+	public static <T extends Comparable<T>>T Max(Enumeration<T> vals)
+	{
+		T res = null;
+		if (vals == null || !vals.hasMoreElements()) return null;
+		
+		while (res == null && vals.hasMoreElements())
+		{
+			res = vals.nextElement();
+		}
+		while (vals.hasMoreElements())
+		{
+			T r2 = vals.nextElement();
+			if (r2 == null) continue;
+			if (res.compareTo(r2) < 0)
+			{
+				res = r2;
+			}
+		}
+		return res;
 	}
 }

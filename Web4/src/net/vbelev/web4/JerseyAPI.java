@@ -31,6 +31,7 @@ public class JerseyAPI
 		/** this might not be saved at all, a new user */
 		public WebUser user;
 		public GBProfile currentProfile;
+		public GBBill currentBill;
 		public final List<String> messages = new ArrayList<String>();
 	}
 
@@ -258,11 +259,113 @@ public class JerseyAPI
 		}
 		engine.calculateAll();
 		
-		engine.save();
+		engine.saveGroups();
 		
 		aff = engine.getAffinity(g, g2.ID, false);
 		
 		GetAffinity res = new GetAffinity(aff, engine);
 		return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
+	}
+	
+	public static class GetBill
+	{
+		public Integer ID;
+		public String title;
+		public String description;
+		public String status;
+		public Date publishedDate;
+		public String profileSay;
+		public Date profileSayDate;
+		
+	}
+
+	@Path("/get_bill")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public Response getBill(@QueryParam("billID") Integer billID)
+	{
+		GBBill bill = null;
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		if (billID == null)
+		{
+			if (session.currentBill == null)
+			{
+				session.currentBill = new GBBill();
+			}
+			bill = session.currentBill; 
+		}
+		else
+		{
+			bill = engine.getBill(billID.intValue(), false);
+		}
+		if (bill == null)
+		{
+			return Response.status(500, "Invalid billID: " + billID)
+				.header("Access-Control-Allow-Origin", "*").build()
+			;
+		}
+		else
+		{
+			GetBill res = new GetBill();
+			
+			/*
+			 * 		public Integer ID;
+		public String title;
+		public String description;
+		public String status;
+		public Date publishedDate;
+		public String profileVote;
+		public Date profileVoteDate;
+			 */
+			res.ID = bill.ID;
+			res.title = bill.title;
+			res.description = bill.description;
+			/*
+			switch (bill.status)
+			{
+			case NEW: res.status = "(Not saved)"; break;
+			case PUBLISHED: res.status = "Published"; break;
+			default: 	res.status = bill.status.name(); break;
+			}
+			*/
+			res.status = bill.status.name();
+			res.publishedDate = bill.publishedDate;
+			
+			GBVote vote = null;
+			//Integer 
+			if (session.currentProfile != null && bill.ID != null)
+			{
+				vote = session.currentProfile.votes.stream()
+				.filter(q -> q.billID == billID)
+				.findFirst()
+				.orElse(null);
+			}
+			
+			if (vote != null)
+			{
+				res.profileSay = vote.say.name();
+				res.profileSayDate = vote.sayDate;
+			}
+			return Response.ok(res)
+				.header("Access-Control-Allow-Origin", "*").build()
+			;
+		}
+	}
+	@Path("/test_bill")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public Response testBill()
+	{
+		GBEngine engine = this.getGBEngine(); 
+		//Web4Session session = getWeb4Session();
+		GBBill bill = new GBBill();
+		bill.publishedDate = new Date();
+		bill.title = "Test " + Utils.formatDateTime(bill.publishedDate);
+		bill.description = "Description of " + bill.title;
+		bill.status = GBBill.StatusEnum.PUBLISHED;
+		engine.saveBill(bill);
+		
+		return getBill(bill.ID);
 	}
 }

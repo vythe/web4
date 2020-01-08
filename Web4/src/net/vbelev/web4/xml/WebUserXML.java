@@ -8,6 +8,8 @@ import net.vbelev.web4.utils.*;
 
 @XmlRootElement(name = "web_user")
 public class WebUserXML {
+	/** users are stored in individual files as [ID].xml */
+	public static final String STORAGE_FOLDER = "web_users"; 
 
 	@XmlAttribute
 	public int ID;
