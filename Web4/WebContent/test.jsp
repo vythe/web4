@@ -14,10 +14,12 @@ double val = 0;
 for (int i = 0; i < 20; i++) {
 	String si = ("0" + i);
 	si = si.substring(si.length() - 2);
-	out.write(si + ": " + val + "<br/>");
-	val = GBProfile.calculateStep(val, 1);
+	double newVal = GBProfile.calculateStep(val, 0.1);
+	out.write(si + ": " + val + " by  " + (newVal - val) + "<br/>");
+	val = newVal;
 }
 %>
+<%--
 <h2>Up2</h2>
 <%
 double val2 = 0;
@@ -28,13 +30,15 @@ for (int i = 0; i < 40; i++) {
 	val2 = GBProfile.calculateStep(val2, 0.5);
 }
 %>
+--%>
 <h2>Down</h2>
 <%
 for (int i = 19; i >= 0; i--) {
 	String si = ("0" + i);
 	si = si.substring(si.length() - 2);
-	out.write(si + ": " + val + "<br/>");
-	val = GBProfile.calculateStep(val, -0.5);
+	double newVal = GBProfile.calculateStep(val, -0.1);
+	out.write(si + ": " + val + " by " + (newVal - val) + "<br/>");
+	val = newVal;
 }
 %>
 </body>

@@ -142,14 +142,14 @@ public class GBBill
 				
 				Double[] listFrom = engine.getAffinitesFor(i);
 				Double newValue = GBAffinity.calculateAffinity(listFrom, listTo);
-				if (newValue != null && (aff == null || aff.quality() == GBAffinity.QualityEnum.NONE || aff.value() != newValue))
+				if (newValue != null && (aff == null || aff.quality() == GBAffinity.QualityEnum.NONE || Math.abs(aff.value() - newValue) > 0.01))
 				{
 					gotChanges = true;
 					this.setInvAffinity(i,  newValue, GBAffinity.QualityEnum.CALCULATED);
 				}
 			}	
 		}
-		while (gotChanges || repeatCount < size);
+		while (gotChanges && repeatCount < size);
 
 	}
 

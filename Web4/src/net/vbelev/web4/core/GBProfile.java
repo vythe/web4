@@ -72,8 +72,8 @@ public class GBProfile
 	public double getInvAffinity(int group)
 	{
 		//if (!affinities.containsKey(group)) return null;
-		Double d = invAffinities.getOrDefault(group, null);
-		return Math.round(Utils.NVL(d, 0.).doubleValue() * 1000.) / 1000.;
+		double d = invAffinities.getOrDefault(group, 0.);
+		return Math.round(d * 1000.) / 1000.;
 	}
 
 	public double[] getInvAffinityValues(int size)
@@ -122,7 +122,7 @@ public class GBProfile
 		double[] res = new double[groupVals.length];
 		for (int i = 0; i < groupVals.length; i++)
 		{
-			double val = calculateStep(getInvAffinity(i), groupVals[i] * step);	
+			double val = calculateStep(getInvAffinity(i), (groupVals[i] - 0.5) * step);	
 			val = Math.round(val * 1000.) / 1000.;
 			res[i] = val;
 		}

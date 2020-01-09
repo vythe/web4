@@ -21,6 +21,7 @@ public class GBEngine {
 	public final Hashtable<Integer, GBBill> bills = new Hashtable<Integer, GBBill>();
 	
 	public final XMLiser xmliser;
+	public final Random random = new Random();
 	
 	private GBEngine(String root)
 	{

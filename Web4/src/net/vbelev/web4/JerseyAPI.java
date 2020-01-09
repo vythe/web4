@@ -273,10 +273,50 @@ public class JerseyAPI
 		public String title;
 		public String description;
 		public String status;
-		public Date publishedDate;
+		public String publishedDate;
 		public String profileSay;
 		public Date profileSayDate;
+		public List<GetAffinity> invAffinities;
 		
+		public void fromGBBill(GBBill bill, GBEngine engine, Collection<GBVote> votes)
+		{
+			this.ID = bill.ID;
+			this.title = bill.title;
+			this.description = bill.description;
+			/*
+			switch (bill.status)
+			{
+			case NEW: this.status = "(Not saved)"; break;
+			case PUBLISHED: this.status = "Published"; break;
+			default: 	this.status = bill.status.name(); break;
+			}
+			*/
+			this.status = bill.status.name();
+			this.publishedDate = Utils.formatDateTime(bill.publishedDate);
+			this.invAffinities = new ArrayList<GetAffinity>();
+			
+			for (int ind = 0; ind < engine.getSize(); ind++)
+			{
+				GBAffinity aff = bill.getInvAffinity(ind);
+				GetAffinity gaf = new GetAffinity(aff, engine);
+				this.invAffinities.add(gaf);
+			}
+			if (votes != null && bill.ID != null)
+			{
+				
+				GBVote vote = votes.stream()
+					.filter(q -> q.billID == bill.ID)
+					.findFirst()
+					.orElse(null)
+				;
+				
+				if (vote != null)
+				{
+					this.profileSay = vote.say.name();
+					this.profileSayDate = vote.sayDate;
+				}
+			}
+		}
 	}
 
 	@Path("/get_bill")	
@@ -308,50 +348,57 @@ public class JerseyAPI
 		else
 		{
 			GetBill res = new GetBill();
-			
-			/*
-			 * 		public Integer ID;
-		public String title;
-		public String description;
-		public String status;
-		public Date publishedDate;
-		public String profileVote;
-		public Date profileVoteDate;
-			 */
-			res.ID = bill.ID;
-			res.title = bill.title;
-			res.description = bill.description;
-			/*
-			switch (bill.status)
-			{
-			case NEW: res.status = "(Not saved)"; break;
-			case PUBLISHED: res.status = "Published"; break;
-			default: 	res.status = bill.status.name(); break;
-			}
-			*/
-			res.status = bill.status.name();
-			res.publishedDate = bill.publishedDate;
-			
-			GBVote vote = null;
-			//Integer 
-			if (session.currentProfile != null && bill.ID != null)
-			{
-				vote = session.currentProfile.votes.stream()
-				.filter(q -> q.billID == billID)
-				.findFirst()
-				.orElse(null);
-			}
-			
-			if (vote != null)
-			{
-				res.profileSay = vote.say.name();
-				res.profileSayDate = vote.sayDate;
-			}
+			res.fromGBBill(bill, engine, session.currentProfile.votes);
 			return Response.ok(res)
 				.header("Access-Control-Allow-Origin", "*").build()
 			;
 		}
 	}
+
+	@Path("/get_bills")	
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	public Response getBills()
+	{
+		ArrayList<GetBill> res = new ArrayList<GetBill>();
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		GBProfile profile = session.currentProfile;
+		if (profile == null)
+		{
+			profile = new GBProfile();
+		}
+		GBBill[] bills = engine.bills.values().stream()
+				.filter(q -> q.status == GBBill.StatusEnum.PUBLISHED)
+				.toArray(GBBill[]::new)
+		;
+		Arrays.sort(bills, new Comparator<GBBill>() {
+
+			@Override
+			public int compare(GBBill b1, GBBill b2)
+			{
+				if (b1 == null && b2 == null) return 0;
+				else if (b1 == null) return -1;
+				else if (b2 == null) return 1;
+				else if (b1.publishedDate == null && b2.publishedDate == null) return 0;
+				else if (b1.publishedDate == null) return -1;
+				else if (b2.publishedDate == null) return 1;
+				else return b2.publishedDate.compareTo(b2.publishedDate);
+			}
+		});
+		
+		for (GBBill bill : bills)
+		{
+			GetBill g = new GetBill();
+			g.fromGBBill(bill, engine, profile.votes);
+			res.add(g);
+		}
+		return Response.ok(res)
+				.header("Access-Control-Allow-Origin", "*").build()
+			;
+		
+	}
+
 	@Path("/test_bill")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -364,8 +411,99 @@ public class JerseyAPI
 		bill.title = "Test " + Utils.formatDateTime(bill.publishedDate);
 		bill.description = "Description of " + bill.title;
 		bill.status = GBBill.StatusEnum.PUBLISHED;
+		
+		// give it two affinities
+		bill.setInvAffinity(engine.random.nextInt(engine.getSize()), Math.random());
+		bill.setInvAffinity(engine.random.nextInt(engine.getSize()), Math.random());
+		bill.calculateInvAffinities(engine);
+		
 		engine.saveBill(bill);
 		
 		return getBill(bill.ID);
 	}
+	
+	public static class GetProfile
+	{
+		public Integer ID;
+		public String name;
+		public String saveDate;
+		
+		public List<GetAffinity> invAffinities;
+		
+		public GetProfile()
+		{
+		}
+		
+		public void fromGBProfile(GBProfile profile, GBEngine engine)
+		{
+			this.ID = profile.ID;
+			this.name = profile.name;
+			this.saveDate = Utils.formatDateTime(profile.saveDate);
+			this.invAffinities = new ArrayList<GetAffinity>();
+			
+			for (int ind = 0; ind < engine.getSize(); ind++)
+			{
+				GBAffinity aff = new GBAffinity(ind, profile.getInvAffinity(ind));
+				GetAffinity gaf = new GetAffinity(aff, engine);
+				this.invAffinities.add(gaf);
+			}
+		}
+	}
+	
+	/**
+	 * Always returns the current (session) profile. If the profileID is not null,
+	 * then loads the profile as current and then returns it.
+	 * @param profileID
+	 * @return
+	 */
+	@Path("/get_profile")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	Response getProfile(Integer profileID)
+	{
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		GBProfile profile = null;
+		if (profileID == null)
+		{
+			profile = session.currentProfile;
+		}
+		else
+		{
+			profile = engine.loadProfile(profileID);
+			if (profile == null)
+			{
+				return Response.status(500, "Invalid profileID: " + profileID)
+						.header("Access-Control-Allow-Origin", "*").build()
+					;
+			}
+			session.currentProfile = profile;
+		}
+		GetProfile res = new GetProfile();
+		res.fromGBProfile(profile, engine);
+		
+		return Response.ok(res)
+				.header("Access-Control-Allow-Origin", "*").build()
+			;
+	}
+
+	@Path("/save_profile")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public Response saveProfile()
+	{
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		GBProfile profile = session.currentProfile;
+		engine.saveProfile(profile);
+		
+		GetProfile res = new GetProfile();
+		res.fromGBProfile(profile, engine);
+		
+		return Response.ok(res)
+				.header("Access-Control-Allow-Origin", "*").build()
+			;	
+	}
+	
+	
 }
