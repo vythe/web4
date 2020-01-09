@@ -18,7 +18,7 @@ public class WebUser
 	}
 	
 	
-	public int ID;
+	public Integer ID;
 	public String name;
 	public String login;
 	public String password;

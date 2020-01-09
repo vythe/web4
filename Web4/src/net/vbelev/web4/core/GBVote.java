@@ -21,4 +21,15 @@ public class GBVote {
 	public int billID;
 	public SayEnum say;
 	public Date sayDate;
+	
+	public GBVote()
+	{
+	}
+	
+	public GBVote(GBVote from)
+	{
+		this.billID = from.billID;
+		this.say = from.say;
+		this.sayDate = from.sayDate;
+	}
 }

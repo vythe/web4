@@ -2,9 +2,9 @@ package net.vbelev.web4.core;
 
 import java.util.*;
 import java.io.*;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import net.vbelev.web4.ui.WebUser;
 import net.vbelev.web4.utils.*;
 import net.vbelev.web4.xml.*;
 
@@ -501,9 +501,11 @@ public class GBEngine {
 		
 		return aff;
 	}
-	public GBProfile loadProfile(int ProfileID)
+
+	//==== GBProfile storage ====
+	public GBProfile loadProfile(int profileID)
 	{
-		File ProfileFile = Paths.get(dataFolder, GBProfileXML.STORAGE_FOLDER, ProfileID + ".xml").toFile();
+		File ProfileFile = Paths.get(dataFolder, GBProfileXML.STORAGE_FOLDER, profileID + ".xml").toFile();
 		if (!ProfileFile.exists() || !ProfileFile.isFile())
 		{
 			return null;
@@ -599,7 +601,110 @@ public class GBEngine {
 		}
 		finally
 		{
+		}		
+	}
+	
+	//==== WebUser storage ====
+	public WebUser loadWebUser(int webUserID)
+	{
+		File webUserFile = Paths.get(dataFolder, WebUserXML.STORAGE_FOLDER, webUserID + ".xml").toFile();
+		if (!webUserFile.exists() || !webUserFile.isFile())
+		{
+			return null;
+		}
+		else
+		{
+			try(InputStream ioWebUser = new FileInputStream(webUserFile))
+			{
+				WebUserXML xml = this.xmliser.fromXML(WebUserXML.class, ioWebUser);
+				ioWebUser.close();
+				
+				WebUser webUser = xml.toWebUser(null);
+				return webUser;
+				
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load WebUser from " + webUserFile.getAbsolutePath(), e);
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load WebUser from " + webUserFile.getAbsolutePath(), e);
+			}
+		}
+	}
+
+	public WebUser getWebUser(Integer webUserID)
+	{
+		if (webUserID == null) return null;
+		
+		WebUser webUser = loadWebUser(webUserID.intValue());
+		return webUser;
+	}
+	
+	public int getNewWebUserID(boolean createFile) {
+		
+		int maxID = 0;
+		File webUserFolder = Paths.get(dataFolder, WebUserXML.STORAGE_FOLDER).toFile();
+		if (!webUserFolder.exists() || !webUserFolder.isDirectory()) return maxID + 1;
+		
+		java.util.regex.Pattern p = java.util.regex.Pattern.compile("^(\\d+).xml$");
+		for (File f : webUserFolder.listFiles())
+		{
+			java.util.regex.Matcher pm = p.matcher(f.getName().toLowerCase());
+			if (pm.matches())
+			{
+				Integer fileID = Utils.tryParseInt(pm.group(1));
+				if (fileID != null && fileID > maxID)
+				{
+					maxID = fileID.intValue();
+				}
+			}									
+		}
+		if (createFile)
+		{
+			File newFile = Paths.get(dataFolder, WebUserXML.STORAGE_FOLDER, (maxID + 1) + ".xml").toFile();
+			try
+			{
+				newFile.createNewFile();
+			}
+			catch (IOException x)
+			{
+				throw new IllegalArgumentException("Failed to create web user file: " + newFile.getAbsolutePath(), x);
+			}
+		}
+		return maxID + 1;
+	}
+	
+	public void saveWebUser(WebUser webUser) {
+		if (webUser == null) return;
+		
+		if (webUser.ID == null)
+		{
+			webUser.ID = this.getNewProfileID(true);
+		}
+		WebUserXML xml = new WebUserXML();
+		xml.fromWebUser(webUser);
+		
+		File webUserFolder = Paths.get(dataFolder, WebUserXML.STORAGE_FOLDER).toFile();
+		if (!webUserFolder.exists())
+		{
+			webUserFolder.mkdirs();
+		}
+		File webUserFile = Paths.get(dataFolder, WebUserXML.STORAGE_FOLDER, xml.ID + ".xml").toFile();
+		try(FileOutputStream ioWebUser = new FileOutputStream(webUserFile))
+		{
+			xmliser.toXML(ioWebUser, xml);
+			ioWebUser.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save profile, this is not a file: " + webUserFile.getAbsolutePath(), e);
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save profile to " + webUserFile.getAbsolutePath(), e);
+		}
+		finally
+		{
 		}
 		
 	}
+	
 }
