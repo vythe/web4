@@ -6,9 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import net.vbelev.web4.utils.*;
-import net.vbelev.web4.xml.GBBillXML;
-import net.vbelev.web4.xml.GBGroupListXML;
-import net.vbelev.web4.xml.WebUserXML;
+import net.vbelev.web4.xml.*;
 
 /**
  * A coherent storage for profiles and groups
@@ -27,7 +25,11 @@ public class GBEngine {
 	private GBEngine(String root)
 	{
 		//xmliser = new XMLiser("net.vbelev.web4.xml");
-		xmliser = new XMLiser(GBGroupListXML.class, WebUserXML.class);
+		xmliser = new XMLiser(
+				GBGroupListXML.class, 
+				GBBillXML.class, 
+				GBProfileXML.class, 
+				WebUserXML.class);
 		dataFolder = root;
 	}
 	
@@ -200,7 +202,7 @@ public class GBEngine {
 		
 		int newID = Utils.NVL(Utils.Max(this.bills.keys()), 0);
 		File f = Paths.get(dataFolder, GBBillXML.STORAGE_FOLDER).toFile();
-		if (!f.exists() || !f.isDirectory()) return newID;
+		if (!f.exists() || !f.isDirectory()) return newID + 1;
 		
 		try
 		{
@@ -499,13 +501,105 @@ public class GBEngine {
 		
 		return aff;
 	}
-	
-	public GBProfile getProfile(int id)
+	public GBProfile loadProfile(int ProfileID)
 	{
-		GBProfile res = new GBProfile();
-		res.ID = id;
-		res.name = "profile#" + id;
+		File ProfileFile = Paths.get(dataFolder, GBProfileXML.STORAGE_FOLDER, ProfileID + ".xml").toFile();
+		if (!ProfileFile.exists() || !ProfileFile.isFile())
+		{
+			return null;
+		}
+		else
+		{
+			try(InputStream ioProfile = new FileInputStream(ProfileFile))
+			{
+				GBProfileXML xml = this.xmliser.fromXML(GBProfileXML.class, ioProfile);
+				ioProfile.close();
+				
+				GBProfile profile = xml.toGBProfile(this, null);
+				return profile;
+				
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load Profile from " + ProfileFile.getAbsolutePath(), e);
+			} catch (IOException e) {
+				e.printStackTrace();
+				throw new IllegalArgumentException("Failed to load Profile from " + ProfileFile.getAbsolutePath(), e);
+			}
+		}
+	}
 
-		return res;
+	public GBProfile getProfile(Integer profileID)
+	{
+		if (profileID == null) return null;
+		
+		GBProfile profile = loadProfile(profileID.intValue());
+		return profile;
+	}
+	
+	public int getNewProfileID(boolean createFile) {
+		
+		int maxID = 0;
+		File profileFolder = Paths.get(dataFolder, GBProfileXML.STORAGE_FOLDER).toFile();
+		if (!profileFolder.exists() || !profileFolder.isDirectory()) return maxID + 1;
+		
+		java.util.regex.Pattern p = java.util.regex.Pattern.compile("^(\\d+).xml$");
+		for (File f : profileFolder.listFiles())
+		{
+			java.util.regex.Matcher pm = p.matcher(f.getName().toLowerCase());
+			if (pm.matches())
+			{
+				Integer fileID = Utils.tryParseInt(pm.group(1));
+				if (fileID != null && fileID > maxID)
+				{
+					maxID = fileID.intValue();
+				}
+			}									
+		}
+		if (createFile)
+		{
+			File newFile = Paths.get(dataFolder, GBProfileXML.STORAGE_FOLDER, (maxID + 1) + ".xml").toFile();
+			try
+			{
+				newFile.createNewFile();
+			}
+			catch (IOException x)
+			{
+				throw new IllegalArgumentException("Failed to create profile file: " + newFile.getAbsolutePath(), x);
+			}
+		}
+		return maxID + 1;
+	}
+	
+	public void saveProfile(GBProfile profile) {
+		if (profile == null) return;
+		
+		if (profile.ID == null)
+		{
+			profile.ID = this.getNewProfileID(true);
+		}
+		GBProfileXML xml = new GBProfileXML();
+		xml.fromGBProfile(this, profile);
+		
+		File profileFolder = Paths.get(dataFolder, GBProfileXML.STORAGE_FOLDER).toFile();
+		if (!profileFolder.exists())
+		{
+			profileFolder.mkdirs();
+		}
+		File ProfileFile = Paths.get(dataFolder, GBProfileXML.STORAGE_FOLDER, xml.ID + ".xml").toFile();
+		try(FileOutputStream ioProfile = new FileOutputStream(ProfileFile))
+		{
+			xmliser.toXML(ioProfile, xml);
+			ioProfile.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save profile, this is not a file: " + ProfileFile.getAbsolutePath(), e);
+		} catch (IOException e) {
+			e.printStackTrace();
+			throw new IllegalArgumentException("Failed to save profile to " + ProfileFile.getAbsolutePath(), e);
+		}
+		finally
+		{
+		}
+		
 	}
 }

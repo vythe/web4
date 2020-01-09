@@ -57,10 +57,13 @@ public class GBBillXML {
 		bill.status = Utils.tryParseEnum(this.status,  GBBill.StatusEnum.PUBLISHED);
 				
 		bill.invAffinities.clear();
+		if (this.invAffinities != null)
+		{
 		for (GBAffinityXML ax : this.invAffinities)
 		{
 			GBAffinity aff = ax.toGBAffinity(engine);
 			bill.invAffinities.put(aff.toID(), aff);
+		}
 		}
 		return bill;
 	}

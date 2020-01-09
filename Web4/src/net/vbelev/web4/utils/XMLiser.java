@@ -107,7 +107,7 @@ public class XMLiser
 	protected static final CharsetDecoder XMLiserCharsetDecoder = XMLiserCharset.newDecoder();
 	protected static final CharsetEncoder XMLiserCharsetEncoder = XMLiserCharset.newEncoder();
 	
-	public final Class[] Classes;
+	public final Class<?>[] Classes;
 	public final JAXBContext Context;
 	protected Marshaller contextMarshaller;
 	protected Unmarshaller contextUnmarshaller;
@@ -165,13 +165,13 @@ public class XMLiser
 		}
 	}
 	
-	public XMLiser(Class... classesToBeBound)
+	public XMLiser(Class<?>... classesToBeBound)
 	{
 		try
 		{
-			ArrayList<Class> classes = new ArrayList<Class>(classesToBeBound.length + 1);
+			ArrayList<Class<?>> classes = new ArrayList<Class<?>>(classesToBeBound.length + 1);
 			classes.add(ObjectWrapper.class);
-			for (Class c : classesToBeBound)
+			for (Class<?> c : classesToBeBound)
 			{
 				classes.add(c);
 			}
@@ -187,9 +187,9 @@ public class XMLiser
 		}
 	}
 
-	public static List<Class> getAllClasses(ClassLoader cc, String packageName)
+	public static List<Class<?>> getAllClasses(ClassLoader cc, String packageName)
 	{
-		ArrayList<Class> res = new ArrayList<Class>();
+		ArrayList<Class<?>> res = new ArrayList<Class<?>>();
 		try
 		{
 			if (cc == null)
@@ -233,12 +233,12 @@ public class XMLiser
 			contextUnmarshaller = Context.createUnmarshaller();
 			
 			//this.getClass().getClassLoader().
-			List<Class> allClasses = new ArrayList<Class>();
+			List<Class<?>> allClasses = new ArrayList<Class<?>>();
 			for (String p : packagesToBeBound)
 			{
 				allClasses.addAll(XMLiser.getAllClasses(null, p));
 			}
-			Classes = (Class[])allClasses.toArray();
+			Classes = (Class<?>[])allClasses.toArray();
 		}
 		catch  (Exception x)
 		{
@@ -260,7 +260,7 @@ public class XMLiser
 				*/
 			}
 			
-			for (Class c : Classes)
+			for (Class<?> c : Classes)
 			{
 				if (c.isInstance(o))
 				{
@@ -328,7 +328,7 @@ public class XMLiser
 
 			StreamSource ss = new StreamSource( xml);
 		
-			for (Class c : Classes)
+			for (Class<?> c : Classes)
 			{
 				if (elementClass.isAssignableFrom(c))
 				{

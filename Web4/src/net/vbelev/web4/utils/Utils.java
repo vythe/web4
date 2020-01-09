@@ -1,7 +1,7 @@
 package net.vbelev.web4.utils;
 
 import java.util.*;
-import java.nio.charset.Charset;
+//import java.nio.charset.Charset;
 
 //import com.sun.media.jfxmedia.track.Track.Encoding;
 
@@ -128,7 +128,7 @@ public class Utils
 	public static String formatDateTime(Date d)
 	{
 		if (d == null) return "";
-		return String.format("%td/%tm/%tY %tH %tM %tS", d, d, d, d, d, d);		
+		return String.format("%td/%tm/%tY %tH:%tM:%tS", d, d, d, d, d, d);		
 	}
 	
 	public static <T extends Comparable<T>>T Max(Enumeration<T> vals)

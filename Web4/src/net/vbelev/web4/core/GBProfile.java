@@ -14,8 +14,10 @@ public class GBProfile
 	/**
 	 * note that profile IDs are primary keys, they are not mapped to anything
 	 */
-	public int ID;
+	public Integer ID;
 	public String name;
+	public Date saveDate;
+
 	/** this is "reverse" affinities. 
 	 * invAffinties[groupA] = 0.3 means "30% of groupA members approve of me". 
 	 * Affinities only store the FORCED values, so they are bare numbers.
@@ -38,4 +40,6 @@ public class GBProfile
 		//if (!affinities.containsKey(group)) return null;
 		return invAffinities.getOrDefault(group, null);
 	}
+
+
 }
