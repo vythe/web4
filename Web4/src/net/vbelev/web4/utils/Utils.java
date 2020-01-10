@@ -49,6 +49,13 @@ public class Utils
 		return null;
 	}
 	
+	public static <T>boolean equals(T t1, T t2)
+	{
+		if (t1 == null && t2 == null) return true;
+		else if (t1 == null || t2 == null) return false;
+		else return t1.equals(t2);
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static <T>T AsClass(Object o, Class<T> c)
 	{

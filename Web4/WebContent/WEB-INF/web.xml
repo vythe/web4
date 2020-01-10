@@ -29,8 +29,17 @@
     <servlet-name>JerseyAPI</servlet-name>
     <url-pattern>/api/*</url-pattern>
   </servlet-mapping>
+  <filter>
+  	<filter-name>JerseyCorsFilter</filter-name>
+  	<filter-class>net.vbelev.web4.JerseyCorsFilter</filter-class>
+  </filter>
+  <filter-mapping>
+  	<filter-name>JerseyCorsFilter</filter-name>
+  	<servlet-name>JerseyAPI</servlet-name>
+    <url-pattern>/api/*</url-pattern>
+  </filter-mapping>
   <context-param>
     	<param-name>dataFolder</param-name>
-    	<param-value>E:\Vythe\Coding\Java\OxyData\SimpleJax</param-value>
+    	<param-value>/media/drive_d/Lubuntu_Vythe/other/gbdata</param-value>
   </context-param>
 </web-app>

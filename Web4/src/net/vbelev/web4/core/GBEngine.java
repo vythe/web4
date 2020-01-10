@@ -23,6 +23,10 @@ public class GBEngine {
 	public final XMLiser xmliser;
 	public final Random random = new Random();
 	
+	public static final java.util.regex.Pattern xmlIdPattern = java.util.regex.Pattern.compile("^(\\d+).xml$");
+	public static final java.util.regex.Pattern webUserLoginPattern = 
+			java.util.regex.Pattern.compile("^[a-z][a-z\\d_]+$");
+	
 	private GBEngine(String root)
 	{
 		//xmliser = new XMLiser("net.vbelev.web4.xml");
@@ -633,6 +637,36 @@ public class GBEngine {
 		}
 	}
 
+	public int loadWebUserIndex(Hashtable<String, Integer> index)
+	{
+		index.clear();
+		
+		File webUserFolder = Paths.get(dataFolder, WebUserXML.STORAGE_FOLDER).toFile();
+		if (!webUserFolder.exists() || !webUserFolder.isDirectory()) return 0;
+		
+		for (File f : webUserFolder.listFiles())
+		{
+			java.util.regex.Matcher pm = xmlIdPattern.matcher(f.getName().toLowerCase());
+			if (f.isFile() && pm.matches())
+			{
+				//Integer fileID = Utils.tryParseInt(pm.group(1));
+				try(InputStream ioWebUser = new FileInputStream(f))
+				{
+					WebUserXML xml = this.xmliser.fromXML(WebUserXML.class, ioWebUser);
+					ioWebUser.close();
+					index.put(Utils.NVL(xml.login, "#" + xml.ID).trim().toLowerCase(), xml.ID);
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+					//throw new IllegalArgumentException("Failed to load WebUser from " + webUserFile.getAbsolutePath(), e);
+				} catch (IOException e) {
+					e.printStackTrace();
+					//throw new IllegalArgumentException("Failed to load WebUser from " + webUserFile.getAbsolutePath(), e);
+				}
+			}									
+		}
+		return index.size();
+	}
+	
 	public WebUser getWebUser(Integer webUserID)
 	{
 		if (webUserID == null) return null;
@@ -647,10 +681,9 @@ public class GBEngine {
 		File webUserFolder = Paths.get(dataFolder, WebUserXML.STORAGE_FOLDER).toFile();
 		if (!webUserFolder.exists() || !webUserFolder.isDirectory()) return maxID + 1;
 		
-		java.util.regex.Pattern p = java.util.regex.Pattern.compile("^(\\d+).xml$");
 		for (File f : webUserFolder.listFiles())
 		{
-			java.util.regex.Matcher pm = p.matcher(f.getName().toLowerCase());
+			java.util.regex.Matcher pm = xmlIdPattern.matcher(f.getName().toLowerCase());
 			if (pm.matches())
 			{
 				Integer fileID = Utils.tryParseInt(pm.group(1));
@@ -680,7 +713,7 @@ public class GBEngine {
 		
 		if (webUser.ID == null)
 		{
-			webUser.ID = this.getNewProfileID(true);
+			webUser.ID = this.getNewWebUserID(true);
 		}
 		WebUserXML xml = new WebUserXML();
 		xml.fromWebUser(webUser);

@@ -8,6 +8,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 import org.glassfish.jersey.media.multipart.*;
 
+import java.io.IOException;
 import java.util.*;
 import net.vbelev.web4.core.*;
 import net.vbelev.web4.ui.*;
@@ -24,7 +25,7 @@ public class JerseyAPI
 	
 	protected static final String SESSION_WEB4_PARAM = "Web4Session";
 	protected static final String CONTEXT_ENGINE_PARAM = "GBEngine";
-
+	
 	public static class Web4Session
 	{
 		
@@ -94,65 +95,144 @@ public class JerseyAPI
 	
 	public static class GetUserModel
 	{
+		public Integer ID;
 		public String name;
 		public String status;
 		public Hashtable<Integer, String> profiles;
+		
+		public void FromWebUser(WebUser user, GBEngine engine)
+		{
+			List<Integer> profiles = new ArrayList<Integer>();
+			synchronized(user)
+			{
+			this.ID = user.ID;
+			this.name = Utils.NVL(user.name, "(Unknown)");
+			this.status = user.status.toString();
+
+			profiles.addAll(user.profiles);
+			}
+			this.profiles = new Hashtable<Integer, String>();
+			//this.profiles.put(null,  "(New Profile)");
+			for (Integer profileID : profiles)
+			{
+				GBProfile f = engine.getProfile(profileID.intValue());
+				this.profiles.put(profileID,  f.name);
+			}
+		}
 	}
 	
 	@Path("/get_user")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-	//public GetUserModel getUserModel()
-	public Response getUserModel()
+	public GetUserModel getUser()
+	//public Response getUser()
 	{
 		GetUserModel res = new GetUserModel();
 		
 		GBEngine engine = getGBEngine();
 		Web4Session session = getWeb4Session();
-		List<Integer> profiles = new ArrayList<Integer>();
-		synchronized(session)
-		{
-			WebUser u = session.user;
-			res.name = Utils.NVL(u.name, "(Unknown)");
-			res.status = u.status.toString();
-			profiles.addAll(u.profiles);
-		}
+		WebUser u = session.user;
+		res.FromWebUser(u, engine);
 		
-		profiles.add(17);
-		profiles.add(18);
-		profiles.add(19);
-		
-		res.profiles = new Hashtable<Integer, String>();
-		for (Integer profileID : profiles)
-		{
-			GBProfile f = engine.getProfile(profileID.intValue());
-			res.profiles.put(profileID,  f.name);
-		}
-		return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
-		//return res;
+		//return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
+		return res;
 	}
 	
 	public class UpdateUserModel
 	{
 		public String name;	
+		public String login;
 	}
 	
 	@Path("/update_user")	
     @POST
     @Produces(MediaType.APPLICATION_JSON)
 	@Consumes(MediaType.APPLICATION_JSON)
-	//public GetUserModel updateUser(UpdateUserModel args)
-	public Response updateUser(UpdateUserModel args)
+	public GetUserModel updateUser(UpdateUserModel args)
+	//public Response updateUser(UpdateUserModel args)
 	{
 		Web4Session session = getWeb4Session();
 		synchronized(session)
 		{
 			WebUser u = session.user;
 			u.name = args.name;
+			u.login = args.login;
 		}
-		return getUserModel();
+		return getUser();
 	}
 
+	@Path("/init_user")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public GetUserModel initUser(@QueryParam("login") String login, @QueryParam("withProfile") String withProfile)
+	{
+		Web4Session session = getWeb4Session();
+		if (session.user.ID != null)
+		{
+			throw new IllegalArgumentException("The current user is already initialized (ID=" + session.user.ID + ")");
+		}
+		login = Utils.NVL(login, session.user.login, "").trim().toLowerCase();
+		if (!GBEngine.webUserLoginPattern.matcher(login).matches())
+		{
+			throw new IllegalArgumentException("The login name is not valid: " + login);
+		}
+		
+		GBEngine engine = this.getGBEngine(); 
+		Hashtable<String, Integer> userIndex = new Hashtable<String, Integer>();
+		engine.loadWebUserIndex(userIndex);
+		
+		if (userIndex.containsKey(login))
+		{
+			throw new IllegalArgumentException("The login name is not available: " + login);
+		}
+		
+		session.user.login = login;
+		session.user.status = WebUser.StatusEnum.ACTIVE;
+		if (Utils.IsEmpty(session.user.name))
+		{
+			session.user.name = login;
+		}
+		engine.saveWebUser(session.user);
+		if (withProfile != null)
+		{
+			engine.saveProfile(session.currentProfile);
+		}
+		GetUserModel res = new GetUserModel();
+		res.FromWebUser(session.user, engine);
+		return res;
+	}
+	
+	@Path("/login")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public GetUserModel loginUser(@QueryParam("login") String login)
+	{
+		Web4Session session = getWeb4Session();
+		if (session.user.ID != null)
+		{
+			throw new IllegalArgumentException("There is a logged-in user " + session.user.name + " already, (ID=" + session.user.ID + ")");
+		}
+		login = Utils.NVL(login, session.user.login, "").trim().toLowerCase();
+		if (!GBEngine.webUserLoginPattern.matcher(login).matches())
+		{
+			throw new IllegalArgumentException("The login name is not valid: " + login);
+		}
+		
+		GBEngine engine = this.getGBEngine(); 
+		Hashtable<String, Integer> userIndex = new Hashtable<String, Integer>();
+		engine.loadWebUserIndex(userIndex);
+		
+		Integer userID = userIndex.getOrDefault(login,  null);
+		if (userID == null)
+		{
+			throw new IllegalArgumentException("The login name is not known: " + login);
+		}
+		
+		session.user = engine.loadWebUser(userID);
+
+		return getUser();
+	}
+	
 	@Path("/http-headers")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -350,7 +430,8 @@ public class JerseyAPI
 			GetBill res = new GetBill();
 			res.fromGBBill(bill, engine, session.currentProfile.votes);
 			return Response.ok(res)
-				.header("Access-Control-Allow-Origin", "*").build()
+				//.header("Access-Control-Allow-Origin", "*")
+				.build()
 			;
 		}
 	}
@@ -451,22 +532,50 @@ public class JerseyAPI
 	}
 	
 	/**
-	 * Always returns the current (session) profile. If the profileID is not null,
-	 * then loads the profile as current and then returns it.
+	 * Always returns the current (session) profile. 
 	 * @param profileID
 	 * @return
 	 */
 	@Path("/get_profile")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-	Response getProfile(Integer profileID)
+	public Response getProfile()
+	{
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		GBProfile profile = session.currentProfile;
+		GetProfile res = new GetProfile();
+		res.fromGBProfile(profile, engine);
+		
+		return Response.ok(res)
+				.header("Access-Control-Allow-Origin", "*").build()
+			;
+	}
+
+	/**
+	 * If the profileID is not null, then loads the profile as current and returns it.
+	 * If the profileID is null, creates a new profile, sets it as current and returns it.
+	 * If force is null and the current profile ID matches profileID, return the current profile.
+	 * If force is not null, abandond the current profile and load/create it again.
+	 * @param profileID
+	 * @return
+	 */
+	@Path("/load_profile")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public Response loadProfile(@QueryParam("profileID") Integer profileID, @QueryParam("force") String force)
 	{
 		GBEngine engine = this.getGBEngine(); 
 		Web4Session session = getWeb4Session();
 		GBProfile profile = null;
-		if (profileID == null)
+		if (force == null && Utils.equals(session.currentProfile.ID, profileID))
 		{
 			profile = session.currentProfile;
+		}
+		else if (profileID == null)
+		{
+			profile = new GBProfile();
+			session.currentProfile = profile;
 		}
 		else
 		{
@@ -487,6 +596,11 @@ public class JerseyAPI
 			;
 	}
 
+	/** saves the current profile. If it's a new profile, assigns an ID to it
+	 * and adds it ot the WebUser. Saves the current WebUser if needed.
+	 * 
+	 * @return
+	 */
 	@Path("/save_profile")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -495,8 +609,22 @@ public class JerseyAPI
 		GBEngine engine = this.getGBEngine(); 
 		Web4Session session = getWeb4Session();
 		GBProfile profile = session.currentProfile;
+		if (session.user.ID == null)
+		{
+			throw new IllegalArgumentException("Only registered users can save profiles");
+		}
+		boolean updateWebUser = (profile.ID == null);
 		engine.saveProfile(profile);
 		
+		if (updateWebUser)
+		{
+			if (!session.user.profiles.contains(profile.ID))
+			{
+				session.user.profiles.add(profile.ID);
+			}
+			engine.saveWebUser(session.user);
+			
+		}
 		GetProfile res = new GetProfile();
 		res.fromGBProfile(profile, engine);
 		
@@ -505,5 +633,45 @@ public class JerseyAPI
 			;	
 	}
 	
-	
+	@Path("/set_vote")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public Response setVote(@QueryParam("billID") Integer billID, @QueryParam("say") String say)
+	{
+		GBEngine engine = this.getGBEngine(); 
+
+		GBVote.SayEnum argSay = Utils.tryParseEnum(say, GBVote.SayEnum.NONE);
+		GBBill bill = engine.getBill(billID, true);
+		if (argSay == GBVote.SayEnum.NONE || bill == null)
+		{
+			throw new IllegalArgumentException("Invalid arguments: " + say + ", " + billID);
+		}
+		if (bill.status != GBBill.StatusEnum.PUBLISHED)
+		{
+			throw new IllegalArgumentException("Bill #" + billID + " is not open for voting (" + bill.status.name() + ")");
+		}
+		
+		Web4Session session = getWeb4Session();
+		GBProfile profile = session.currentProfile;
+		GBVote oldVote = profile.getVote(billID);
+		if (oldVote != null)
+		{
+			throw new IllegalArgumentException("Bill #" + billID 
+					+ " is already decided: " + oldVote.say.name()
+					+ " on " + Utils.formatDateTime(oldVote.sayDate)
+			);
+		}
+		GBVote newVote = new GBVote();
+		newVote.billID = bill.ID;
+		newVote.say = argSay;
+		newVote.sayDate = new Date();
+		profile.addVote(bill.getInvAffinityValues(engine.getSize()), newVote );
+		
+		GetProfile res = new GetProfile();
+		res.fromGBProfile(profile, engine);
+		
+		return Response.ok(res)
+				.header("Access-Control-Allow-Origin", "*").build()
+			;	
+	}
 }

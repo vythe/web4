@@ -32,7 +32,19 @@ public class GBProfile
 	
 	}
 	
-	public void addVote(double[] groupVals, GBVote vote)
+	public GBVote getVote(Integer billID)
+	{
+		if (billID == null) return null;
+		
+		GBVote vote = votes.stream()
+				.filter(q -> q.billID == billID)
+				.findFirst()
+				.orElse(null)
+			;
+		return vote;	
+	}
+	
+	public void addVote(Double[] groupVals, GBVote vote)
 	{
 		GBVote oldVote = votes.stream()
 				.filter(q -> q.billID == vote.billID)
@@ -117,12 +129,14 @@ public class GBProfile
 	 * For aye, the step would be 1, for Nay it would be -1, Pass is -0.5 or so.
 	 * Returns the array of inv affinities, including 0s.
 	 */
-	public double[] calculateInvAffinityStep(double[] groupVals, double step)
+	public double[] calculateInvAffinityStep(Double[] groupVals, double step)
 	{
 		double[] res = new double[groupVals.length];
 		for (int i = 0; i < groupVals.length; i++)
 		{
-			double val = calculateStep(getInvAffinity(i), (groupVals[i] - 0.5) * step);	
+			double groupVal = (Utils.NVL(groupVals[i], 0.) - 0.5);
+			
+			double val = calculateStep(getInvAffinity(i), groupVal * step);	
 			val = Math.round(val * 1000.) / 1000.;
 			res[i] = val;
 		}
@@ -135,7 +149,7 @@ public class GBProfile
 	 * @param step
 	 * @return
 	 */
-	public double[] applyInvAffinityStep(double[] groupVals, double step)
+	public double[] applyInvAffinityStep(Double[] groupVals, double step)
 	{
 		double[] res = calculateInvAffinityStep(groupVals, step);
 		for (int i = 0; i < groupVals.length; i++)
@@ -156,18 +170,24 @@ public class GBProfile
 		{
 			return from;
 		}
-		if (step < 0)
+		else if (from <= 0.001 && step < 0)
 		{
-			return 1. - calculateStep(1. - from, -step);
+			return 0;
 		}
-		if (from >= 0.999)
+		else if (from >= 0.999 && step > 0)
 		{
 			return 1.;
 		}
-		
-		double x = from / (1. - from) + step;
-		double newVal = x / (x + 1.);
-		
-		return newVal; //Math.round(newVal * 1000.) / 1000.;
+		else if (step < 0)
+		{
+			return 1. - calculateStep(1. - from, -step);
+		}
+		else
+		{
+			double x = from / (1. - from) + step;
+			double newVal = x / (x + 1.);
+			
+			return newVal; //Math.round(newVal * 1000.) / 1000.;
+		}
 	}
 }
