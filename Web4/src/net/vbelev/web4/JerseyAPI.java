@@ -98,9 +98,10 @@ public class JerseyAPI
 		public Integer ID;
 		public String name;
 		public String status;
+		public Integer currentProfileID;
 		public Hashtable<Integer, String> profiles;
 		
-		public void FromWebUser(WebUser user, GBEngine engine)
+		public void FromWebUser(WebUser user, GBEngine engine, GBProfile profile)
 		{
 			List<Integer> profiles = new ArrayList<Integer>();
 			synchronized(user)
@@ -108,6 +109,10 @@ public class JerseyAPI
 			this.ID = user.ID;
 			this.name = Utils.NVL(user.name, "(Unknown)");
 			this.status = user.status.toString();
+			if (profile != null)
+			{
+				this.currentProfileID = profile.ID;
+			}
 
 			profiles.addAll(user.profiles);
 			}
@@ -132,8 +137,7 @@ public class JerseyAPI
 		GBEngine engine = getGBEngine();
 		Web4Session session = getWeb4Session();
 		WebUser u = session.user;
-		res.FromWebUser(u, engine);
-		
+		res.FromWebUser(u, engine, session.currentProfile);
 		//return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
 		return res;
 	}
@@ -198,7 +202,7 @@ public class JerseyAPI
 			engine.saveProfile(session.currentProfile);
 		}
 		GetUserModel res = new GetUserModel();
-		res.FromWebUser(session.user, engine);
+		res.FromWebUser(session.user, engine, session.currentProfile);
 		return res;
 	}
 	
@@ -229,6 +233,19 @@ public class JerseyAPI
 		}
 		
 		session.user = engine.loadWebUser(userID);
+
+		return getUser();
+	}
+	
+	@Path("/logout")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public GetUserModel logoutUser()
+	{
+		Web4Session session = getWeb4Session();
+		
+		session.user = new WebUser();
+		session.currentProfile = new GBProfile();
 
 		return getUser();
 	}
@@ -344,7 +361,9 @@ public class JerseyAPI
 		aff = engine.getAffinity(g, g2.ID, false);
 		
 		GetAffinity res = new GetAffinity(aff, engine);
-		return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
+		return Response.ok(res)
+				//.header("Access-Control-Allow-Origin", "*")
+				.build();
 	}
 	
 	public static class GetBill
@@ -422,7 +441,8 @@ public class JerseyAPI
 		if (bill == null)
 		{
 			return Response.status(500, "Invalid billID: " + billID)
-				.header("Access-Control-Allow-Origin", "*").build()
+				//.header("Access-Control-Allow-Origin", "*")
+				.build()
 			;
 		}
 		else
@@ -475,7 +495,8 @@ public class JerseyAPI
 			res.add(g);
 		}
 		return Response.ok(res)
-				.header("Access-Control-Allow-Origin", "*").build()
+				//.header("Access-Control-Allow-Origin", "*")
+				.build()
 			;
 		
 	}
@@ -548,7 +569,8 @@ public class JerseyAPI
 		res.fromGBProfile(profile, engine);
 		
 		return Response.ok(res)
-				.header("Access-Control-Allow-Origin", "*").build()
+				//.header("Access-Control-Allow-Origin", "*")
+				.build()
 			;
 	}
 
@@ -592,7 +614,8 @@ public class JerseyAPI
 		res.fromGBProfile(profile, engine);
 		
 		return Response.ok(res)
-				.header("Access-Control-Allow-Origin", "*").build()
+				//.header("Access-Control-Allow-Origin", "*")
+				.build()
 			;
 	}
 
@@ -629,7 +652,8 @@ public class JerseyAPI
 		res.fromGBProfile(profile, engine);
 		
 		return Response.ok(res)
-				.header("Access-Control-Allow-Origin", "*").build()
+				//.header("Access-Control-Allow-Origin", "*")
+				.build()
 			;	
 	}
 	
@@ -671,7 +695,8 @@ public class JerseyAPI
 		res.fromGBProfile(profile, engine);
 		
 		return Response.ok(res)
-				.header("Access-Control-Allow-Origin", "*").build()
+				//.header("Access-Control-Allow-Origin", "*")
+				.build()
 			;	
 	}
 }

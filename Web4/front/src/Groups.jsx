@@ -1,6 +1,9 @@
 import React from 'react';
 import axios from 'axios';
 import {Utils} from './Utils'
+import { AffinityEdit } from './AffinityEdit';
+import {WebUser} from './WebUser';
+import { UserProfile } from './UserProfile';
 
 class AffinityCell extends React.Component {
 
@@ -33,7 +36,7 @@ class AffinityCell extends React.Component {
       text = aff.value;
       title = "Calculated";
     } else {
-      let valColour = "#" 
+      valColour = "#" 
       + (aff.value * 255).toString(16).padStart(2, "0").substring(0, 2)
       + (aff.value * 255).toString(16).padStart(2, "0").substring(0, 2) 
       + "20";
@@ -41,7 +44,7 @@ class AffinityCell extends React.Component {
       title = "Assigned";
     }
     return (
-      <td toMoniker={aff.toMoniker} title={title} style={{backgroundColor: valColour}} onClick={this.cellClickHandler}>{text}</td>
+      <td tomoniker={aff.toMoniker} title={title} style={{backgroundColor: valColour}} onClick={this.cellClickHandler}>{text}</td>
     );
     
   }
@@ -104,6 +107,12 @@ export class Groups extends React.Component {
     this.data = res.data;
     console.log("axios received: " + JSON.stringify(res));
     this.setState({loadCount: this.state.loadCount + 1});
+    window.redux.dispatch({
+      type: "GROUPS",
+      payload: {
+        groups: res.data
+      }
+    })
     })
     .catch(error => console.error('axios error: ' + error))
   }
@@ -137,7 +146,6 @@ export class Groups extends React.Component {
           <th key={"header_" + this.data[k].moniker}>{this.data[k].name}</th>
         );
       }
-
       
       let rows = [];
       for (var k in this.data) {
@@ -159,8 +167,11 @@ export class Groups extends React.Component {
           </tr>
         ))
       }
+
       return (
       <div>
+        <WebUser/>
+        <UserProfile/>
         <div className="notification">LoadCount {this.state.loadCount}
             <button onClick={this.reloadClickHandle}>Reload</button>
         </div>
@@ -170,15 +181,17 @@ export class Groups extends React.Component {
       }</div>
         <table className="info_table">
           <thead>
-            <tr><th> </th><th colspan={headerCells.length}>Affinity to (total of {rows.length})</th></tr>
+            <tr><th> </th><th colSpan={headerCells.length}>Affinity to (total of {rows.length})</th></tr>
             <tr><th> </th>{headerCells}</tr>
           </thead>
           <tbody>
           {rows}
           </tbody>
         </table>
+        <br/>
+        <AffinityEdit moniker="a" name="GroupA" tomoniker="b" toname="GroupB" value="0.17"/>
       </div>
-      )
+      );
     }
   }
 }

@@ -40,6 +40,6 @@
   </filter-mapping>
   <context-param>
     	<param-name>dataFolder</param-name>
-    	<param-value>/media/drive_d/Lubuntu_Vythe/other/gbdata</param-value>
+    	<param-value>E:\Vythe\Coding\other\gbdata</param-value>
   </context-param>
 </web-app>
