@@ -10,6 +10,7 @@ import java.io.*;
 public class JerseyCorsFilter //extends javax.servlet.http.HttpFilter
 implements Filter
 {
+	private String allowOrigin = null;
 	public void doFilter(ServletRequest arg0, ServletResponse arg1, FilterChain arg2)
 			throws IOException, ServletException 
 	{
@@ -17,10 +18,12 @@ implements Filter
 		HttpServletResponse response = (HttpServletResponse) arg1;
 		FilterChain filterChain = arg2;
 
-        //response.addHeader("Access-Control-Allow-Origin", "*");
         response.addHeader("Access-Control-Allow-Credentials", "true");
-        response.addHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-        
+        //response.addHeader("Access-Control-Allow-Origin", "*");
+        if (allowOrigin != null)
+        {
+        response.addHeader("Access-Control-Allow-Origin", allowOrigin); // "http://localhost:3000"
+        }
         if (request.getHeader("Access-Control-Request-Method") != null
                 && "OPTIONS".equals(request.getMethod())) {
             // CORS "pre-flight" request
@@ -56,8 +59,7 @@ implements Filter
 	//@Override
 	public void init(FilterConfig arg0) throws ServletException
 	{
-		// TODO Auto-generated method stub
-		
+		allowOrigin = arg0.getInitParameter("origin");		
 	}
 }	
 

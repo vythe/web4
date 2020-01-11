@@ -93,6 +93,7 @@ public class JerseyAPI
 		return res;
 	}
 	
+// ====== Web Users =====	
 	public static class GetUserModel
 	{
 		public Integer ID;
@@ -257,6 +258,7 @@ public class JerseyAPI
         return Response.ok(httpHeaders.getRequestHeaders()).build();
     }
 	
+// ====== Groups =====	
 	public static class GetAffinity
 	{
 		public String toMoniker;
@@ -292,7 +294,7 @@ public class JerseyAPI
 	@Path("/get_groups")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getGroups() {
+    public List<GetGroup> getGroups() {
         //return Response.ok(httpHeaders.getRequestHeaders()).build();
 		GBEngine engine = this.getGBEngine(); 
 		List<GBGroup> allGroups = engine.getGroups();
@@ -310,7 +312,47 @@ public class JerseyAPI
 			}			
 			res.add(gg);
 		}
-		return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
+		//return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
+		return res;
+	}
+	
+	public static class UpdateGroup
+	{
+		public String moniker;
+		public String name;
+	}
+	
+	@Path("/update_group")	
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+	public List<GetGroup> updateGroup(UpdateGroup group)
+	{
+		GBEngine engine = this.getGBEngine(); 
+
+		if (Utils.IsEmpty(group.moniker) || Utils.IsEmpty(group.name))
+		{
+			throw new IllegalArgumentException("Moniker and name must not be empty");
+					
+		}
+		GBGroup oldGroup = engine.getGroup(group.moniker);
+		if (oldGroup != null && group.name.contentEquals(oldGroup.name))
+		{
+			// do nothing
+		}
+		else if (oldGroup != null)
+		{
+			oldGroup.name = group.name;
+			engine.saveGroups();
+		}
+		else
+		{
+			int size = engine.getSize();
+			engine.setSize(size + 1);
+			engine.getGroup(size).name = group.name;
+			engine.saveGroups();
+		}
+		return getGroups();
 	}
 	
 	@XmlRootElement
@@ -366,6 +408,7 @@ public class JerseyAPI
 				.build();
 	}
 	
+// ====== Bills =====	
 	public static class GetBill
 	{
 		public Integer ID;
@@ -421,7 +464,7 @@ public class JerseyAPI
 	@Path("/get_bill")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-	public Response getBill(@QueryParam("billID") Integer billID)
+	public GetBill getBill(@QueryParam("billID") Integer billID)
 	{
 		GBBill bill = null;
 		GBEngine engine = this.getGBEngine(); 
@@ -440,26 +483,28 @@ public class JerseyAPI
 		}
 		if (bill == null)
 		{
-			return Response.status(500, "Invalid billID: " + billID)
-				//.header("Access-Control-Allow-Origin", "*")
-				.build()
-			;
+			throw new IllegalArgumentException("Invalid billID: " + billID);
+			//return Response.status(500, "Invalid billID: " + billID)
+			//	//.header("Access-Control-Allow-Origin", "*")
+			//	.build()
+			//;		
 		}
 		else
 		{
 			GetBill res = new GetBill();
 			res.fromGBBill(bill, engine, session.currentProfile.votes);
-			return Response.ok(res)
+			//return Response.ok(res)
 				//.header("Access-Control-Allow-Origin", "*")
-				.build()
-			;
+			//	.build()
+			//;
+			return res;
 		}
 	}
 
 	@Path("/get_bills")	
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public Response getBills()
+	public List<GetBill> getBills()
 	{
 		ArrayList<GetBill> res = new ArrayList<GetBill>();
 		GBEngine engine = this.getGBEngine(); 
@@ -494,17 +539,17 @@ public class JerseyAPI
 			g.fromGBBill(bill, engine, profile.votes);
 			res.add(g);
 		}
-		return Response.ok(res)
+		//return Response.ok(res)
 				//.header("Access-Control-Allow-Origin", "*")
-				.build()
-			;
-		
+		//		.build()
+		//	;
+		return res;		
 	}
 
 	@Path("/test_bill")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-	public Response testBill()
+	public GetBill testBill()
 	{
 		GBEngine engine = this.getGBEngine(); 
 		//Web4Session session = getWeb4Session();
@@ -524,6 +569,112 @@ public class JerseyAPI
 		return getBill(bill.ID);
 	}
 	
+	/** sets the current session bill and returns it for editing;
+	 * it's rather similar to getBill
+	 * 
+	 * @param billID
+	 * @return
+	 */
+	@Path("/edit_bill")	
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+	public GetBill editBill(@QueryParam("billID") Integer billID, @QueryParam("reload") String reload)
+	{
+		GBBill bill = null;
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		
+		if (session.currentBill != null
+				&& reload == null
+				&& (billID == null || Utils.equals(session.currentBill.ID, billID)))
+		{
+			bill = session.currentBill;
+		}
+		else if (billID == null)
+		{
+			session.currentBill = new GBBill();
+			bill = session.currentBill; 
+		}
+		else
+		{
+			bill = engine.getBill(billID.intValue(), false);
+			if (bill == null)
+			{
+				throw new IllegalArgumentException("Invalid billID: " + billID);
+				//return Response.status(500, "Invalid billID: " + billID)
+				//	//.header("Access-Control-Allow-Origin", "*")
+				//	.build()
+				//;		
+			}
+				
+//			if (bill.status != GBBill.StatusEnum.NEW)
+//			{
+//				throw new IllegalArgumentException("bill ID " + billID + " is " + bill.status + " and cannot be edited");
+//			}
+			session.currentBill = bill;
+		}
+		GetBill res = new GetBill();
+		res.fromGBBill(bill, engine, null);
+		//return Response.ok(res)
+			//.header("Access-Control-Allow-Origin", "*")
+		//	.build()
+		//;
+		return res;
+	}
+
+	public static class UpdateBill
+	{
+		public String title;
+		public String description;
+		public String action;
+		public List<GetAffinity> invAffinities;
+	}
+	
+	@Path("/update_bill")	
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+	public GetBill updateBill(UpdateBill update)
+	{
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		GBBill bill = session.currentBill;
+		
+		if (bill.status != GBBill.StatusEnum.NEW)
+		{
+			throw new IllegalArgumentException("bill ID " + bill.ID + " is " + bill.status + " and cannot be edited");
+		}
+		
+		bill.title = Utils.NVL(update.title, "").trim();
+		bill.description = Utils.NVL(update.description, "").trim();
+		bill.invAffinities.clear();
+		if (update.invAffinities != null)
+		{
+			for (GetAffinity ga : update.invAffinities)
+			{
+				GBGroup g = engine.getGroup(ga.toMoniker);
+				GBAffinity.QualityEnum q = Utils.tryParseEnum(ga.quality, GBAffinity.QualityEnum.SET);
+				if (g != null && q == GBAffinity.QualityEnum.SET)
+				{
+					bill.setInvAffinity(g.ID, ga.value);
+				}
+			}
+			bill.calculateInvAffinities(engine);
+		}
+		
+		if ("save".equals(update.action))
+		{
+			engine.saveBill(bill);
+		}
+		else if ("publish".equals(update.action))
+		{
+			bill.status = GBBill.StatusEnum.PUBLISHED;
+			engine.saveBill(bill);
+		}
+		return editBill(null, null);
+	}
+	
+// ====== Profiles =====	
 	public static class GetProfile
 	{
 		public Integer ID;
@@ -560,7 +711,7 @@ public class JerseyAPI
 	@Path("/get_profile")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-	public Response getProfile()
+	public GetProfile getProfile()
 	{
 		GBEngine engine = this.getGBEngine(); 
 		Web4Session session = getWeb4Session();
@@ -568,10 +719,11 @@ public class JerseyAPI
 		GetProfile res = new GetProfile();
 		res.fromGBProfile(profile, engine);
 		
-		return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-				.build()
-			;
+//		return Response.ok(res)
+//				//.header("Access-Control-Allow-Origin", "*")
+//				.build()
+//			;
+		return res;
 	}
 
 	/**
@@ -619,6 +771,31 @@ public class JerseyAPI
 			;
 	}
 
+	public static class UpdateProfile
+	{
+		public String name;
+		public String action;
+	}
+	
+	@Path("/update_profile")	
+    @POST
+    @Produces(MediaType.APPLICATION_JSON)
+	@Consumes(MediaType.APPLICATION_JSON)
+	public GetProfile updateProfile(UpdateProfile args)
+	{
+		Web4Session session = getWeb4Session();
+		GBProfile profile = session.currentProfile;
+		if (args.name != null)
+		{
+			profile.name = args.name.trim();
+		}
+		if ("reset".equals(args.action))
+		{
+			profile.votes.clear();
+			profile.invAffinities.clear();
+		}
+		return getProfile();
+	}	
 	/** saves the current profile. If it's a new profile, assigns an ID to it
 	 * and adds it ot the WebUser. Saves the current WebUser if needed.
 	 * 
@@ -637,6 +814,10 @@ public class JerseyAPI
 			throw new IllegalArgumentException("Only registered users can save profiles");
 		}
 		boolean updateWebUser = (profile.ID == null);
+		if (Utils.IsEmpty(profile.name))
+		{
+			profile.name = "Created on " + Utils.formatDateTime(new Date());
+		}
 		engine.saveProfile(profile);
 		
 		if (updateWebUser)
