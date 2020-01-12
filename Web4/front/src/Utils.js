@@ -10,4 +10,12 @@ export class Utils {
     }
     return res;
   }
+
+  static cssURL(imageFile) {
+    return "url(" +process.env.PUBLIC_URL + imageFile + ")";
+  }
+
+  static localURL(href) {
+    return process.env.PUBLIC_URL + href;
+  }
 }
