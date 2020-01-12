@@ -172,13 +172,15 @@ export class Groups extends React.Component {
       <div>
         <WebUser/>
         <UserProfile/>
+        {/*
         <div className="notification">LoadCount {this.state.loadCount}
             <button onClick={this.reloadClickHandle}>Reload</button>
         </div>
         <div className="notification">{typeof(this.data) + ": " +
         //JSON.stringify(Utils.squash(this.data))
         JSON.stringify(this.data)
-      }</div>
+      	}</div>
+      	*/}
         <table className="info_table">
           <thead>
             <tr><th> </th><th colSpan={headerCells.length}>Affinity to (total of {rows.length})</th></tr>

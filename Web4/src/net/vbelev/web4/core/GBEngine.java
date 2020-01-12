@@ -51,7 +51,8 @@ public class GBEngine {
 		File groupList = Paths.get(dataFolder, GBGroupListXML.STORAGE_NAME).toFile();
 		if (!groupList.exists())
 		{
-		this.testSet();
+			this.testSet();
+			this.saveGroups();
 		}
 		else if (!groupList.isFile())
 		{
@@ -96,10 +97,12 @@ public class GBEngine {
 			ioGroupList.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
-			throw new IllegalArgumentException("Failed to save engine, this is not a file: " + groupList.getAbsolutePath(), e);
+			throw new IllegalArgumentException("Failed to save engine to " + groupList.getAbsolutePath()
+			+ "FNFException: " + e.getMessage(), e);
 		} catch (IOException e) {
 			e.printStackTrace();
-			throw new IllegalArgumentException("Failed to save engine to " + groupList.getAbsolutePath(), e);
+			throw new IllegalArgumentException("Failed to save engine to " + groupList.getAbsolutePath()
+			+ "IOException: " + e.getMessage(), e);
 		}
 		finally
 		{

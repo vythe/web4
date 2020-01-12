@@ -20,7 +20,7 @@ implements Filter
 
         response.addHeader("Access-Control-Allow-Credentials", "true");
         //response.addHeader("Access-Control-Allow-Origin", "*");
-        if (allowOrigin != null)
+        if (allowOrigin != null && !allowOrigin.isEmpty())
         {
         response.addHeader("Access-Control-Allow-Origin", allowOrigin); // "http://localhost:3000"
         }
