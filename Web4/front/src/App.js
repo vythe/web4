@@ -12,7 +12,7 @@ function App() {
   return (
     <div>
     <TopMenu/>
-    <BrowserRouter>
+    <BrowserRouter basename={window.appconfig.public_url}>
     {/*
     <div className="App">
       <header className="App-header">

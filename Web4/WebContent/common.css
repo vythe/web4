@@ -1,7 +1,9 @@
+
+/*
 body {
   background-color: gray;
 }
-
+*/
 
 .notification {
   width: 100%;
@@ -26,4 +28,87 @@ table.info_table td {
 
 td.affinitySet {
   background-color: yellow;
+}
+
+/* taken from tomcat.css */
+body {
+  margin: 10px 20px;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  /*background-color: lightgray;*/
+}
+
+h1, h2, h3, h4, h5, h6, p, ul, ol {
+  margin: 0 0 0.5em;
+}
+h1 {
+  font-size: 18pt;
+  margin: 0.5em 0 0;
+}
+h2 {
+  font-size: 16pt;
+}
+h3 {
+  font-size: 13pt;
+}
+h4 {
+  font-size: 12pt;
+}
+h5 {
+  font-size: 11pt;
+}
+p {
+  font-size: 11pt
+}
+
+.container {
+  padding: 10px;
+  margin: 0 0 10px;
+}
+
+.col20 {
+  float: left;
+  width: 20%;
+}
+
+.col25 {
+  float: left;
+  width: 25%;
+}
+
+.curved {
+  border-radius: 10px;
+  -moz-border-radius: 10px;
+  -webkit-border-radius: 10px;
+  -khtml-border-radius: 10px;
+}
+
+a.menu_link:link,
+a.menu_link:visited,
+a.menu_link:hover,
+a.menu_link:active {
+    color: #666;
+    text-decoration: none;
+}
+
+a.menu_link {
+  display: block;
+  padding: 10px;
+  font-weight: bold;
+  text-shadow: 1px 1px 1px #fff;
+}
+
+br.separator {
+  margin: 0;
+  padding: 0;
+  clear: both;
+}
+
+/* top menu */
+.menu_item_left {
+float: left;
+}
+
+.menu_item_right {
+float: right;
 }
