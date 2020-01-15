@@ -44,6 +44,10 @@
   </filter-mapping>
   <context-param>
     	<param-name>dataFolder</param-name>
+    	<param-value>/home/webapp_home</param-value>
+    	<!-- 
     	<param-value>E:\Vythe\Coding\other\gbdata</param-value>
+    	<param-value>/home/webapp_home</param-value>
+    	 -->
   </context-param>
 </web-app>

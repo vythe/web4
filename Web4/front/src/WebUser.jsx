@@ -152,7 +152,9 @@ export class WebUser extends React.Component
         }
         if (!gbState.user.ID) {
             return (
-                <div className="pageBand"><span>Hello, Guest </span>
+                <div className="pageBand">
+                    <h3>Login as test, with a blank password</h3>
+                    <span>Hello, Guest </span>
                 Login: <input type="text" ref={this.loginField} defaultValue=""/>
                 Password: <input type="text" ref={this.passwordField} defaultValue=""/>
                 <button onClick={this.loginClick}>Login</button>

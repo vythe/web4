@@ -74,28 +74,13 @@ export class Groups extends React.Component {
     this.load();
   }
 
-  async load() {
-    /*
-    console.log("Groups.load called");
-    var app = this;
-    fetch(window.appconfig.apiurl + "get_groups")
-    .then(function(res) { return res.json(); })
-    .then((res) => {
-      app.data = res;
+  load() {
+    Groups.loadGroups((res) => {
       this.data = res;
-      console.log("received: " + JSON.stringify(res));
       this.setState({loadCount: this.state.loadCount + 1});
     });
-    */
-    /*
-    let res1 = await fetch(window.appconfig.apiurl + "get_groups");
-    console.log("got res1");
-    let res2 = await res1.json();
-    console.log("got res2: " + JSON.stringify(res2));
-    app.data = res2;
-    this.data = res2;
-    this.setState({loadCount: this.state.loadCount + 1});
-    */
+  }
+  static loadGroups(callback) {
     axios({
       method: 'get',
       url: window.appconfig.apiurl + "get_groups"
@@ -105,9 +90,10 @@ export class Groups extends React.Component {
     .then(res => {
     /* handle the response */
     //app.data = res.data;
-    this.data = res.data;
-    console.log("axios received: " + JSON.stringify(res));
-    this.setState({loadCount: this.state.loadCount + 1});
+    //console.log("axios received: " + JSON.stringify(res));
+    //this.data = res.data;
+    //this.setState({loadCount: this.state.loadCount + 1});
+    callback(res.data);
     window.redux.dispatch({
       type: "GROUPS",
       payload: {
