@@ -82,8 +82,9 @@ export class Groups extends React.Component {
   }
   static loadGroups(callback) {
     axios({
+      url: window.appconfig.apiurl + "get_groups",
       method: 'get',
-      url: window.appconfig.apiurl + "get_groups"
+      withCredentials: true      
       //, timeout: 4000,    // 4 seconds timeout
       //, data: {firstName: 'David',lastName: 'Pollock'}
     })
@@ -97,7 +98,8 @@ export class Groups extends React.Component {
     window.redux.dispatch({
       type: "GROUPS",
       payload: {
-        groups: res.data
+        groups: res.data,
+        gbTimestamp : new Date()
       }
     })
     })
@@ -141,7 +143,7 @@ export class Groups extends React.Component {
         for (var m in monikers) {
           let aff = row.affinities.find(a => a.toMoniker == monikers[m]);
           rowCells.push(
-          <AffinityCell moniker={row.moniker} aff={aff} onClick={null}/>
+          <AffinityCell key={monikers[m]} moniker={row.moniker} aff={aff} onClick={null}/>
           );
         }
         //rows.push(
@@ -159,7 +161,6 @@ export class Groups extends React.Component {
       <div>
 {/*}        <TopMenu/> */}
         <WebUser/>
-        <UserProfile/>
         {/*}
         <div className="notification">LoadCount {this.state.loadCount}
             <button onClick={this.reloadClickHandle}>Reload</button>

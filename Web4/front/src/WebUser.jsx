@@ -148,7 +148,7 @@ export class WebUser extends React.Component
     render() {
         let gbState = window.redux.getState();
         if (!gbState.user) {
-            return (<div className="pageBand">Loading...</div>);
+            return (<div className="pageBand">Loading user details...</div>);
         }
         if (!gbState.user.ID) {
             return (

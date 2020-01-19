@@ -20,6 +20,7 @@ export class UserProfile extends React.Component
         this.reload = this.reload.bind(this);
         this.readContext = this.readContext.bind(this);
         this.saveProfile = this.saveProfile.bind(this);
+        this.reloadProfile = this.reloadProfile.bind(this);
         /*
         this.loginClick = this.loginClick.bind(this);
         this.initUserClick = this.initUserClick.bind(this);
@@ -74,7 +75,7 @@ export class UserProfile extends React.Component
         })
         .then(response => {// handle the response
             window.redux.dispatch({
-                type: "USER",
+                type: "PROFILE",
                 payload: {
                     profile: response.data,
                     gbTimestamp: new Date()
@@ -115,11 +116,44 @@ export class UserProfile extends React.Component
         }
     }
 
+
+    reloadProfile() {
+        axios({
+            method: 'get',
+            withCredentials: true,
+            url: window.appconfig.apiurl + "load_profile", 
+            timeout: 400000,    // 4 seconds timeout
+            params: {
+                force: "Y"
+            } 
+        })
+        .then(response => {// handle the response
+            window.redux.dispatch({
+                type: "USER",
+                payload: {
+                    profile: response.data,
+                    gbTimestamp: new Date()
+                }
+            });
+        })
+        .catch(error => {//console.error('timeout exceeded')
+            alert("Server call failed: " + error);
+        });
+    }    
+    componentDidMount() {
+        let gbState = window.redux.getState();
+        if (gbState.profile == null || gbState.user == null || gbState.profile.ID != gbState.user.currentProfileID) {
+            this.load();
+        }
+    }
+
     render() {
         let gbState = window.redux.getState();
 
         if (gbState.profile == null) {
-            return (<div className="pageBand">Loading...</div>);
+            return (<div className="pageBand">Loading profile...</div>);
+        } else if (gbState.groups == null) {
+                return (<div className="pageBand">Loading profile - groups...</div>);
         } else {
             let cells = [];
             for (let g in gbState.groups) {
@@ -127,14 +161,16 @@ export class UserProfile extends React.Component
                 let prof = gbState.profile.invAffinities.find(q => q.toMoniker == gbState.groups[g].moniker);
                 let val = prof? prof.value: 0;
                 cells.push (
-                <span> {gbState.groups[g].name}: {val}</span>
+                <span style={{backgroundColor: Utils.colourAffinity(val), color: 'white'}}> {gbState.groups[g].name}: {val}</span>
                 );
             }
             //return (<div className="pageBand">{JSON.stringify(gbState.profile)}</div>);
             return (
             <div className="pageBand">
-                {(gbState.user != null && gbState.user.ID) != null && <button onClick={this.saveProfile}>Save Profile</button>}
+                <h3>Profile numbers</h3>
                 {cells}
+                {(gbState.user != null && gbState.user.ID) != null && <button onClick={this.saveProfile}>Save Profile</button>}
+                <button onClick={this.reloadProfile}>Reload Profile</button>
             </div>
             );
 

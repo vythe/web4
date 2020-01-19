@@ -10,16 +10,12 @@ export class TopMenu extends React.Component
         return (
             <div>
                         <h1>Speaking Up Playground</h1>
-            <div className="curved container" style={{backgroundImage: Utils.cssURL("/img/grad_grey.png") }}>
+            <div className="curved container" style={{backgroundImage: Utils.cssURL("/img/grad_grey.png"), backgroundSize : '100% 100%' }}>
                 <span className="menu_item_left">                    
                     <a className="menu_link" href={Utils.localURL("/")}>Front</a>
                 </span>
                 <span className="menu_item_left">
                     <a className="menu_link" href={Utils.localURL("/groups")}>Groups</a>
-                    <BrowserRouter basename={window.appconfig.public_url}>
-                    <Link to="/about">AboutLink-4: {window.appconfig.public_url} </Link>
-                        <Link to="/groups">GroupsLink-4: {window.appconfig.public_url} </Link>
-                    </BrowserRouter>
                 </span>
                 <span className="menu_item_right">
                     <a className="menu_link" href={Utils.localURL("/about")}>About</a>

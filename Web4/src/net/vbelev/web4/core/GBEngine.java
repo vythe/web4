@@ -42,6 +42,7 @@ public class GBEngine {
 	{
 		GBEngine res = new GBEngine(root);
 		res.loadGroups();
+		res.loadBills();
 		return res;
 	}
 	
