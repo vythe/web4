@@ -9,7 +9,7 @@ import net.vbelev.web4.utils.*;
 @XmlRootElement(name = "groups")
 public class GBGroupListXML 
 {
-	public static final String STORAGE_NAME = "groups.xml"; 
+	public static final String STORAGE_NAME = "groups"; 
 
 	@XmlAttribute
 	public Date saveTime;

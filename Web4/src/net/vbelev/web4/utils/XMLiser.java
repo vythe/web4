@@ -6,6 +6,7 @@ import java.nio.CharBuffer;
 import java.nio.charset.*;
 import java.util.*;
 
+import org.eclipse.persistence.jaxb.MarshallerProperties;
 import org.w3c.dom.*;
 
 import javax.xml.bind.*;
@@ -16,6 +17,7 @@ import javax.xml.parsers.*;
 import javax.xml.transform.*;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.*;
+//import org.eclipse.persistence.jaxb.MarshallerProperties;
 
 
 public class XMLiser
@@ -155,9 +157,19 @@ public class XMLiser
 			Classes = new Class[0];
 			Context = JAXBContext.newInstance(ObjectWrapper.class);
 			contextMarshaller = Context.createMarshaller();
+			
+	        // Set the Marshaller media type to JSON or XML
+			//contextMarshaller.setProperty(MarshallerProperties.MEDIA_TYPE, "application/json");	        
+			contextMarshaller.setProperty("eclipselink.media-type", "application/json");	        
+	        // Set it to true if you need to include the JSON root element in the JSON output
+			contextMarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, false);			
+			
 			contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
 			
 			contextUnmarshaller = Context.createUnmarshaller();
+			//contextUnmarshaller.setProperty(MarshallerProperties.MEDIA_TYPE, "application/json");	        
+			contextUnmarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, false);			
+			contextUnmarshaller.setProperty("eclipselink.media-type", "application/json");	        
 		}
 		catch  (Exception x)
 		{
@@ -178,8 +190,12 @@ public class XMLiser
 			Classes = classesToBeBound.clone();
 			Context = JAXBContext.newInstance(Classes, null);
 			contextMarshaller = Context.createMarshaller();
+			contextMarshaller.setProperty("eclipselink.media-type", "application/json");	        
 			contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+			contextMarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
 			contextUnmarshaller = Context.createUnmarshaller();
+			contextUnmarshaller.setProperty("eclipselink.media-type", "application/json");
+			//contextUnmarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
 		}
 		catch  (Exception x)
 		{
@@ -246,6 +262,22 @@ public class XMLiser
 		}
 	}
 	
+	public String toXMLString(Object o)
+	{
+		try (ByteArrayOutputStream os = new ByteArrayOutputStream())
+		{
+			toXML(os, o);
+			String res = XMLiser.stringFromBytes(os.toByteArray());
+			return res;
+		}
+		catch (IOException x)
+		{
+			throw new IllegalArgumentException("failed to serialize object to string", x);			
+		}
+		finally
+		{
+		}	
+	}
 	public void toXML(OutputStream out, Object o)
 	{
 		try
@@ -315,6 +347,21 @@ public class XMLiser
 		}
 	}
 	
+
+	public <T>T fromXML(Class<T> elementClass, String xml)
+	{
+		try (ByteArrayInputStream is = new ByteArrayInputStream(xml.getBytes(Charset.forName("UTF-8"))))
+		{
+			return fromXML(elementClass, is);
+		}
+		catch (IOException x)
+		{
+			throw new IllegalArgumentException("Unmarshaller from string", x);
+		}
+		finally
+		{
+		}
+	}
 	
 	@SuppressWarnings("unchecked")
 	public <T>T fromXML(Class<T> elementClass, InputStream xml)
@@ -324,15 +371,17 @@ public class XMLiser
 		//lock.lock();
 		try
 		{
-		//StringReader tReader = new StringReader(xml);
 
-			StreamSource ss = new StreamSource( xml);
+			//StreamSource ss = new StreamSource( xml);
+			InputStreamReader tReader = new InputStreamReader(xml, "UTF-8");
+			StreamSource ss = new StreamSource(tReader);
 		
 			for (Class<?> c : Classes)
 			{
 				if (elementClass.isAssignableFrom(c))
 				{
-					return contextUnmarshaller.unmarshal(ss, elementClass).getValue();
+					JAXBElement<T> je = contextUnmarshaller.unmarshal(ss, elementClass);
+					return je.getValue();
 				}
 			}
 			ObjectWrapper ow = contextUnmarshaller.unmarshal(ss, ObjectWrapper.class).getValue();

@@ -8,7 +8,8 @@ export class UserProfile extends React.Component
     {
         super(props);
         this.state = {
-            gbTimestamp: null
+            gbTimestamp: null,
+            profileID : null
         };
         /*
         // fields
@@ -35,7 +36,9 @@ export class UserProfile extends React.Component
     readContext() {
         let gbState = window.redux.getState();
 
-        if (this.state.gbTimestamp == null || this.state.gbTimestamp < gbState.gbTimestamp) {
+        if (!gbState.profile || gbState.profile.ID != this.state.profileID) {
+            this.load();
+        } else if (this.state.gbTimestamp == null || this.state.gbTimestamp < gbState.gbTimestamp) {
             this.setState({gbTimestamp: gbState.gbTimestamp});
         }        
     }
@@ -49,8 +52,9 @@ export class UserProfile extends React.Component
             params: {} 
         })
         .then(response => {// handle the response
+            this.setState({profileID: response.data.ID});
             window.redux.dispatch({
-                type: "USER",
+                type: "PROFILE",
                 payload: {
                     profile: response.data,
                     gbTimestamp: new Date()
@@ -74,6 +78,7 @@ export class UserProfile extends React.Component
             } 
         })
         .then(response => {// handle the response
+            this.setState({profileID: response.data.ID});
             window.redux.dispatch({
                 type: "PROFILE",
                 payload: {
@@ -124,6 +129,7 @@ export class UserProfile extends React.Component
             url: window.appconfig.apiurl + "load_profile", 
             timeout: 400000,    // 4 seconds timeout
             params: {
+                profileID: this.state.profileID,
                 force: "Y"
             } 
         })
@@ -167,7 +173,8 @@ export class UserProfile extends React.Component
             //return (<div className="pageBand">{JSON.stringify(gbState.profile)}</div>);
             return (
             <div className="pageBand">
-                <h3>Profile numbers</h3>
+                <h3>Profile [{gbState.profile.name}]<br/><small>Saved on {gbState.profile.saveDate}</small></h3>
+                <h3>Approval numbers:</h3>
                 {cells}
                 {(gbState.user != null && gbState.user.ID) != null && <button onClick={this.saveProfile}>Save Profile</button>}
                 <button onClick={this.reloadProfile}>Reload Profile</button>

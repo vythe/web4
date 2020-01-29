@@ -25,6 +25,8 @@ export class Bills extends React.Component {
 
         this.renderBill = this.renderBill.bind(this);
         this.clickVote = this.clickVote.bind(this);
+        this.clickReloadBills = this.clickReloadBills.bind(this);
+        this.reloadBills = this.reloadBills.bind(this);
 
         if(window.redux) {
             window.redux.subscribe(this.readContext);
@@ -74,6 +76,10 @@ export class Bills extends React.Component {
             alert("select the vote for bill " + billid);
         }
     }
+    
+    clickReloadBills() {
+        this.reloadBills("Y");
+    }
 
     // Bill would be happier as a separate component,
     // but just for fun, we'll make it a subroutine
@@ -99,10 +105,16 @@ export class Bills extends React.Component {
         let cells = [];
         for (let g in gbState.groups) {
             let aff = bill.invAffinities.find(q => q.toMoniker == gbState.groups[g].moniker);
-            let val = aff? aff.value: 0;
-            cells.push (
-            <td key={aff.toMoniker} style={{backgroundColor: Utils.colourApproval(val), color: 'white'}}>{val}</td>
-            );
+            if (aff) {
+                let val = aff.value;
+                cells.push (
+                    <td key={gbState.groups[g].moniker} style={{backgroundColor: Utils.colourApproval(val), color: 'white'}}>{val}</td>
+                );
+            } else {
+                cells.push (
+                    <td key={gbState.groups[g].moniker} style={{backgroundColor: 'pink'}}>({gbState.groups[g].moniker})</td>
+                );        
+            }
         }
         let saySpan = "";
         if (!bill.profileSay) {
@@ -137,9 +149,8 @@ export class Bills extends React.Component {
             <td></td>
             <td colSpan={gbState.groups.length + 3}>{saySpan}</td>
         </tr>
-        </>)
-        }
-        
+        </>);        
+    }
 
     testBillClick() {
 
@@ -194,26 +205,31 @@ export class Bills extends React.Component {
     voteClick() {
 
     }
-    load() {
+
+    reloadBills(forceArg) {
     
         axios({
             method: 'get',
             withCredentials: true,
             url: window.appconfig.apiurl + "get_bills", 
             timeout: 400000,    // 4 seconds timeout
-            params: {} 
+            params: {force: forceArg} 
         })
         .then (res => {
             this.setState({bills: res.data});
         });
     }
+
+    load() {
+        this.reloadBills(null);
+    }
+
     componentDidMount() {
         Groups.loadGroups((res) => {
             //this.data = res;
             //this.setState({loadCount: this.state.loadCount + 1});
             this.load();
-          });
-        
+          });        
     }
 
     render() {
@@ -231,7 +247,9 @@ export class Bills extends React.Component {
             return (
                 <div className="pageBand">
                     <br/>
-                    <h3>List of Bills</h3>
+                    <h3>List of Bills
+                        <button onClick={this.clickReloadBills}>Reload Bills</button>
+                    </h3>
                     <table>
                         <thead><tr>
                             <th>ID</th>

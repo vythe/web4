@@ -34,10 +34,10 @@ public class GBProfileXML
 		}
 	}
 	
-	public static final String STORAGE_FOLDER = "profiles"; 
+	public static final String STORAGE_NAME = "profiles"; 
 	
 	@XmlAttribute
-	public int ID;
+	public Integer ID;
 	public String name;
 	@XmlAttribute
 	public Date saveDate;

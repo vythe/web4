@@ -9,10 +9,10 @@ import net.vbelev.web4.utils.*;
 @XmlRootElement(name = "web_user")
 public class WebUserXML {
 	/** users are stored in individual files as [ID].xml */
-	public static final String STORAGE_FOLDER = "web_users"; 
+	public static final String STORAGE_NAME = "web_users"; 
 
 	@XmlAttribute
-	public int ID;
+	public Integer ID;
 	public String name;
 	@XmlAttribute
 	public String login;
@@ -49,9 +49,9 @@ public class WebUserXML {
 		u.password = Utils.IsEmpty(this.password)? null : this.password;
 		u.status = Utils.tryParseEnum(this.status, WebUser.StatusEnum.VISITOR);
 		u.profiles.clear();
-		if (!u.profiles.isEmpty())
+		if (!this.profiles.isEmpty())
 		{
-			u.profiles.addAll(u.profiles);
+			u.profiles.addAll(this.profiles);
 		}
 
 		return u;

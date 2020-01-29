@@ -68,29 +68,45 @@ public class JerseyAPI
 		return res;
 	}
 
+	protected GBEngine getGBEngine(boolean forceNew)
+	{
+		if (forceNew)
+		{
+			request.getSession().removeAttribute(CONTEXT_ENGINE_PARAM);
+		}
+		return getGBEngine();
+	}
 	protected GBEngine getGBEngine()
 	{
-		GBEngine res = null;
-		String root = Utils.NVL(context.getInitParameter("dataFolder"), ".");
-		
-		if (context == null)
+		synchronized(CONTEXT_ENGINE_PARAM) // to keep it simple, make everybody wait until the engine is loaded.
 		{
-			res = GBEngine.loadEngine(root);
-		}
-		else 
-		{
-			Object oRes = request.getSession().getAttribute(CONTEXT_ENGINE_PARAM);
-			if (oRes == null || !(oRes instanceof GBEngine))
+			GBEngine res = null;
+			String root = Utils.NVL(context.getInitParameter("dataFolder"), ".");
+			
+			if (context == null)
 			{
-				res = GBEngine.loadEngine(root);
-				request.getSession().setAttribute(CONTEXT_ENGINE_PARAM, res);
+				//GBFileStorage storage = new GBFileStorage(root);
+				GBMongoStorage storage = new GBMongoStorage("");
+				res = GBEngine.loadEngine(storage);
 			}
-			else
+			else 
 			{
-				res = (GBEngine)oRes;
+				Object oRes = request.getSession().getAttribute(CONTEXT_ENGINE_PARAM);
+				if (oRes == null || !(oRes instanceof GBEngine))
+				{
+					//GBFileStorage storage = new GBFileStorage(root);
+					GBMongoStorage storage = new GBMongoStorage("");
+					res = GBEngine.loadEngine(storage);
+					request.getSession().setAttribute(CONTEXT_ENGINE_PARAM, res);
+				}
+				else
+				{
+					res = (GBEngine)oRes;
+				}
 			}
+			res.storage.ping(false);
+			return res;
 		}
-		return res;
 	}
 	
 // ====== Web Users =====	
@@ -122,7 +138,10 @@ public class JerseyAPI
 			for (Integer profileID : profiles)
 			{
 				GBProfile f = engine.getProfile(profileID.intValue());
-				this.profiles.put(profileID,  f.name);
+				if (f != null)
+				{
+					this.profiles.put(profileID,  f.name);
+				}
 			}
 		}
 	}
@@ -234,6 +253,12 @@ public class JerseyAPI
 		}
 		
 		session.user = engine.loadWebUser(userID);
+		if (session.user != null && !session.user.profiles.isEmpty())
+		{
+			Integer profileID = session.user.profiles.get(0);
+			GBProfile profile = engine.loadProfile(profileID);
+			session.currentProfile = profile;
+		}
 
 		return getUser();
 	}
@@ -294,9 +319,9 @@ public class JerseyAPI
 	@Path("/get_groups")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
-    public List<GetGroup> getGroups() {
+    public List<GetGroup> getGroups(@QueryParam("force") String force) {
         //return Response.ok(httpHeaders.getRequestHeaders()).build();
-		GBEngine engine = this.getGBEngine(); 
+		GBEngine engine = this.getGBEngine(force != null); 
 		List<GBGroup> allGroups = engine.getGroups();
 		List<GetGroup> res = new ArrayList<GetGroup>();
 		for (GBGroup g : allGroups)
@@ -352,7 +377,7 @@ public class JerseyAPI
 			engine.getGroup(size).name = group.name;
 			engine.saveGroups();
 		}
-		return getGroups();
+		return getGroups(null);
 	}
 	
 	@XmlRootElement
@@ -504,7 +529,7 @@ public class JerseyAPI
 	@Path("/get_bills")	
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public List<GetBill> getBills()
+	public List<GetBill> getBills(@QueryParam("force") String force)
 	{
 		ArrayList<GetBill> res = new ArrayList<GetBill>();
 		GBEngine engine = this.getGBEngine(); 
@@ -513,6 +538,10 @@ public class JerseyAPI
 		if (profile == null)
 		{
 			profile = new GBProfile();
+		}
+		if (force != null)
+		{
+			engine.loadBills();
 		}
 		GBBill[] bills = engine.bills.values().stream()
 				.filter(q -> q.status == GBBill.StatusEnum.PUBLISHED)

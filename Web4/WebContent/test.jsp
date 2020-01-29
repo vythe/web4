@@ -1,6 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
     pageEncoding="UTF-8"
-    import="net.vbelev.web4.core.*"%>
+    import="net.vbelev.web4.core.*, java.util.*"%>
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head>
@@ -8,6 +8,17 @@
 <title>Insert title here</title>
 </head>
 <body>
+<%
+net.vbelev.web4.GBMongoStorage storage = new net.vbelev.web4.GBMongoStorage("mongodb://web4:vbelevweb4@vbelev.net");
+//Integer i1 = storage.getNewBillID(false);
+//Integer i2 = storage.getNewWebUserID(false);
+net.vbelev.web4.xml.GBBillXML gb = storage.loadBill(1);
+Hashtable<String, Integer> wIndex = new Hashtable<String, Integer>();
+storage.loadWebUserIndex(wIndex);
+GBEngine engine = GBEngine.loadEngine(storage);
+engine.loadGroups();
+%>
+<h2>Engine groups: <%=engine.getSize() %></h2>
 <h2>Up</h2>
 <%
 double val = 0;

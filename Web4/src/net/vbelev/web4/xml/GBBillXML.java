@@ -9,10 +9,10 @@ import net.vbelev.web4.utils.*;
 @XmlRootElement
 public class GBBillXML {
 	
-	public static final String STORAGE_FOLDER = "bills"; 
+	public static final String STORAGE_NAME = "bills"; 
 	
 	@XmlAttribute
-	public int ID;
+	public Integer ID;
 	public String title;
 	public String description;
 	@XmlAttribute
