@@ -2,6 +2,8 @@ package net.vbelev.web4;
 
 import java.util.*;
 
+import org.bson.BsonArray;
+import org.bson.BsonValue;
 import org.bson.Document;
 
 import java.io.*;
@@ -47,7 +49,7 @@ public class GBMongoStorage implements GBEngine.Storage
 				GBGroupListXML.class, 
 				GBBillXML.class, 
 				GBProfileXML.class, 
-				GBMongoStorage.MongoTest.class,
+				//GBMongoStorage.MongoTest.class,
 				WebUserXML.class
 				);
 
@@ -156,6 +158,26 @@ public class GBMongoStorage implements GBEngine.Storage
 	}
 	
 	
+	public static Document mdbDocument(Object... attrs)
+	{
+		Document d = new Document();
+		for (int i = 0; i < attrs.length;)
+		{
+			String attrName = (attrs[i] == null? "" : (attrs[i] instanceof String? (String)attrs[i] : attrs[i].toString()));
+			Object attrValue = (++i >= attrs.length || attrs[i] == null) ? "" : attrs[i];
+			i++;
+			d.append(attrName, attrValue);
+		}
+		return d;
+		
+	}
+	
+	public static Object[] mdbArray(Object... elems)
+	{
+		//Object[] res = new Object[elems.length];
+		return elems.clone();
+	}
+	
 	public void testMongo()
 	{
 		/*
@@ -185,6 +207,7 @@ public class GBMongoStorage implements GBEngine.Storage
 		//GBGroupListXML res = getOne(GBGroupListXML.class, coll.find());
 				
 		Document d3 = coll.find().first();
+		if (d3 ==  null) return null;
 		d3.remove("_id");
 		GBGroupListXML res = xmliser.fromXML(GBGroupListXML.class, d3.toJson());
 		d3 = null;
@@ -200,7 +223,8 @@ public class GBMongoStorage implements GBEngine.Storage
 	public void saveGroups(GBGroupListXML xml)
 	{
 		ping(false);
-		
+		//Bson c;
+		//mongoDB.runCommand(null)
 		String xmlStr = xmliser.toXMLString(xml);
 		Document d = Document.parse(xmlStr);
 		d.put("_id", 1);
@@ -249,7 +273,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 		GBBillXML res = getOne(GBBillXML.class, 
 				mongoDB.getCollection(GBBillXML.STORAGE_NAME)
 				//.find(new Document("$gbBillXML.ID", billID))
-				.find(Filters.eq("gbBillXML.ID", billID))
+				.find(Filters.eq("ID", billID))
 				.projection(Projections.excludeId())
 				);
 		return res;
@@ -262,11 +286,11 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 	 		Arrays.asList(
 	 			Aggregates.group(
 	 				null, // the grouping field, "$status" 
-	 				Accumulators.max("ID", "$gbBillXML.ID")
+	 				Accumulators.max("maxID", "$ID")
 	 			)
 	 		)
 		).first();
-		Integer res = idDoc != null? (Integer)idDoc.get("ID") : null;
+		Integer res = idDoc != null? (Integer)idDoc.get("maxID") : null;
 		 if (res == null) 
 			 res = 1;
 		 else 
@@ -295,7 +319,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 		
 		String json = xmliser.toXMLString(xml);
 		mongoDB.getCollection(GBBillXML.STORAGE_NAME).replaceOne(
-				 Filters.eq("gbBillXML.ID", xml.ID), 
+				 Filters.eq("ID", xml.ID), 
 				 Document.parse(json), 
 				 new ReplaceOptions().upsert(true)
 				 );	 
@@ -308,7 +332,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 		GBProfileXML res = getOne(GBProfileXML.class, 
 				mongoDB.getCollection(GBProfileXML.STORAGE_NAME)
 				//.find(new Document("$gbBillXML.ID", billID))
-				.find(Filters.eq("gbProfileXML.ID", profileID))
+				.find(Filters.eq("ID", profileID))
 				.projection(Projections.excludeId())
 				);
 		return res;
@@ -321,7 +345,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 			 		Arrays.asList(
 			 			Aggregates.group(
 			 				null, // the grouping field, "$status" 
-			 				Accumulators.max("ID", "$gbProfileXML.ID")
+			 				Accumulators.max("ID", "$ID")
 			 			)
 			 		)
 				).first();
@@ -354,7 +378,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 		
 		String json = xmliser.toXMLString(xml);
 		mongoDB.getCollection(GBProfileXML.STORAGE_NAME).replaceOne(
-				 Filters.eq("gbProfileXML.ID", xml.ID), 
+				 Filters.eq("ID", xml.ID), 
 				 Document.parse(json), 
 				 new ReplaceOptions().upsert(true)
 				 );	 
@@ -368,7 +392,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 		WebUserXML res = getOne(WebUserXML.class, 
 				mongoDB.getCollection(WebUserXML.STORAGE_NAME)
 				//.find(new Document("$gbBillXML.ID", billID))
-				.find(Filters.eq("web_user.ID", webUserID))
+				.find(Filters.eq("ID", webUserID))
 				.projection(Projections.excludeId())
 				);
 		return res;
@@ -384,14 +408,15 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 				"find: \"" + WebUserXML.STORAGE_NAME + "\",\r\n" + 
 				"filter: {},\r\n" +
 				"batchSize: 999999,\r\n" +
-				"projection: { _id: 0, \"web_user.ID\" : 1, \"web_user.login\": 1}\r\n" + 
+				"projection: { _id: 0, \"ID\" : 1, \"login\": 1}\r\n" + 
 				"}";
 		
 		//mongoDB.getCollection("web_users").find();
 		Document d = mongoDB.runCommand(Document.parse(command));
 		for (Document item : ((Document)d.get("cursor")).getList("firstBatch", Document.class))
 		{
-			Document webUser = (Document)item.get("web_user");
+			//Document webUser = (Document)item.get("web_user");
+			Document webUser = item;
 			if (webUser != null) 
 			{
 			int id = webUser.getInteger("ID", 0);
@@ -405,22 +430,13 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 	
 	public int getNewWebUserID(boolean withCreate) 
 	{
-		Document idDoc = mongoDB.getCollection(WebUserXML.STORAGE_NAME)
-			 	.aggregate(
-			 		Arrays.asList(
-			 			Aggregates.group(
-			 				null, // the grouping field, "$status" 
-			 				Accumulators.max("ID", "$webUserXML.ID")
-			 			)
-			 		)
-				).first();		
 		Integer res = getOneScalar(Integer.class, 
 				mongoDB.getCollection(WebUserXML.STORAGE_NAME)
 				 	.aggregate(
 				 		Arrays.asList(
 				 			Aggregates.group(
 				 				null, // the grouping field, "$status" 
-				 				Accumulators.max("ID", "$webUserXML.ID")
+				 				Accumulators.max("ID", "$ID")
 				 			)
 				 		)
 					)
@@ -432,7 +448,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 		 {
  
 			 mongoDB.getCollection(WebUserXML.STORAGE_NAME).replaceOne(
-					 Filters.eq("webUserXML.ID", res), 
+					 Filters.eq("ID", res), 
 					 new Document("ID", res), 
 					 new ReplaceOptions().upsert(true)
 					 );	 
@@ -452,7 +468,7 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 		
 		String json = xmliser.toXMLString(xml);
 		mongoDB.getCollection(WebUserXML.STORAGE_NAME).replaceOne(
-				 Filters.eq("web_user.ID", xml.ID), 
+				 Filters.eq("ID", xml.ID), 
 				 //Filters.eq("ID", xml.ID), 
 				 Document.parse(json), 
 				 new ReplaceOptions().upsert(true)

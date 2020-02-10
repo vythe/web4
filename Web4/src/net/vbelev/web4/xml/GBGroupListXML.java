@@ -48,10 +48,13 @@ public class GBGroupListXML
 			if (g == null) g = new GBGroup();
 			
 			g.affinities.clear();
+			if (this.affinities != null)
+			{
 			for (GBAffinityXML ax : this.affinities)
 			{
 				GBAffinity aff = ax.toGBAffinity(engine);
 				g.affinities.put(aff.toID(), aff);
+			}
 			}
 			return g;
 		}

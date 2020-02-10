@@ -106,13 +106,13 @@ public class XMLiser
 	}
 
 	public static final Charset XMLiserCharset = StandardCharsets.UTF_8;
-	protected static final CharsetDecoder XMLiserCharsetDecoder = XMLiserCharset.newDecoder();
-	protected static final CharsetEncoder XMLiserCharsetEncoder = XMLiserCharset.newEncoder();
+	public static final CharsetDecoder XMLiserCharsetDecoder = XMLiserCharset.newDecoder();
+	public static final CharsetEncoder XMLiserCharsetEncoder = XMLiserCharset.newEncoder();
 	
 	public final Class<?>[] Classes;
 	public final JAXBContext Context;
-	protected Marshaller contextMarshaller;
-	protected Unmarshaller contextUnmarshaller;
+	private Marshaller contextMarshaller;
+	private Unmarshaller contextUnmarshaller;
 	
 	public static String stringFromBytes(byte[] bytes)
 	{
@@ -150,6 +150,35 @@ public class XMLiser
 		}
 	}
 
+	private void initMarshallersJSON() throws PropertyException, JAXBException
+	{
+		contextMarshaller = Context.createMarshaller();
+		contextMarshaller.setProperty("eclipselink.media-type", "application/json");	        
+		contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+		contextMarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, false);			
+		contextMarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
+		contextUnmarshaller = Context.createUnmarshaller();
+		contextUnmarshaller.setProperty("eclipselink.media-type", "application/json");
+		contextUnmarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, false);			
+		//contextUnmarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
+		
+	}
+
+	private void initMarshallersXML() throws PropertyException, JAXBException
+	{
+		contextMarshaller = Context.createMarshaller();
+		contextMarshaller.setProperty("eclipselink.media-type", "text/xml");	        
+		contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+		contextMarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, true);			
+		contextMarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
+
+		contextUnmarshaller = Context.createUnmarshaller();
+		contextUnmarshaller.setProperty("eclipselink.media-type", "text/xml");
+		contextUnmarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, true);			
+		//contextUnmarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");		
+	}
+	
+	
 	public XMLiser()
 	{
 		try
@@ -158,18 +187,7 @@ public class XMLiser
 			Context = JAXBContext.newInstance(ObjectWrapper.class);
 			contextMarshaller = Context.createMarshaller();
 			
-	        // Set the Marshaller media type to JSON or XML
-			//contextMarshaller.setProperty(MarshallerProperties.MEDIA_TYPE, "application/json");	        
-			contextMarshaller.setProperty("eclipselink.media-type", "application/json");	        
-	        // Set it to true if you need to include the JSON root element in the JSON output
-			contextMarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, false);			
-			
-			contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
-			
-			contextUnmarshaller = Context.createUnmarshaller();
-			//contextUnmarshaller.setProperty(MarshallerProperties.MEDIA_TYPE, "application/json");	        
-			contextUnmarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, false);			
-			contextUnmarshaller.setProperty("eclipselink.media-type", "application/json");	        
+			initMarshallersJSON();
 		}
 		catch  (Exception x)
 		{
@@ -189,13 +207,7 @@ public class XMLiser
 			}
 			Classes = classesToBeBound.clone();
 			Context = JAXBContext.newInstance(Classes, null);
-			contextMarshaller = Context.createMarshaller();
-			contextMarshaller.setProperty("eclipselink.media-type", "application/json");	        
-			contextMarshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
-			contextMarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
-			contextUnmarshaller = Context.createUnmarshaller();
-			contextUnmarshaller.setProperty("eclipselink.media-type", "application/json");
-			//contextUnmarshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
+			initMarshallersJSON();
 		}
 		catch  (Exception x)
 		{
