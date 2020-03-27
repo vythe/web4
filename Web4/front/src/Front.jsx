@@ -37,6 +37,9 @@ export class Front extends React.Component {
             <div className="error">Under construction</div>
             <WebUser/>
             <UserProfile/>
+            <div className="note">
+                This list of bils shows open bills only - those, open for voting. 
+            </div>
             <Bills/>
             <hr/>
             <button onClick={() => {this.doShowModal("1"); }}>Show modal1</button>

@@ -35,7 +35,7 @@ public class GBBillXML {
 		}
 		else
 		{
-			this.status = bill.status.name();
+			this.status = bill.status == null? "NEW" : bill.status.name();
 		}
 		this.invAffinities = new ArrayList<GBAffinityXML>();
 		for (GBAffinity aff : bill.getInvAffinities(false))

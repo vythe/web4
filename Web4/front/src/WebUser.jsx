@@ -1,7 +1,7 @@
 import React from 'react';
 import axios from 'axios';
 import {Utils} from './Utils'
-
+import {ModalBox} from './ModalBox'
 export class WebUser extends React.Component
 {
 
@@ -14,6 +14,8 @@ export class WebUser extends React.Component
         // fields
         this.loginField = React.createRef();
         this.passwordField = React.createRef();
+        this.profileBox = React.createRef();
+        this.listProfiles = React.createRef();
 
         // methods
         this.load = this.load.bind(this);
@@ -21,6 +23,7 @@ export class WebUser extends React.Component
         this.loginClick = this.loginClick.bind(this);
         this.initUserClick = this.initUserClick.bind(this);
         this.logoutClick = this.logoutClick.bind(this);
+        this.selectProfile = this.selectProfile.bind(this);
 
         // extra
         if(window.redux) {
@@ -138,6 +141,35 @@ export class WebUser extends React.Component
         });
     }
 
+    selectProfile() {
+        let selectProf = this.listProfiles.current.value;
+        //alert("selected: " + selectProf);
+        this.profileBox.current.doClose();
+        let axiosData = {
+            profileID: selectProf,
+            force: "Y"
+        };
+        axios({
+            method: 'get',
+            withCredentials: true,
+            url: window.appconfig.apiurl + "load_profile",
+            timeout: 400000,    // 4 seconds timeout
+            params: axiosData
+        })
+        .then(response => {// handle the response
+            window.redux.dispatch({
+                type: "PROFILE",
+                payload: {
+                    profile: response.data,
+                    gbTimestamp: new Date()
+                }
+            });
+        })
+        .catch(error => {//console.error('timeout exceeded')
+            alert("loadProfile failed: " + error);
+        });        
+    }
+
     componentDidMount() {
         let gbState = window.redux.getState();
         if (!gbState.user) {
@@ -162,9 +194,35 @@ export class WebUser extends React.Component
                 </div>
             )
         } else {
+            /*
+            let profileOptions = [];
+            for (var k in gbState.user.profiles) {
+                // test = "sss";
+                //alert("my k:" + test;
+                profileOptions.push(
+                <option value={k}>{gbState.user.profiles[k]}</option>
+                );
+            }*/
+
             return (
             <div className="pageBand"><span>Hello, {gbState.user.name} (#{gbState.user.ID}) </span>
             <button onClick={this.logoutClick}>Logout</button>
+            {(gbState.user)? (<>
+            <br/>
+                {(gbState.user && gbState.user.profiles[gbState.user.currentProfileID])? gbState.user.profiles[gbState.user.currentProfileID] : ""}
+                <button onClick={() => {this.profileBox.current.doOpen();}}>Change Profile</button>
+                <ModalBox ref={this.profileBox}>
+                    <h3>Profiles:</h3>
+                    <div>{JSON.stringify(gbState.user.profiles)}</div>
+                    <select ref={this.listProfiles} defaultValue={gbState.user.currentProfileID}>
+                        {/*profileOptions*/}
+                        {Object.keys(gbState.user.profiles).map(k => <option value={k}>{gbState.user.profiles[k]}</option>)}
+                        <option value="">(New profile)</option>
+                    </select>
+                    <br/>
+                    <button onClick={this.selectProfile}>Choose</button>
+                </ModalBox>
+                </>) : ""}
             </div>
             );
         }

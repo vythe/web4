@@ -16,6 +16,12 @@ body {
   color: red
 }
 
+.note {
+  width: 100%;
+  border: solid blue 1px;
+  color: blue
+}
+
 .pageBand {
   width: 100%;
   margin: 1em 0 1em 0;

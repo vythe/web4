@@ -10,6 +10,8 @@ import org.glassfish.jersey.media.multipart.*;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Stream;
+
 import net.vbelev.web4.core.*;
 import net.vbelev.web4.ui.*;
 import net.vbelev.web4.utils.Utils;
@@ -444,6 +446,8 @@ public class JerseyAPI
 		public String profileSay;
 		public Date profileSayDate;
 		public List<GetAffinity> invAffinities;
+		/** what actions are allowed on this bill, for this user. The idea is to control the workflow from the server side **/
+		public List<String> actions;
 		
 		public void fromGBBill(GBBill bill, GBEngine engine, Collection<GBVote> votes)
 		{
@@ -458,7 +462,7 @@ public class JerseyAPI
 			default: 	this.status = bill.status.name(); break;
 			}
 			*/
-			this.status = bill.status.name();
+			this.status = bill.status == null? "(null)" : bill.status.name();
 			this.publishedDate = Utils.formatDateTime(bill.publishedDate);
 			this.invAffinities = new ArrayList<GetAffinity>();
 			
@@ -486,11 +490,45 @@ public class JerseyAPI
 		}
 	}
 
+	public List<String> billActions(GBBill bill, Collection<GBVote> votes)
+	{
+		List<String> res = new ArrayList<String>();
+		GBVote vote = null;
+		// "vote":
+		if (bill.ID != null && votes != null)
+		{
+			
+			vote = votes.stream()
+				.filter(q -> q.billID == bill.ID)
+				.findFirst()
+				.orElse(null)
+			;
+		}
+		if (bill.status == GBBill.StatusEnum.PUBLISHED && vote == null)
+		{
+			res.add("vote");
+		}
+		
+		if (bill.status == GBBill.StatusEnum.NEW)
+		{
+			res.add("edit");
+			res.add("publish");
+			res.add("delete");
+		}
+		else if (bill.status == GBBill.StatusEnum.PUBLISHED)
+		{
+			res.add("close");
+		}
+		
+		return res;
+
+	}
 	@Path("/get_bill")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
 	public GetBill getBill(@QueryParam("billID") Integer billID)
 	{
+		GetBill res = new GetBill();
 		GBBill bill = null;
 		GBEngine engine = this.getGBEngine(); 
 		Web4Session session = getWeb4Session();
@@ -505,25 +543,24 @@ public class JerseyAPI
 		else
 		{
 			bill = engine.getBill(billID.intValue(), false);
+			if (bill == null)
+			{
+				throw new IllegalArgumentException("Invalid billID: " + billID);
+				//return Response.status(500, "Invalid billID: " + billID)
+				//	//.header("Access-Control-Allow-Origin", "*")
+				//	.build()
+				//;		
+			}
+			session.currentBill = bill;
 		}
-		if (bill == null)
-		{
-			throw new IllegalArgumentException("Invalid billID: " + billID);
-			//return Response.status(500, "Invalid billID: " + billID)
-			//	//.header("Access-Control-Allow-Origin", "*")
-			//	.build()
-			//;		
-		}
-		else
-		{
-			GetBill res = new GetBill();
-			res.fromGBBill(bill, engine, session.currentProfile.votes);
-			//return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-			//	.build()
-			//;
-			return res;
-		}
+		
+		res.fromGBBill(bill, engine, session.currentProfile.votes);
+		//return Response.ok(res)
+			//.header("Access-Control-Allow-Origin", "*")
+		//	.build()
+		//;
+		res.actions = billActions(bill, session.currentProfile.votes);
+		return res;
 	}
 
 	@Path("/get_bills")	
@@ -566,6 +603,7 @@ public class JerseyAPI
 		{
 			GetBill g = new GetBill();
 			g.fromGBBill(bill, engine, profile.votes);
+			g.actions = billActions(bill, profile.votes);
 			res.add(g);
 		}
 		//return Response.ok(res)
@@ -575,6 +613,69 @@ public class JerseyAPI
 		return res;		
 	}
 
+
+	/**
+	 * A list of bills for editing and search. When getBills will show only current bills,
+	 * this will be used for viewing unfinished and archived bills, probably with a filter.
+	 * This does not include your current in-memory bill. 
+	 * @param mode
+	 * @return
+	 */
+	@Path("/get_bills_archive")	
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	public List<GetBill> getBillsArchive(@QueryParam("mode") String mode, @QueryParam("force") String force)
+	{
+		ArrayList<GetBill> res = new ArrayList<GetBill>();
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		//GBProfile profile = session.currentProfile;
+		//if (profile == null)
+		//{
+		//	profile = new GBProfile();
+		//}
+		if (force != null)
+		{
+			engine.loadBills();
+		}
+		Stream<GBBill> billStream = engine.bills.values().stream();
+		if ("published".equals(mode))
+		{
+			billStream = billStream.filter(q -> q.status == GBBill.StatusEnum.PUBLISHED); 
+		}
+		else if ("new".equals(mode))
+		{
+			billStream = billStream.filter(q -> q.status == GBBill.StatusEnum.NEW); 
+		}
+		GBBill[] bills = billStream.toArray(GBBill[]::new);
+		Arrays.sort(bills, new Comparator<GBBill>() {
+
+			@Override
+			public int compare(GBBill b1, GBBill b2)
+			{
+				if (b1 == null && b2 == null) return 0;
+				else if (b1 == null) return -1;
+				else if (b2 == null) return 1;
+				else if (b1.publishedDate == null && b2.publishedDate == null) return 0;
+				else if (b1.publishedDate == null) return -1;
+				else if (b2.publishedDate == null) return 1;
+				else return b2.publishedDate.compareTo(b2.publishedDate);
+			}
+		});
+		
+		for (GBBill bill : bills)
+		{
+			GetBill g = new GetBill();
+			g.fromGBBill(bill, engine, null);
+			g.actions = billActions(bill, null);
+			res.add(g);
+		}
+		//return Response.ok(res)
+				//.header("Access-Control-Allow-Origin", "*")
+		//		.build()
+		//	;
+		return res;		
+	}	
 	@Path("/test_bill")	
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -653,12 +754,21 @@ public class JerseyAPI
 
 	public static class UpdateBill
 	{
+		public Integer ID;
 		public String title;
 		public String description;
 		public String action;
 		public List<GetAffinity> invAffinities;
 	}
 	
+	/**
+	 * This will receive the bill object (UpdateBill), copy it to the session.currentBill, 
+	 * recalculate affinities and return the whole bill (GetBill).
+	 * The optional action will save or publish the bill after updating.
+	 * The trick is to send UpdateBill correctly. 
+	 * @param update
+	 * @return
+	 */
 	@Path("/update_bill")	
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
@@ -669,7 +779,20 @@ public class JerseyAPI
 		Web4Session session = getWeb4Session();
 		GBBill bill = session.currentBill;
 		
-		if (bill.status != GBBill.StatusEnum.NEW)
+		if (bill == null || bill.ID != update.ID)
+		{
+			if (update.ID != null)
+			{
+				bill = engine.getBill(update.ID, true);
+			}
+			else
+			{
+				bill = new GBBill();
+			}
+			session.currentBill = bill;
+		}
+		
+		if (false && bill.status != GBBill.StatusEnum.NEW)
 		{
 			throw new IllegalArgumentException("bill ID " + bill.ID + " is " + bill.status + " and cannot be edited");
 		}
@@ -702,6 +825,39 @@ public class JerseyAPI
 		}
 		return editBill(null, null);
 	}
+	
+	/**
+	 * the full updateBill() is heavy, it causes an OPTIONS call.
+	 * So, to support simple recalcs, we make a GET update of one aff value only.
+	 * This method will not load a bill by ID, but it will create a blank one if needed
+	 * @param update
+	 * @return
+	 */
+	@Path("/update_bill_aff")	
+    @GET
+    //@Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+	public GetBill updateBillAff(@QueryParam("moniker") String moniker, @QueryParam("value") double value)
+	{
+		GBEngine engine = this.getGBEngine(); 
+		Web4Session session = getWeb4Session();
+		GBBill bill = session.currentBill;
+		
+		if (bill == null)
+		{
+			bill = new GBBill();
+			session.currentBill = bill;
+		}
+		GBGroup g = engine.getGroup(moniker);
+		if (g != null)
+		{
+			bill.setInvAffinity(g.ID, value);
+		}
+		bill.calculateInvAffinities(engine);
+
+		return editBill(null, null);
+	}
+	
 	
 // ====== Profiles =====	
 	public static class GetProfile

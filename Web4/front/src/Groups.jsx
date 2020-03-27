@@ -5,6 +5,7 @@ import {TopMenu} from './TopMenu';
 import { AffinityEdit } from './AffinityEdit';
 import {WebUser} from './WebUser';
 import { UserProfile } from './UserProfile';
+import {BillsAdmin} from './BillsAdmin';
 
 class AffinityCell extends React.Component {
 
@@ -181,6 +182,8 @@ export class Groups extends React.Component {
         </table>
         <br/>
         <AffinityEdit moniker="a" name="GroupA" tomoniker="b" toname="GroupB" value="0.17"/>
+        <h3>Bills</h3>
+      <BillsAdmin/>
       </div>
       );
     }

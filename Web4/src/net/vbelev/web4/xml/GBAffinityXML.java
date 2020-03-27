@@ -39,6 +39,7 @@ public class GBAffinityXML
 		{
 			throw new IllegalArgumentException("Invalid group moniker: " + this.toMoniker);
 		}
-		return new GBAffinity(g2.ID, this.value, affQ);
+		double checkedValue = this.value < 0? 0 : this.value > 1? 1 : this.value;
+		return new GBAffinity(g2.ID, checkedValue, affQ);
 	}
 }

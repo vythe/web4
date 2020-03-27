@@ -6,9 +6,10 @@ import {ModalBox} from './ModalBox';
 import {BillEdit} from './BillEdit';
 
 /**
- * The list of "current" bills - open or something, relevant for voting.
+ * The list of all bills for editing. No voting, but more details and edit buttons.
+ * Note that it reads its own copy of bills, different from the redux storage.
  */
-export class Bills extends React.Component {
+export class BillsAdmin extends React.Component {
 
     constructor(props) {
         super(props);
@@ -25,10 +26,8 @@ export class Bills extends React.Component {
         this.load = this.load.bind(this);
         this.readContext = this.readContext.bind(this);
         this.testBillClick = this.testBillClick.bind(this);
-        this.testProfile = this.testProfile.bind(this);
 
         this.renderBill = this.renderBill.bind(this);
-        this.clickVote = this.clickVote.bind(this);
         this.clickReloadBills = this.clickReloadBills.bind(this);
         this.reloadBills = this.reloadBills.bind(this);
         this.clickEditBill = this.clickEditBill.bind(this);
@@ -49,46 +48,97 @@ export class Bills extends React.Component {
             this.load();
         }        
     }
-
-    clickVote(e1) {
-        let billid = e1.target.getAttribute('billid') 
-        let mybill = this.state.bills.find(q => q.ID == billid);
-        //console.log(JSON.stringify(Utils.squash(this.radios[0].current)));
-        //alert("mydata:" + this.radios[0].current["data-billid"]);
-        let myradio = this.radios.find(q => q.current && q.current.getAttribute("billid") == billid && q.current.checked);
-        //let myradio = this.radios.find(q => q.current && q.current.billid == billid && q.current.checked);
-        let myvote = (myradio && myradio.current? myradio.current.value : null);
-        //alert("bill: " + billid + ", vote: " + myvote);
-        if (billid && myvote) {
-            axios({
-                method: 'get',
-                withCredentials: true,
-                url: window.appconfig.apiurl + "set_vote", 
-                timeout: 400000,    // 4 seconds timeout
-                params: {
-                    billID: billid,
-                    say: myvote
-                } 
-            })
-            .then (res => {
-                window.redux.dispatch({
-                    type: "PROFILE",
-                    payload: {
-                        profile: res.data,
-                        gbTimestamp: new Date()
-                    }
-                });
-              this.load();
-            });
-        } else {
-            alert("select the vote for bill " + billid);
-        }
-    }
     
     clickReloadBills() {
         this.reloadBills("Y");
     }
 
+    testBillClick() {
+
+        axios({
+            method: 'get',
+            withCredentials: true,
+            url: window.appconfig.apiurl + "test_bill", 
+            timeout: 400000,    // 4 seconds timeout
+            params: {} 
+        })
+        .then (res => {
+            //this.setState({bills: res.data});
+            this.load();
+        });
+    }
+
+    reloadBills(forceArg) {
+    
+        axios({
+            method: 'get',
+            withCredentials: true,
+            url: window.appconfig.apiurl + "get_bills_archive", 
+            timeout: 400000,    // 4 seconds timeout
+            params: {mode: "all", force: forceArg} 
+        })
+        .then (res => {
+            this.setState({bills: res.data});
+        });
+    }
+
+    load() {
+        this.reloadBills();
+    }
+
+    componentDidMount() {
+        let gbState = window.redux.getState();
+        if (!gbState || !gbState.groups) {
+        Groups.loadGroups((res) => {
+            //this.data = res;
+            //this.setState({loadCount: this.state.loadCount + 1});
+            this.load();
+          });        
+        }
+    }
+
+ 
+    clickEditBill(billID) {
+        /* we can use the previously loaded bills
+        this.editBill = this.state.bills.find(q =>q.ID == billID);
+        this.setState({editBill: this.editBill});        
+        this.modalEditBill.current.setState({show: true, myval2: "test"});
+        */
+        // or we can load fresh
+        axios({
+            method: 'get',
+            withCredentials: true,
+            url: window.appconfig.apiurl + "get_bill", 
+            timeout: 400000,    // 4 seconds timeout
+            params: {billID: billID} 
+        })
+        .then (res => {
+            this.setState({editBill: res.data});        
+            this.modalEditBill.current.setState({show: true});
+         });
+
+    }
+
+    clickDeleteBill(billID) {
+        this.setState({
+            simpleConfirmText: "Delete the bill " + billID + "?",
+            onSimpleConfirm: () => {
+                alert("confirm delete " + billID + " clicked!");
+            }
+        });
+        this.refs.simpleConfirm.setState({show: true})
+    }
+    
+    clickPublishBill(billID) {
+        this.setState({
+            simpleConfirmText: "Publish the bill " + billID + "?",
+            onSimpleConfirm: () => {
+                alert("confirm publishing " + billID + " clicked!");
+            }
+        });
+        this.refs.simpleConfirm.setState({show: true})
+    }
+    
     // Bill would be happier as a separate component,
     // but just for fun, we'll make it a subroutine
     renderBill(bill) {
@@ -124,131 +174,25 @@ export class Bills extends React.Component {
                 );        
             }
         }
-        let saySpan = "";
-        if (!bill.profileSay) {
-            let sayAye = React.createRef();
-            let sayNay = React.createRef();
-            let sayPass = React.createRef();
-            //bill.sayAye = sayAye;
-            this.radios.push(sayAye);
-            this.radios.push(sayNay);
-            this.radios.push(sayPass);
-            saySpan = <>
-            <label><input name={bill.ID + "_say"} data-billid={bill.ID} billid={bill.ID} type="radio" ref={sayAye} defaultValue="AYE"/>AYE</label>
-            <label><input name={bill.ID + "_say"} billid={bill.ID} type="radio" ref={sayNay} defaultValue="NAY"/>NAY</label>
-            <label><input name={bill.ID + "_say"} billid={bill.ID} type="radio" ref={sayPass} defaultValue="PASS"/>PASS</label>
-            <button billid={bill.ID} onClick={this.clickVote}>Vote</button>
-            </>;
-        } else {
-            saySpan= <span>{bill.profileSay} on {bill.profileSayDate}</span>;
-        }
+
         return (<>
-        <tr key={bill.ID}>
+        <tr id={bill.ID}>
             <td>{bill.ID}</td>
             <td>{bill.title}</td>
             <td>{bill.publishedDate}</td>
             {cells}
-            <td><button onClick={() => this.clickEditBill(bill.ID)}>Edit</button></td>
+            <td>{/*bill.status == "NEW"? (<button onClick={() => this.clickEditBill(bill.ID)}>Edit</button>) : (<span></span>)*/}
+            {Utils.inList("edit", bill.actions)? (<button onClick={() => this.clickEditBill(bill.ID)}>Edit</button>) : (<span></span>)}
+            {Utils.inList("delete", bill.actions)? (<button onClick={() => this.clickDeleteBill(bill.ID)}>Delete</button>) : (<span></span>)}
+            {Utils.inList("publish", bill.actions)? (<button onClick={() => this.clickPublishBill(bill.ID)}>Publish</button>) : (<span></span>)}
+            </td>
         </tr>
-        <tr key={bill.iD + "_descr"}>
+        <tr id={bill.iD + "_descr"}>
             <td></td>
+            <td>{bill.status}</td>
             <td colSpan={gbState.groups.length + 3}>{bill.description}</td>
         </tr>
-        <tr key={bill.ID + "_vote"}>
-            <td></td>
-            <td colSpan={gbState.groups.length + 3}>{saySpan}</td>
-        </tr>
         </>);        
-    }
-
-    testBillClick() {
-
-        axios({
-            method: 'get',
-            withCredentials: true,
-            url: window.appconfig.apiurl + "test_bill", 
-            timeout: 400000,    // 4 seconds timeout
-            params: {} 
-        })
-        .then (res => {
-            //this.setState({bills: res.data});
-            this.load();
-        });
-    }
-
-    testProfile() {
-        /*
-        axios({
-            method: 'get',
-            withCredentials: true,
-            url: window.appconfig.apiurl + "get_profile", 
-            timeout: 400000,    // 4 seconds timeout
-            params: {} 
-        })
-        .then (res => {
-            //this.setState({bills: res.data});
-            //this.load();
-            alert(JSON.stringify(Utils.squash(res.headers)));
-        });
-        */
-       /*
-       fetch(window.appconfig.apiurl + "get_profile", {
-           withCredentials: true,
-           method: 'get',
-           credentials: 'include'
-       })
-       .then(response => {
-         //console.log(response.status);
-         alert(JSON.stringify(Utils.squash(response)));
-         return response.json();
-       })
-       .then(data => {
-        //alert(JSON.stringify(Utils.squash(data)));
-        })
-       .catch(error => console.error(error))
-       ; 
-       */      
-    }
-
-
-    voteClick() {
-
-    }
-
-    reloadBills(forceArg) {
-    
-        axios({
-            method: 'get',
-            withCredentials: true,
-            url: window.appconfig.apiurl + "get_bills", 
-            timeout: 400000,    // 4 seconds timeout
-            params: {force: forceArg} 
-        })
-        .then (res => {
-            this.setState({bills: res.data});
-        });
-    }
-
-    load() {
-        this.reloadBills(null);
-    }
-
-    componentDidMount() {
-        Groups.loadGroups((res) => {
-            //this.data = res;
-            //this.setState({loadCount: this.state.loadCount + 1});
-            this.load();
-          });        
-    }
-
- 
-    clickEditBill(billID) {
-        //let gbState = window.redux.getState();
-this.editBill = this.state.bills.find(q =>q.ID == billID);
-//alert("Bill clicked,id=" + billID + ". : " + this.editBill);
-
-this.setState({editBill: this.editBill});
-        this.modalEditBill.current.setState({show: true, myval2: "test"});
     }
 
     render() {
@@ -282,6 +226,7 @@ this.setState({editBill: this.editBill});
                         </tbody>
                     </table>
                     <div style={{textAlign: 'center'}}>
+                    <button onClick={() => {this.clickEditBill(null) ;}}>New Bill</button>
                     <button onClick={this.testBillClick}>Add Test Bill</button>
                     {/*<br/>
                     <button onClick={this.testProfile}>Test PRofile</button>
@@ -297,6 +242,9 @@ this.setState({editBill: this.editBill});
                             <div>no modalEditBill</div>
                         )
                         }
+                    </ModalBox>
+                    <ModalBox ref="simpleConfirm" closeOnVeil={true} onConfirm={this.state.onSimpleConfirm}>
+                        <div>{this.state.simpleConfirmText}</div>
                     </ModalBox>
                 </div>
             );

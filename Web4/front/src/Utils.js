@@ -1,4 +1,8 @@
+/**
+ * A utility library of static methods excluding API calls. 
+ */
 export class Utils {
+
   static squash(obj) {
     let res = {};
     if (obj) {
@@ -11,6 +15,9 @@ export class Utils {
     return res;
   }
 
+  static squashStr(obj) {
+    return JSON.stringify(Utils.squash(obj));
+  }
   static cssURL(imageFile) {
     return "url(" +process.env.PUBLIC_URL + imageFile + ")";
   }
@@ -43,5 +50,19 @@ export class Utils {
     + "20";
 
     return valColour;
+  }
+
+  static inList(val, list) {
+    if (!list) return !val;
+
+    if (typeof(list) == "object") {
+      for (var k in list) {
+        if (list[k] == val) return true;
+      }
+      return false;
+    }
+    else {
+      return val == list;
+    }
   }
 }

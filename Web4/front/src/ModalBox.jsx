@@ -8,9 +8,12 @@ export class ModalBox extends React.Component {
             show: false,
             closeOnVeil: props.closeOnVeil,
             onClose: props.onClose,
+            onConfirm: props.onConfirm,
             content: props.content
         };
         this.doClose = this.doClose.bind(this);
+        this.doOpen = this.doOpen.bind(this);
+        this.doConfirm = this.doConfirm.bind(this);
     }
 
     doClose() {
@@ -23,6 +26,22 @@ export class ModalBox extends React.Component {
         this.setState({show: false});
     }
 
+    doConfirm() {
+        if (!this.state.show) {
+            return;
+        }
+        if (typeof (this.props.onConfirm) == "function") {
+            this.props.onConfirm();
+        }
+        this.setState({show: false});
+    }
+
+    doOpen() {
+        if (this.state.show) {
+            return;
+        }
+        this.setState({show: true});
+    }
     render() {
         return (
         <div className="modal_veil" style={{display: this.state.show? "block" : "none"}} onClick={() => {if (this.state.closeOnVeil) this.doClose(); } }> 
@@ -31,6 +50,11 @@ export class ModalBox extends React.Component {
                 <button style={{float: 'right', border: '1px solid black'}} onClick={this.doClose}>Close</button>
             </div>
             <div style={{width: '100%'}}>{this.props.children}</div>
+            {typeof(this.props.onConfirm == "function")? (
+                <div style={{textAlign: "center"}}>
+                <button style={{}} onClick={this.doConfirm}>Confirm</button>
+                <button style={{}} onClick={this.doClose}>Cancel</button>
+                </div>) : ("")}
             </div>
         </div>
         );

@@ -86,14 +86,21 @@ public class GBAffinity {
 		for (int i = 0; i < listFrom.length; i++)
 		{
 			if (listFrom[i] == null || listTo[i] == null) continue;
-			nom += listFrom[i] * listFrom[i];
-			denom += listFrom[i] * listFrom[i] * listTo[i];
+			//nom += listFrom[i] * listFrom[i];
+			//denom += listFrom[i] * listFrom[i] * listTo[i];
+			nom += listFrom[i] * listFrom[i] * listTo[i];
+			denom += listFrom[i] * listFrom[i];
 		}
 		if (denom <= 0)
 		{
 			return null;
 		}
-		return nom / denom;
+		double res = nom / denom;
+		if (res > 1)
+		{
+			System.out.print("weird affinity: " + res);
+		}
+		return res;
 	}
 
 }

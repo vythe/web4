@@ -28,8 +28,8 @@ implements Filter
                 && "OPTIONS".equals(request.getMethod())) {
             // CORS "pre-flight" request
             //response.addHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-            response.addHeader("Access-Control-Allow-Methods", "GET, POST");
-            //response.addHeader("Access-Control-Allow-Headers", "X-Requested-With,Origin,Content-Type, Accept");
+            response.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            response.addHeader("Access-Control-Allow-Headers", "X-Requested-With,Origin,Content-Type, Accept");
         }
         //response.addCookie(new Cookie("mystamp", new java.util.Date().toGMTString()));
         filterChain.doFilter(request, response);			

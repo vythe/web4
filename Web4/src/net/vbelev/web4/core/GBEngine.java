@@ -168,6 +168,10 @@ public class GBEngine {
 		{
 			bill.ID = this.getNewBillID(true);
 		}
+		if (bill.status == null)
+		{
+			bill.status = GBBill.StatusEnum.NEW;
+		}
 		GBBillXML xml = new GBBillXML();
 		xml.fromGBBill(this, bill);
 		
