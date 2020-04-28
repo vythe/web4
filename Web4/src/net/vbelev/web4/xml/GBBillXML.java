@@ -13,6 +13,8 @@ public class GBBillXML {
 	
 	@XmlAttribute
 	public Integer ID;
+	@XmlAttribute
+	public Integer setID;
 	public String title;
 	public String description;
 	@XmlAttribute
@@ -22,9 +24,10 @@ public class GBBillXML {
 	
 	public List<GBAffinityXML> invAffinities;
 
-	public void fromGBBill(GBEngine engine, GBBill bill)
+	public void fromGBBill(GBGroupSet gblist, GBBill bill)
 	{
 		this.ID = bill.ID;
+		this.setID = bill.setID;
 		this.title = Utils.NVL(bill.title, "");
 		this.description = Utils.NVL(bill.description, "");
 		this.publishDate = bill.publishedDate;
@@ -41,15 +44,16 @@ public class GBBillXML {
 		for (GBAffinity aff : bill.getInvAffinities(false))
 		{
 			GBAffinityXML ax = new GBAffinityXML();
-			ax.fromGBAffinity(engine, aff);
+			ax.fromGBAffinity(gblist, aff);
 			this.invAffinities.add(ax);
 		}			
 	}
 	
-	public GBBill toGBBill(GBEngine engine, GBBill bill)
+	public GBBill toGBBill(GBGroupSet gblist, GBBill bill)
 	{
 		if (bill == null) bill = new GBBill();
 		bill.ID = this.ID;
+		bill.setID = Utils.NVL(this.setID, 0);
 		bill.title = Utils.NVL(this.title, "");
 		bill.description = Utils.NVL(this.description, "");
 		bill.publishedDate = this.publishDate;
@@ -61,7 +65,7 @@ public class GBBillXML {
 		{
 		for (GBAffinityXML ax : this.invAffinities)
 		{
-			GBAffinity aff = ax.toGBAffinity(engine);
+			GBAffinity aff = ax.toGBAffinity(gblist);
 			bill.invAffinities.put(aff.toID(), aff);
 		}
 		}

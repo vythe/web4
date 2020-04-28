@@ -2,6 +2,8 @@ import React from 'react';
 import axios from 'axios';
 import {Utils} from './Utils'
 import {ModalBox} from './ModalBox'
+import {DocFragment} from './DocFragment';
+
 export class WebUser extends React.Component
 {
 
@@ -34,12 +36,19 @@ export class WebUser extends React.Component
     readContext() {
         let gbState = window.redux.getState();
 
-        if (this.state.gbTimestamp == null || this.state.gbTimestamp < gbState.gbTimestamp) {
-            this.setState({gbTimestamp: gbState.gbTimestamp});
+        if (this.state.gbTimestamp == null 
+            || this.state.gbTimestamp < gbState.gbTimestamp
+            || this.state.gbTimestamp < gbState.gbUserTS
+            ) {
+            this.setState({gbTimestamp: (gbState.gbUserTS || gbState.gbTimestamp)});
         }        
     }
 
     load() {
+        WebUser.loadUser();
+    }
+
+    static loadUser() {
         axios({
             method: 'get',
             withCredentials: true,
@@ -143,10 +152,13 @@ export class WebUser extends React.Component
 
     selectProfile() {
         let selectProf = this.listProfiles.current.value;
+        let selectSet = this.refs.listSets.value;
+
         //alert("selected: " + selectProf);
         this.profileBox.current.doClose();
         let axiosData = {
             profileID: selectProf,
+            setID: selectSet,
             force: "Y"
         };
         axios({
@@ -182,8 +194,8 @@ export class WebUser extends React.Component
         if (!gbState.user) {
             return (<div className="pageBand">Loading user details...</div>);
         }
-        if (!gbState.user.ID) {
-            return (
+        else if (!gbState.user.ID) {
+            return (<>
                 <div className="pageBand">
                     <h3>Login as test, with a blank password</h3>
                     <span>Hello, Guest </span>
@@ -191,7 +203,24 @@ export class WebUser extends React.Component
                 Password: <input type="text" ref={this.passwordField} defaultValue=""/>
                 <button onClick={this.loginClick}>Login</button>
                 <button onClick={this.initUserClick}>Save as New User</button>
+                <span>Domain: 
+                    <select ref="listSets" defaultValue={gbState.user.currentSetID} onChange={this.selectProfile}>
+                        {/*set options*/}
+                        {Object.keys(gbState.user.groupSets).map(k => <option value={k} key={k}>{gbState.user.groupSets[k]}</option>)}
+                        {/*<option value="">(New profile)</option>*/}
+                    </select>
+
+                </span>
+                <img className="icon_link" 
+                    src={Utils.localURL("/img/question.png")}
+                    onClick={() => this.refs.userIntroBox.setState({show: true})}
+                    title="Why Log in?"
+                />
                 </div>
+                <ModalBox ref="userIntroBox" labelClose="Okay" title="Why Log in" closeOnVeil={true}>
+                    <DocFragment hashtag="user:intro"/>
+                </ModalBox>
+                </>
             )
         } else {
             /*
@@ -207,10 +236,18 @@ export class WebUser extends React.Component
             return (
             <div className="pageBand"><span>Hello, {gbState.user.name} (#{gbState.user.ID}) </span>
             <button onClick={this.logoutClick}>Logout</button>
-            {(gbState.user)? (<>
             <br/>
                 {(gbState.user && gbState.user.profiles[gbState.user.currentProfileID])? gbState.user.profiles[gbState.user.currentProfileID] : ""}
                 <button onClick={() => {this.profileBox.current.doOpen();}}>Change Profile</button>
+                <span>Domain: 
+                    <select ref="listSets" defaultValue={gbState.user.currentSetID} onChange={this.selectProfile}>
+                        {/*set options*/}
+                        {Object.keys(gbState.user.groupSets).map(k => <option key={k} value={k}>{gbState.user.groupSets[k]}</option>)}
+                        {/*<option value="">(New profile)</option>*/}
+                    </select>
+
+                </span>
+
                 <ModalBox ref={this.profileBox}>
                     <h3>Profiles:</h3>
                     <div>{JSON.stringify(gbState.user.profiles)}</div>
@@ -222,7 +259,6 @@ export class WebUser extends React.Component
                     <br/>
                     <button onClick={this.selectProfile}>Choose</button>
                 </ModalBox>
-                </>) : ""}
             </div>
             );
         }

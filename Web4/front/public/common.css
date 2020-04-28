@@ -13,18 +13,21 @@ body {
 .error {
   width: 100%;
   border: solid red 1px;
+  box-sizing: border-box;
   color: red
 }
 
 .note {
   width: 100%;
   border: solid blue 1px;
+  box-sizing: border-box;
   color: blue
 }
 
 .pageBand {
   width: 100%;
   margin: 1em 0 1em 0;
+  box-sizing: border-box;
   border-bottom: solid black 1px;
 }
 
@@ -136,4 +139,23 @@ float: right;
   top:50%;
   left:50%;
   transform: translate(-50%,-50%);
+}
+
+.appdocs {
+  text-align: left;
+}
+
+.react_body .doclink {
+  display: none;
+}
+
+.appdocs h1, .appdocs h2, .approcs h3 {
+  text-align: center;
+}
+
+.icon_link {
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  vertical-align: bottom;
 }

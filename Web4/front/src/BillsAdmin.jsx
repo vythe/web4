@@ -3,7 +3,9 @@ import axios from 'axios';
 import {Utils} from './Utils';
 import {Groups} from './Groups';
 import {ModalBox} from './ModalBox';
+import {Bills} from './Bills';
 import {BillEdit} from './BillEdit';
+import {DocFragment} from './DocFragment';
 
 /**
  * The list of all bills for editing. No voting, but more details and edit buttons.
@@ -31,6 +33,8 @@ export class BillsAdmin extends React.Component {
         this.clickReloadBills = this.clickReloadBills.bind(this);
         this.reloadBills = this.reloadBills.bind(this);
         this.clickEditBill = this.clickEditBill.bind(this);
+        this.clickActionBill = this.clickActionBill.bind(this);
+        this.onSaveBill = this.onSaveBill.bind(this);
 
         this.modalEditBill = React.createRef();
         this.editBill = {};
@@ -119,6 +123,13 @@ export class BillsAdmin extends React.Component {
 
     }
 
+    onSaveBill(savedBill) {
+        this.modalEditBill.current.setState({show: false});
+        if (savedBill) {
+            this.reloadBills(true);
+        }
+    }
+/*
     clickDeleteBill(billID) {
         this.setState({
             simpleConfirmText: "Delete the bill " + billID + "?",
@@ -128,12 +139,23 @@ export class BillsAdmin extends React.Component {
         });
         this.refs.simpleConfirm.setState({show: true})
     }
-    
-    clickPublishBill(billID) {
+*/    
+    clickActionBill(billID, action) {
         this.setState({
-            simpleConfirmText: "Publish the bill " + billID + "?",
+            simpleConfirmText: action + " the bill " + billID + "?",
             onSimpleConfirm: () => {
-                alert("confirm publishing " + billID + " clicked!");
+                alert("action=" + action);
+                axios({
+                    method: 'get',
+                    withCredentials: true,
+                    url: window.appconfig.apiurl + "action_bill", 
+                    timeout: 400000,    // 4 seconds timeout
+                    params: {billID: billID, action: action} 
+                })
+                .then (res => {
+                    this.setState({gbTimestamp: new Date()});        
+                    //this.modalEditBill.current.setState({show: true});
+                });
             }
         });
         this.refs.simpleConfirm.setState({show: true})
@@ -161,16 +183,17 @@ export class BillsAdmin extends React.Component {
         }
         */
         let cells = [];
-        for (let g in gbState.groups) {
-            let aff = bill.invAffinities.find(q => q.toMoniker == gbState.groups[g].moniker);
+        let groups = gbState.groups.groups;
+        for (let g in groups) {
+            let aff = bill.invAffinities.find(q => q.toMoniker == groups[g].moniker);
             if (aff) {
                 let val = aff.value;
                 cells.push (
-                    <td key={gbState.groups[g].moniker} style={{backgroundColor: Utils.colourApproval(val), color: 'white'}}>{val}</td>
+                    <td key={groups[g].moniker} style={{backgroundColor: Utils.colourApproval(val), color: 'white'}}>{val}</td>
                 );
             } else {
                 cells.push (
-                    <td key={gbState.groups[g].moniker} style={{backgroundColor: 'pink'}}>({gbState.groups[g].moniker})</td>
+                    <td key={groups[g].moniker} style={{backgroundColor: 'pink'}}>({groups[g].moniker})</td>
                 );        
             }
         }
@@ -183,14 +206,16 @@ export class BillsAdmin extends React.Component {
             {cells}
             <td>{/*bill.status == "NEW"? (<button onClick={() => this.clickEditBill(bill.ID)}>Edit</button>) : (<span></span>)*/}
             {Utils.inList("edit", bill.actions)? (<button onClick={() => this.clickEditBill(bill.ID)}>Edit</button>) : (<span></span>)}
-            {Utils.inList("delete", bill.actions)? (<button onClick={() => this.clickDeleteBill(bill.ID)}>Delete</button>) : (<span></span>)}
-            {Utils.inList("publish", bill.actions)? (<button onClick={() => this.clickPublishBill(bill.ID)}>Publish</button>) : (<span></span>)}
+            {Utils.inList("delete", bill.actions)? (<button onClick={() => this.clickActionBill(bill.ID, "delete")}>Delete</button>) : (<span></span>)}
+            {Utils.inList("publish", bill.actions)? (<button onClick={() => this.clickActionBill(bill.ID), "publish"}>Publish</button>) : (<span></span>)}
+            {Utils.inList("close", bill.actions)? (<button onClick={() => this.clickActionBill(bill.ID, "close")}>Close</button>) : (<span></span>)}
+            {Utils.inList("cancel", bill.actions)? (<button onClick={() => this.clickActionBill(bill.ID, "cancel")}>Cancel</button>) : (<span></span>)}
             </td>
         </tr>
         <tr id={bill.iD + "_descr"}>
             <td></td>
             <td>{bill.status}</td>
-            <td colSpan={gbState.groups.length + 3}>{bill.description}</td>
+            <td colSpan={(groups.length || 0) + 3}>{bill.description}</td>
         </tr>
         </>);        
     }
@@ -198,14 +223,23 @@ export class BillsAdmin extends React.Component {
     render() {
         let gbState = window.redux.getState();
         let bills = this.state.bills;
+        let groups = (gbState.groups || {}).groups;
         let headerCells = [];
         if (!bills || !gbState.groups) {
+            if (!bills) {
+                Bills.loadBills("Y");
+            }
+
+            if (!gbState.groups) {
+                Groups.loadGroups("Y");
+            }
+
             return (
-                <div className="pageBand">Loading Bills... gbState = {JSON.stringify(gbState)}</div>
+                <div className="pageBand">Loading Bills...</div>
             );
         } else {
-            for (let g in gbState.groups) {
-                headerCells.push(<th key={gbState.groups[g].name}>{gbState.groups[g].name}</th>);
+            for (let g in groups) {
+                headerCells.push(<th key={groups[g].moniker}>{groups[g].name}</th>);
             }
             return (
                 <div className="pageBand">
@@ -233,7 +267,7 @@ export class BillsAdmin extends React.Component {
                     */}
                     </div>
                     <ModalBox ref={this.modalEditBill} closeOnVeil={true}>
-                        <BillEdit bill={this.state.editBill}>                            
+                        <BillEdit bill={this.state.editBill} onSave={this.onSaveBill}>
                         </BillEdit>
                         {(this.modalEditBill && this.modalEditBill.current != null) ?  
                         (
@@ -243,7 +277,8 @@ export class BillsAdmin extends React.Component {
                         )
                         }
                     </ModalBox>
-                    <ModalBox ref="simpleConfirm" closeOnVeil={true} onConfirm={this.state.onSimpleConfirm}>
+                    <ModalBox ref="simpleConfirm" closeOnVeil={true} onConfirm={this.state.onSimpleConfirm} title="Simple Confirm!" labelClose="No, Ignore this">
+                        {/*<div><h2>Simple Confirm!</h2></div>*/}
                         <div>{this.state.simpleConfirmText}</div>
                     </ModalBox>
                 </div>

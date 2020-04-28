@@ -6,8 +6,9 @@ import { AffinityEdit } from './AffinityEdit';
 import {WebUser} from './WebUser';
 import { UserProfile } from './UserProfile';
 import {BillsAdmin} from './BillsAdmin';
+import {GroupsEdit} from './GroupsEdit';
 
-class AffinityCell extends React.Component {
+export class AffinityCell extends React.Component {
 
   constructor(props) {
     super(props);
@@ -64,23 +65,65 @@ export class Groups extends React.Component {
     this.data = null; //{};
     // declarations: state
     this.state = {
-      loadCount: 0
+      loadCount: 0,
+      isEditMode: false,
+      editSetID: null
     };
     // declarations: member functions
     this.load = this.load.bind(this);
     this.reloadClickHandle = this.reloadClickHandle.bind(this);
+    this.renderGroupsView = this.renderGroupsView.bind(this);
+    this.readContext = this.readContext.bind(this);
+    this.startEdit = this.startEdit.bind(this);
+    this.startNewSet = this.startNewSet.bind(this);
+    this.finishEdit = this.finishEdit.bind(this);
+
+    if(window.redux) {
+      window.redux.subscribe(this.readContext);
+    }
+
   }
+
+  readContext() {
+    let gbState = window.redux.getState();
+
+    if (!gbState.groups) {
+        Groups.loadGroups(null);  
+    }
+    else if (!this.state.bills 
+        || this.state.gbTimestamp < gbState.gbTimestamp
+        || this.state.gbTimestamp < gbState.gbGroupsTS
+        || this.state.gbTimestamp < gbState.gbUserTS
+    ) {
+      this.data = gbState.groups;
+      this.setState({
+            //bills: gbState.bills,
+            gbTimestamp: gbState.gbGroupsTS || gbState.gbTimestamp
+        });
+    } else {
+    //    this.setState({
+    //        gbTimestamp: gbState.gbBillsTS || gbState.gbTimestamp
+    //    });
+    }        
+}
+
 
   componentDidMount() {
     this.load();
   }
 
   load() {
+    console.log("### Groups load called");
     Groups.loadGroups((res) => {
       this.data = res;
       this.setState({loadCount: this.state.loadCount + 1});
     });
+
+    if (!window.redux.getState().user) {
+      WebUser.loadUser();
+    }
   }
+
   static loadGroups(callback) {
     axios({
       url: window.appconfig.apiurl + "get_groups",
@@ -90,19 +133,22 @@ export class Groups extends React.Component {
       //, data: {firstName: 'David',lastName: 'Pollock'}
     })
     .then(res => {
-    /* handle the response */
-    //app.data = res.data;
-    //console.log("axios received: " + JSON.stringify(res));
-    //this.data = res.data;
-    //this.setState({loadCount: this.state.loadCount + 1});
-    callback(res.data);
-    window.redux.dispatch({
-      type: "GROUPS",
-      payload: {
-        groups: res.data,
-        gbTimestamp : new Date()
+      /* handle the response */
+      //app.data = res.data;
+      //console.log("axios received: " + JSON.stringify(res));
+      //this.data = res.data;
+      //this.setState({loadCount: this.state.loadCount + 1});
+      if (typeof(callback) == "function") {
+          callback(res.data);
       }
-    })
+      console.log("### Groups load returned, dispatch re.sgroups");
+      window.redux.dispatch({
+        type: "GROUPS",
+        payload: {
+          groups: res.data,
+          gbTimestamp : new Date()
+        }
+      });
     })
     .catch(error => console.error('axios error: ' + error))
   }
@@ -115,77 +161,133 @@ export class Groups extends React.Component {
     alert("clicked " + JSON.stringify(this));
   }
 
-  render() {
-    console.log("render start: " + JSON.stringify(this.data));
-    if (!this.data) {
-      return (
-        <div className="notification">No data</div>
-      )
-    } else {
-      let groupCount = this.data.length;
-      /* the data structure is [group... ]
-      group: {moniker, name, [affinity...]}
-      affinity: {toMoniker, quality, value}
-      */
+  startEdit(setID) {
+    console.log("start edit with setID=" + setID + ", dataID=" + this.data.ID);
+    axios({
+      url: window.appconfig.apiurl + "edit_group_set",
+      method: 'get',
+      withCredentials: true      
+      //, timeout: 4000,    // 4 seconds timeout
+      , params: {id: (setID || this.data.ID)} // for GET it's called params, for POST it's called data
+    })
+    .then(res => {
+      this.setState({
+        isEditMode: true
+      });
+    })
+    .catch(error => console.error('axios error: ' + error))
+  }
 
-      let headerCells = [];
-      let monikers = [];
-      for (var k in this.data) {
-        monikers.push(this.data[k].moniker);
-        headerCells.push(
-          <th key={"header_" + this.data[k].moniker}>{this.data[k].name}</th>
+  startNewSet() {
+    axios({
+      url: window.appconfig.apiurl + "action_group_set",
+      method: 'get',
+      withCredentials: true      
+      //, timeout: 4000,    // 4 seconds timeout
+      , data: {action: "newset"}
+    })
+    .then(res => {
+      this.setState({
+        isEditMode: true
+      });
+    })
+    .catch(error => console.error('axios error: ' + error))
+  }
+
+  finishEdit(savedSet) {
+    // need to handle groupset saving here... maybe
+    this.setState({
+      isEditMode: false
+    });
+  }
+
+  renderGroupsView(groupList) {
+    let groupCount = groupList.length;
+    /* the data structure is [group... ]
+    group: {moniker, name, [affinity...]}
+    affinity: {toMoniker, quality, value}
+    */
+
+    let headerCells = [];
+    let monikers = [];
+    for (var k in groupList) {
+      monikers.push(groupList[k].moniker);
+      headerCells.push(
+        <th key={"header_" + groupList[k].moniker}>{groupList[k].name}</th>
+      );
+    }
+    
+    let rows = [];
+    for (var k in groupList) {
+      let rowCells = [];
+      let row = groupList[k];
+      for (var m in monikers) {
+        let aff = row.affinities.find(a => a.toMoniker == monikers[m]);
+        rowCells.push(
+        <AffinityCell key={monikers[m]} moniker={row.moniker} aff={aff} onClick={null}/>
         );
       }
-      
-      let rows = [];
-      for (var k in this.data) {
-        let rowCells = [];
-        let row = this.data[k];
-        for (var m in monikers) {
-          let aff = row.affinities.find(a => a.toMoniker == monikers[m]);
-          rowCells.push(
-          <AffinityCell key={monikers[m]} moniker={row.moniker} aff={aff} onClick={null}/>
-          );
-        }
-        //rows.push(
-        //  <tr key={this.data[k].moniker}><td>{JSON.stringify(this.data[k])}</td></tr>
-        //)
-        rows.push((
-          <tr key={"row_" + row.moniker}>
-            <td>{row.name}</td>
-            {rowCells}
-          </tr>
-        ))
-      }
+      rows.push(
+        <tr key={"row_" + row.moniker}>
+          <td>{row.name}</td>
+          {rowCells}
+        </tr>
+      );
+    }
+    return (
+      <table className="info_table">
+      <thead>
+        <tr><th> </th><th colSpan={headerCells.length}>Affinity to (total of {rows.length})</th></tr>
+        <tr><th> </th>{headerCells}</tr>
+      </thead>
+      <tbody>
+      {rows}
+      </tbody>
+    </table>
+    );
+  }
 
+  render() {
+    //console.log("render start: " + JSON.stringify(this.data));
+    let gbstate = window.redux.getState();
+
+    if (!this.data || !gbstate.user) {
       return (
-      <div>
-{/*}        <TopMenu/> */}
+        <div className="notification">No data</div>
+      );
+    } else if (this.state.isEditMode) {
+      return (<div>
         <WebUser/>
-        {/*}
-        <div className="notification">LoadCount {this.state.loadCount}
-            <button onClick={this.reloadClickHandle}>Reload</button>
+        <div>{Utils.squashStr(this.data, 3)}</div>
+        <hr/>
+        <h3>This will be Edit!</h3>
+        <GroupsEdit onSave={this.finishEdit}/>
+      </div>);
+    } else {
+      console.log("Groups.render, data=" + Utils.squashStr(this.data));
+      let openEditTitle = gbstate.user.editingSetTitle || null;
+      return (<div>
+        <WebUser/>
+        <hr/>
+        <div className="pageband">
+          <h3>{this.data.title || ("Group Set #" + this.data.ID)}</h3><br/>
+          {this.data.description}
         </div>
-        <div className="notification">{typeof(this.data) + ": " +
-        //JSON.stringify(Utils.squash(this.data))
-        JSON.stringify(this.data)
-      }</div>
-    */}
-        <table className="info_table">
-          <thead>
-            <tr><th> </th><th colSpan={headerCells.length}>Affinity to (total of {rows.length})</th></tr>
-            <tr><th> </th>{headerCells}</tr>
-          </thead>
-          <tbody>
-          {rows}
-          </tbody>
-        </table>
+        <br/>
+        {(openEditTitle? (
+        <button onClick={() => {this.setState({isEditMode: true});}}>Continue Editing {openEditTitle}</button>
+        ) : (<>
+          <button onClick={() => { this.startEdit(this.data.ID);}}>Start Edit</button>
+          <button onClick={() => { this.startEdit(null);}}>Start New Set</button>
+        </>)
+        )}
+        
+        {this.renderGroupsView(this.data.groups)}
         <br/>
         <AffinityEdit moniker="a" name="GroupA" tomoniker="b" toname="GroupB" value="0.17"/>
         <h3>Bills</h3>
       <BillsAdmin/>
-      </div>
-      );
+    </div>);
     }
   }
 }

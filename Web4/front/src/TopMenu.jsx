@@ -17,6 +17,10 @@ export class TopMenu extends React.Component
                 <span className="menu_item_left">
                     <a className="menu_link" href={Utils.localURL("/groups")}>Groups</a>
                 </span>
+                <span className="menu_item_left">
+                    <a className="menu_link" href={Utils.localURL("/docs/docs.html")}>Docs</a>
+                </span>
+
                 <span className="menu_item_right">
                     <a className="menu_link" href={Utils.localURL("/about")}>About</a>
                 </span>

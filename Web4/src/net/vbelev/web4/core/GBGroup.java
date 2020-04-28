@@ -13,7 +13,8 @@ public class GBGroup {
 
 	/** This ID is set by GBEngine to back-reference the position in groups[] */
 	public int ID;
-	/** This is the stable (exportable) ID to be used for storage */
+	/** This is the stable (exportable) ID to be used for storage.
+	 * We need the monikers to link bill records with the groups */
 	public String moniker;
 	public String name;
 	/** affinity[groupB] = 0.3 here means "30% of my members are also in groupB" */  

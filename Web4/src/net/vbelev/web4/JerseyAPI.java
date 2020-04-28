@@ -16,7 +16,6 @@ import net.vbelev.web4.core.*;
 import net.vbelev.web4.ui.*;
 import net.vbelev.web4.utils.Utils;
 
-@Path("/")
 public class JerseyAPI
 {
 	@Context 
@@ -33,8 +32,14 @@ public class JerseyAPI
 		
 		/** this might not be saved at all, a new user */
 		public WebUser user;
+		/** currently selected profile, there will always be an instance */
 		public GBProfile currentProfile;
-		public GBBill currentBill;
+		
+		/** the bill record for editing */
+		public GBBill editingBill;
+		/** the group set for editing - it may be null. It's a different instance from the engine's group set*/
+		public GBGroupSet editingSet; 
+		
 		public final List<String> messages = new ArrayList<String>();
 	}
 
@@ -66,10 +71,11 @@ public class JerseyAPI
 		if (res.currentProfile == null)
 		{
 			res.currentProfile = new GBProfile();
+			res.currentProfile.setID = 0; // the default set ?
 		}
 		return res;
 	}
-
+/*
 	protected GBEngine getGBEngine(boolean forceNew)
 	{
 		if (forceNew)
@@ -78,214 +84,41 @@ public class JerseyAPI
 		}
 		return getGBEngine();
 	}
-	protected GBEngine getGBEngine()
+*/	
+	protected GBEngine getGBEngine(boolean forceNew)
 	{
 		synchronized(CONTEXT_ENGINE_PARAM) // to keep it simple, make everybody wait until the engine is loaded.
 		{
-			GBEngine res = null;
-			String root = Utils.NVL(context.getInitParameter("dataFolder"), ".");
+			GBEngine res = null;			
+			Object engineObj = context == null? null : context.getAttribute(CONTEXT_ENGINE_PARAM);
 			
-			if (context == null)
+			if (forceNew || engineObj == null || !(engineObj instanceof GBEngine))
 			{
 				//GBFileStorage storage = new GBFileStorage(root);
-				GBMongoStorage storage = new GBMongoStorage("");
-				res = GBEngine.loadEngine(storage);
-			}
-			else 
-			{
-				Object oRes = request.getSession().getAttribute(CONTEXT_ENGINE_PARAM);
-				if (oRes == null || !(oRes instanceof GBEngine))
+				String mongoConnection = Utils.NVL(context.getInitParameter("mongoConnection"), "");
+				String dataFolder = Utils.NVL(context.getInitParameter("dataFolder"), ".");
+				if (!Utils.IsEmpty(mongoConnection))
 				{
-					//GBFileStorage storage = new GBFileStorage(root);
-					GBMongoStorage storage = new GBMongoStorage("");
+					GBMongoStorage storage = new GBMongoStorage(mongoConnection);
 					res = GBEngine.loadEngine(storage);
-					request.getSession().setAttribute(CONTEXT_ENGINE_PARAM, res);
 				}
 				else
 				{
-					res = (GBEngine)oRes;
+					GBFileStorage storage = new GBFileStorage(dataFolder);
+					res = GBEngine.loadEngine(storage);
 				}
+			}
+			else 
+			{
+				res = (GBEngine)engineObj;
 			}
 			res.storage.ping(false);
 			return res;
 		}
 	}
 	
-// ====== Web Users =====	
-	public static class GetUserModel
-	{
-		public Integer ID;
-		public String name;
-		public String status;
-		public Integer currentProfileID;
-		public Hashtable<Integer, String> profiles;
-		
-		public void FromWebUser(WebUser user, GBEngine engine, GBProfile profile)
-		{
-			List<Integer> profiles = new ArrayList<Integer>();
-			synchronized(user)
-			{
-			this.ID = user.ID;
-			this.name = Utils.NVL(user.name, "(Unknown)");
-			this.status = user.status.toString();
-			if (profile != null)
-			{
-				this.currentProfileID = profile.ID;
-			}
-
-			profiles.addAll(user.profiles);
-			}
-			this.profiles = new Hashtable<Integer, String>();
-			//this.profiles.put(null,  "(New Profile)");
-			for (Integer profileID : profiles)
-			{
-				GBProfile f = engine.getProfile(profileID.intValue());
-				if (f != null)
-				{
-					this.profiles.put(profileID,  f.name);
-				}
-			}
-		}
-	}
+// ==== Shared model classes =====
 	
-	@Path("/get_user")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetUserModel getUser()
-	//public Response getUser()
-	{
-		GetUserModel res = new GetUserModel();
-		
-		GBEngine engine = getGBEngine();
-		Web4Session session = getWeb4Session();
-		WebUser u = session.user;
-		res.FromWebUser(u, engine, session.currentProfile);
-		//return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
-		return res;
-	}
-	
-	public class UpdateUserModel
-	{
-		public String name;	
-		public String login;
-	}
-	
-	@Path("/update_user")	
-    @POST
-    @Produces(MediaType.APPLICATION_JSON)
-	@Consumes(MediaType.APPLICATION_JSON)
-	public GetUserModel updateUser(UpdateUserModel args)
-	//public Response updateUser(UpdateUserModel args)
-	{
-		Web4Session session = getWeb4Session();
-		synchronized(session)
-		{
-			WebUser u = session.user;
-			u.name = args.name;
-			u.login = args.login;
-		}
-		return getUser();
-	}
-
-	@Path("/init_user")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetUserModel initUser(@QueryParam("login") String login, @QueryParam("withProfile") String withProfile)
-	{
-		Web4Session session = getWeb4Session();
-		if (session.user.ID != null)
-		{
-			throw new IllegalArgumentException("The current user is already initialized (ID=" + session.user.ID + ")");
-		}
-		login = Utils.NVL(login, session.user.login, "").trim().toLowerCase();
-		if (!GBEngine.webUserLoginPattern.matcher(login).matches())
-		{
-			throw new IllegalArgumentException("The login name is not valid: " + login);
-		}
-		
-		GBEngine engine = this.getGBEngine(); 
-		Hashtable<String, Integer> userIndex = new Hashtable<String, Integer>();
-		engine.loadWebUserIndex(userIndex);
-		
-		if (userIndex.containsKey(login))
-		{
-			throw new IllegalArgumentException("The login name is not available: " + login);
-		}
-		
-		session.user.login = login;
-		session.user.status = WebUser.StatusEnum.ACTIVE;
-		if (Utils.IsEmpty(session.user.name))
-		{
-			session.user.name = login;
-		}
-		engine.saveWebUser(session.user);
-		if (withProfile != null)
-		{
-			engine.saveProfile(session.currentProfile);
-		}
-		GetUserModel res = new GetUserModel();
-		res.FromWebUser(session.user, engine, session.currentProfile);
-		return res;
-	}
-	
-	@Path("/login")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetUserModel loginUser(@QueryParam("login") String login)
-	{
-		Web4Session session = getWeb4Session();
-		if (session.user.ID != null)
-		{
-			throw new IllegalArgumentException("There is a logged-in user " + session.user.name + " already, (ID=" + session.user.ID + ")");
-		}
-		login = Utils.NVL(login, session.user.login, "").trim().toLowerCase();
-		if (!GBEngine.webUserLoginPattern.matcher(login).matches())
-		{
-			throw new IllegalArgumentException("The login name is not valid: " + login);
-		}
-		
-		GBEngine engine = this.getGBEngine(); 
-		Hashtable<String, Integer> userIndex = new Hashtable<String, Integer>();
-		engine.loadWebUserIndex(userIndex);
-		
-		Integer userID = userIndex.getOrDefault(login,  null);
-		if (userID == null)
-		{
-			throw new IllegalArgumentException("The login name is not known: " + login);
-		}
-		
-		session.user = engine.loadWebUser(userID);
-		if (session.user != null && !session.user.profiles.isEmpty())
-		{
-			Integer profileID = session.user.profiles.get(0);
-			GBProfile profile = engine.loadProfile(profileID);
-			session.currentProfile = profile;
-		}
-
-		return getUser();
-	}
-	
-	@Path("/logout")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetUserModel logoutUser()
-	{
-		Web4Session session = getWeb4Session();
-		
-		session.user = new WebUser();
-		session.currentProfile = new GBProfile();
-
-		return getUser();
-	}
-	
-	@Path("/http-headers")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getAllHttpHeaders(final @Context HttpHeaders httpHeaders) {
-        return Response.ok(httpHeaders.getRequestHeaders()).build();
-    }
-	
-// ====== Groups =====	
 	public static class GetAffinity
 	{
 		public String toMoniker;
@@ -296,9 +129,9 @@ public class JerseyAPI
 		{
 		}
 		
-		public GetAffinity(GBAffinity aff, GBEngine engine)
+		public GetAffinity(GBAffinity aff, GBGroupSet gblist)
 		{
-			this.toMoniker = engine.getGroupMoniker(aff.toID());
+			this.toMoniker = gblist.getGroupMoniker(aff.toID());
 			this.value = aff.value();
 			if (this.toMoniker == null)
 			{
@@ -316,126 +149,56 @@ public class JerseyAPI
 		public String moniker;
 		public String name;
 		public List<GetAffinity> affinities;
-	}
-	
-	@Path("/get_groups")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public List<GetGroup> getGroups(@QueryParam("force") String force) {
-        //return Response.ok(httpHeaders.getRequestHeaders()).build();
-		GBEngine engine = this.getGBEngine(force != null); 
-		List<GBGroup> allGroups = engine.getGroups();
-		List<GetGroup> res = new ArrayList<GetGroup>();
-		for (GBGroup g : allGroups)
+		
+		public GetGroup()
 		{
-			GetGroup gg = new GetGroup();
-			gg.name = g.name;
-			gg.moniker = g.moniker;
-			gg.affinities = new ArrayList<GetAffinity>();
-			for (GBGroup g2 : allGroups)
+		}
+		
+		public void fromGBGroup(GBGroup g, GBGroupSet gblist)
+		{
+			this.name = g.name;
+			this.moniker = g.moniker;
+			this.affinities = new ArrayList<GetAffinity>();
+			for (GBGroup g2 : gblist.getGroups())
 			{
-				GBAffinity gf = engine.getAffinity(g,  g2.ID, false);
-				gg.affinities.add(new GetAffinity(gf, engine));
+				GBAffinity gf = gblist.getAffinity(g,  g2.ID, false);
+				this.affinities.add(new GetAffinity(gf, gblist));
 			}			
-			res.add(gg);
 		}
-		//return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
-		return res;
 	}
 	
-	public static class UpdateGroup
+	
+	public static class GetGroupSet
 	{
-		public String moniker;
-		public String name;
-	}
-	
-	@Path("/update_group")	
-    @POST
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-	public List<GetGroup> updateGroup(UpdateGroup group)
-	{
-		GBEngine engine = this.getGBEngine(); 
-
-		if (Utils.IsEmpty(group.moniker) || Utils.IsEmpty(group.name))
-		{
-			throw new IllegalArgumentException("Moniker and name must not be empty");
-					
-		}
-		GBGroup oldGroup = engine.getGroup(group.moniker);
-		if (oldGroup != null && group.name.contentEquals(oldGroup.name))
-		{
-			// do nothing
-		}
-		else if (oldGroup != null)
-		{
-			oldGroup.name = group.name;
-			engine.saveGroups();
-		}
-		else
-		{
-			int size = engine.getSize();
-			engine.setSize(size + 1);
-			engine.getGroup(size).name = group.name;
-			engine.saveGroups();
-		}
-		return getGroups(null);
-	}
-	
-	@XmlRootElement
-	public static class SetAffinity
-	{
-		public String moniker;
-		public String toMoniker;
-		public Double value;
+		public Integer ID;
+		public String title;
+		public String description;
+		public List<GetGroup> groups;
 		
-		public SetAffinity()
+		public GetGroupSet()
 		{
+		}
+			
+		public void fromGBGroupSet(GBGroupSet gblist)
+		{
+			if (gblist == null)
+			{
+				return;
+			}
+			this.ID = gblist.ID;
+			this.title = Utils.NVL(gblist.title, "");
+			this.description = Utils.NVL(gblist.description, "");
+			this.groups = new ArrayList<GetGroup>();
+			
+			for (GBGroup g : gblist.getGroups())
+			{
+				GetGroup gg = new GetGroup();
+				gg.fromGBGroup(g, gblist);
+				this.groups.add(gg);
+			}
 		}
 	}
 	
-	@Path("/set_affinity")	
-    @POST
-    @Consumes(MediaType.APPLICATION_JSON)
-    //@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-    @Produces(MediaType.APPLICATION_JSON)
-	public Response setAffinity(SetAffinity args)
-	{
-		GBEngine engine = this.getGBEngine(); 
-		GBGroup g = engine.getGroup(args.moniker);
-		GBGroup g2 = engine.getGroup(args.toMoniker);
-		GBAffinity aff = null;
-		
-		if (g == null || g2 == null || g.ID == g2.ID)
-		{
-			throw new IllegalArgumentException("Invalid group monikers provided");
-		}
-		if (args.value < 0 || args.value > 1) 
-		{
-			throw new IllegalArgumentException("Value must be between 0 and 1");
-		}
-		if (args.value == null)
-		{
-			g.setAffinity(g2.ID,  0, GBAffinity.QualityEnum.NONE);
-			aff = engine.getAffinity(g, g2.ID, true);
-		}
-		else
-		{
-			aff = g.setAffinity(g2.ID,  args.value, GBAffinity.QualityEnum.SET);
-		}
-		engine.calculateAll();
-		
-		engine.saveGroups();
-		
-		aff = engine.getAffinity(g, g2.ID, false);
-		
-		GetAffinity res = new GetAffinity(aff, engine);
-		return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-				.build();
-	}
-	
-// ====== Bills =====	
 	public static class GetBill
 	{
 		public Integer ID;
@@ -445,6 +208,10 @@ public class JerseyAPI
 		public String publishedDate;
 		public String profileSay;
 		public Date profileSayDate;
+		/** The balance of assigned values only: when editing, aim for the editScore of 0 */
+		public double editScore;
+		/** The balance of all bill values, assigned and calculated */
+		public double billScore;
 		public List<GetAffinity> invAffinities;
 		/** what actions are allowed on this bill, for this user. The idea is to control the workflow from the server side **/
 		public List<String> actions;
@@ -464,12 +231,16 @@ public class JerseyAPI
 			*/
 			this.status = bill.status == null? "(null)" : bill.status.name();
 			this.publishedDate = Utils.formatDateTime(bill.publishedDate);
+			this.editScore = bill.getScore(true);
+			this.billScore = bill.getScore(false);
 			this.invAffinities = new ArrayList<GetAffinity>();
 			
-			for (int ind = 0; ind < engine.getSize(); ind++)
+			GBGroupSet gblist = engine.getGroupSet(bill.setID);
+			
+			for (int ind = 0; ind < gblist.getSize(); ind++)
 			{
 				GBAffinity aff = bill.getInvAffinity(ind);
-				GetAffinity gaf = new GetAffinity(aff, engine);
+				GetAffinity gaf = new GetAffinity(aff, gblist);
 				this.invAffinities.add(gaf);
 			}
 			if (votes != null && bill.ID != null)
@@ -490,6 +261,24 @@ public class JerseyAPI
 		}
 	}
 
+	public List<GetGroup> getGroups(GBGroupSet gblist)
+	{
+		List<GBGroup> allGroups = gblist.getGroups();
+		ArrayList<GetGroup> res = new ArrayList<GetGroup>();
+		for (GBGroup g : allGroups)
+		{
+			GetGroup gg = new GetGroup();
+			gg.fromGBGroup(g, gblist);
+			res.add(gg);
+		}
+		//return Response.ok(res).header("Access-Control-Allow-Origin", "*").build();
+		return res;
+	}
+	
+	
+	
+	/** The workflow control method - eventually we'll move it to a separate class.
+	 */
 	public List<String> billActions(GBBill bill, Collection<GBVote> votes)
 	{
 		List<String> res = new ArrayList<String>();
@@ -512,8 +301,13 @@ public class JerseyAPI
 		if (bill.status == GBBill.StatusEnum.NEW)
 		{
 			res.add("edit");
-			res.add("publish");
 			res.add("delete");
+			double editScore = bill.getScore(true);
+			if (editScore > - 0.1 && editScore < 0.1)
+			{
+				res.add("publish");
+			}
+			
 		}
 		else if (bill.status == GBBill.StatusEnum.PUBLISHED)
 		{
@@ -523,546 +317,11 @@ public class JerseyAPI
 		return res;
 
 	}
-	@Path("/get_bill")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetBill getBill(@QueryParam("billID") Integer billID)
+
+	public Response response500(String message)
 	{
-		GetBill res = new GetBill();
-		GBBill bill = null;
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		if (billID == null)
-		{
-			if (session.currentBill == null)
-			{
-				session.currentBill = new GBBill();
-			}
-			bill = session.currentBill; 
-		}
-		else
-		{
-			bill = engine.getBill(billID.intValue(), false);
-			if (bill == null)
-			{
-				throw new IllegalArgumentException("Invalid billID: " + billID);
-				//return Response.status(500, "Invalid billID: " + billID)
-				//	//.header("Access-Control-Allow-Origin", "*")
-				//	.build()
-				//;		
-			}
-			session.currentBill = bill;
-		}
-		
-		res.fromGBBill(bill, engine, session.currentProfile.votes);
-		//return Response.ok(res)
-			//.header("Access-Control-Allow-Origin", "*")
-		//	.build()
-		//;
-		res.actions = billActions(bill, session.currentProfile.votes);
-		return res;
-	}
-
-	@Path("/get_bills")	
-	@GET
-	@Produces(MediaType.APPLICATION_JSON)
-	public List<GetBill> getBills(@QueryParam("force") String force)
-	{
-		ArrayList<GetBill> res = new ArrayList<GetBill>();
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		GBProfile profile = session.currentProfile;
-		if (profile == null)
-		{
-			profile = new GBProfile();
-		}
-		if (force != null)
-		{
-			engine.loadBills();
-		}
-		GBBill[] bills = engine.bills.values().stream()
-				.filter(q -> q.status == GBBill.StatusEnum.PUBLISHED)
-				.toArray(GBBill[]::new)
-		;
-		Arrays.sort(bills, new Comparator<GBBill>() {
-
-			@Override
-			public int compare(GBBill b1, GBBill b2)
-			{
-				if (b1 == null && b2 == null) return 0;
-				else if (b1 == null) return -1;
-				else if (b2 == null) return 1;
-				else if (b1.publishedDate == null && b2.publishedDate == null) return 0;
-				else if (b1.publishedDate == null) return -1;
-				else if (b2.publishedDate == null) return 1;
-				else return b2.publishedDate.compareTo(b2.publishedDate);
-			}
-		});
-		
-		for (GBBill bill : bills)
-		{
-			GetBill g = new GetBill();
-			g.fromGBBill(bill, engine, profile.votes);
-			g.actions = billActions(bill, profile.votes);
-			res.add(g);
-		}
-		//return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-		//		.build()
-		//	;
-		return res;		
-	}
-
-
-	/**
-	 * A list of bills for editing and search. When getBills will show only current bills,
-	 * this will be used for viewing unfinished and archived bills, probably with a filter.
-	 * This does not include your current in-memory bill. 
-	 * @param mode
-	 * @return
-	 */
-	@Path("/get_bills_archive")	
-	@GET
-	@Produces(MediaType.APPLICATION_JSON)
-	public List<GetBill> getBillsArchive(@QueryParam("mode") String mode, @QueryParam("force") String force)
-	{
-		ArrayList<GetBill> res = new ArrayList<GetBill>();
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		//GBProfile profile = session.currentProfile;
-		//if (profile == null)
-		//{
-		//	profile = new GBProfile();
-		//}
-		if (force != null)
-		{
-			engine.loadBills();
-		}
-		Stream<GBBill> billStream = engine.bills.values().stream();
-		if ("published".equals(mode))
-		{
-			billStream = billStream.filter(q -> q.status == GBBill.StatusEnum.PUBLISHED); 
-		}
-		else if ("new".equals(mode))
-		{
-			billStream = billStream.filter(q -> q.status == GBBill.StatusEnum.NEW); 
-		}
-		GBBill[] bills = billStream.toArray(GBBill[]::new);
-		Arrays.sort(bills, new Comparator<GBBill>() {
-
-			@Override
-			public int compare(GBBill b1, GBBill b2)
-			{
-				if (b1 == null && b2 == null) return 0;
-				else if (b1 == null) return -1;
-				else if (b2 == null) return 1;
-				else if (b1.publishedDate == null && b2.publishedDate == null) return 0;
-				else if (b1.publishedDate == null) return -1;
-				else if (b2.publishedDate == null) return 1;
-				else return b2.publishedDate.compareTo(b2.publishedDate);
-			}
-		});
-		
-		for (GBBill bill : bills)
-		{
-			GetBill g = new GetBill();
-			g.fromGBBill(bill, engine, null);
-			g.actions = billActions(bill, null);
-			res.add(g);
-		}
-		//return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-		//		.build()
-		//	;
-		return res;		
-	}	
-	@Path("/test_bill")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetBill testBill()
-	{
-		GBEngine engine = this.getGBEngine(); 
-		//Web4Session session = getWeb4Session();
-		GBBill bill = new GBBill();
-		bill.publishedDate = new Date();
-		bill.title = "Test " + Utils.formatDateTime(bill.publishedDate);
-		bill.description = "Description of " + bill.title;
-		bill.status = GBBill.StatusEnum.PUBLISHED;
-		
-		// give it two affinities
-		bill.setInvAffinity(engine.random.nextInt(engine.getSize()), Math.random());
-		bill.setInvAffinity(engine.random.nextInt(engine.getSize()), Math.random());
-		bill.calculateInvAffinities(engine);
-		
-		engine.saveBill(bill);
-		
-		return getBill(bill.ID);
-	}
+			return Response.status(500, message).build();
+				//.header("Access-Control-Allow-Origin", "*").build();		
 	
-	/** sets the current session bill and returns it for editing;
-	 * it's rather similar to getBill
-	 * 
-	 * @param billID
-	 * @return
-	 */
-	@Path("/edit_bill")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetBill editBill(@QueryParam("billID") Integer billID, @QueryParam("reload") String reload)
-	{
-		GBBill bill = null;
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		
-		if (session.currentBill != null
-				&& reload == null
-				&& (billID == null || Utils.equals(session.currentBill.ID, billID)))
-		{
-			bill = session.currentBill;
-		}
-		else if (billID == null)
-		{
-			session.currentBill = new GBBill();
-			bill = session.currentBill; 
-		}
-		else
-		{
-			bill = engine.getBill(billID.intValue(), false);
-			if (bill == null)
-			{
-				throw new IllegalArgumentException("Invalid billID: " + billID);
-				//return Response.status(500, "Invalid billID: " + billID)
-				//	//.header("Access-Control-Allow-Origin", "*")
-				//	.build()
-				//;		
-			}
-				
-//			if (bill.status != GBBill.StatusEnum.NEW)
-//			{
-//				throw new IllegalArgumentException("bill ID " + billID + " is " + bill.status + " and cannot be edited");
-//			}
-			session.currentBill = bill;
-		}
-		GetBill res = new GetBill();
-		res.fromGBBill(bill, engine, null);
-		//return Response.ok(res)
-			//.header("Access-Control-Allow-Origin", "*")
-		//	.build()
-		//;
-		return res;
-	}
-
-	public static class UpdateBill
-	{
-		public Integer ID;
-		public String title;
-		public String description;
-		public String action;
-		public List<GetAffinity> invAffinities;
-	}
-	
-	/**
-	 * This will receive the bill object (UpdateBill), copy it to the session.currentBill, 
-	 * recalculate affinities and return the whole bill (GetBill).
-	 * The optional action will save or publish the bill after updating.
-	 * The trick is to send UpdateBill correctly. 
-	 * @param update
-	 * @return
-	 */
-	@Path("/update_bill")	
-    @POST
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetBill updateBill(UpdateBill update)
-	{
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		GBBill bill = session.currentBill;
-		
-		if (bill == null || bill.ID != update.ID)
-		{
-			if (update.ID != null)
-			{
-				bill = engine.getBill(update.ID, true);
-			}
-			else
-			{
-				bill = new GBBill();
-			}
-			session.currentBill = bill;
-		}
-		
-		if (false && bill.status != GBBill.StatusEnum.NEW)
-		{
-			throw new IllegalArgumentException("bill ID " + bill.ID + " is " + bill.status + " and cannot be edited");
-		}
-		
-		bill.title = Utils.NVL(update.title, "").trim();
-		bill.description = Utils.NVL(update.description, "").trim();
-		bill.invAffinities.clear();
-		if (update.invAffinities != null)
-		{
-			for (GetAffinity ga : update.invAffinities)
-			{
-				GBGroup g = engine.getGroup(ga.toMoniker);
-				GBAffinity.QualityEnum q = Utils.tryParseEnum(ga.quality, GBAffinity.QualityEnum.SET);
-				if (g != null && q == GBAffinity.QualityEnum.SET)
-				{
-					bill.setInvAffinity(g.ID, ga.value);
-				}
-			}
-			bill.calculateInvAffinities(engine);
-		}
-		
-		if ("save".equals(update.action))
-		{
-			engine.saveBill(bill);
-		}
-		else if ("publish".equals(update.action))
-		{
-			bill.status = GBBill.StatusEnum.PUBLISHED;
-			engine.saveBill(bill);
-		}
-		return editBill(null, null);
-	}
-	
-	/**
-	 * the full updateBill() is heavy, it causes an OPTIONS call.
-	 * So, to support simple recalcs, we make a GET update of one aff value only.
-	 * This method will not load a bill by ID, but it will create a blank one if needed
-	 * @param update
-	 * @return
-	 */
-	@Path("/update_bill_aff")	
-    @GET
-    //@Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetBill updateBillAff(@QueryParam("moniker") String moniker, @QueryParam("value") double value)
-	{
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		GBBill bill = session.currentBill;
-		
-		if (bill == null)
-		{
-			bill = new GBBill();
-			session.currentBill = bill;
-		}
-		GBGroup g = engine.getGroup(moniker);
-		if (g != null)
-		{
-			bill.setInvAffinity(g.ID, value);
-		}
-		bill.calculateInvAffinities(engine);
-
-		return editBill(null, null);
-	}
-	
-	
-// ====== Profiles =====	
-	public static class GetProfile
-	{
-		public Integer ID;
-		public String name;
-		public String saveDate;
-		
-		public List<GetAffinity> invAffinities;
-		
-		public GetProfile()
-		{
-		}
-		
-		public void fromGBProfile(GBProfile profile, GBEngine engine)
-		{
-			this.ID = profile.ID;
-			this.name = profile.name;
-			this.saveDate = Utils.formatDateTime(profile.saveDate);
-			this.invAffinities = new ArrayList<GetAffinity>();
-			
-			for (int ind = 0; ind < engine.getSize(); ind++)
-			{
-				GBAffinity aff = new GBAffinity(ind, profile.getInvAffinity(ind));
-				GetAffinity gaf = new GetAffinity(aff, engine);
-				this.invAffinities.add(gaf);
-			}
-		}
-	}
-	
-	/**
-	 * Always returns the current (session) profile. 
-	 * @param profileID
-	 * @return
-	 */
-	@Path("/get_profile")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public GetProfile getProfile()
-	{
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		GBProfile profile = session.currentProfile;
-		GetProfile res = new GetProfile();
-		res.fromGBProfile(profile, engine);
-		
-//		return Response.ok(res)
-//				//.header("Access-Control-Allow-Origin", "*")
-//				.build()
-//			;
-		return res;
-	}
-
-	/**
-	 * If the profileID is not null, then loads the profile as current and returns it.
-	 * If the profileID is null, creates a new profile, sets it as current and returns it.
-	 * If force is null and the current profile ID matches profileID, return the current profile.
-	 * If force is not null, abandond the current profile and load/create it again.
-	 * @param profileID
-	 * @return
-	 */
-	@Path("/load_profile")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public Response loadProfile(@QueryParam("profileID") Integer profileID, @QueryParam("force") String force)
-	{
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		GBProfile profile = null;
-		if (force == null && Utils.equals(session.currentProfile.ID, profileID))
-		{
-			profile = session.currentProfile;
-		}
-		else if (profileID == null)
-		{
-			profile = new GBProfile();
-			session.currentProfile = profile;
-		}
-		else
-		{
-			profile = engine.loadProfile(profileID);
-			if (profile == null)
-			{
-				return Response.status(500, "Invalid profileID: " + profileID)
-						.header("Access-Control-Allow-Origin", "*").build()
-					;
-			}
-			session.currentProfile = profile;
-		}
-		GetProfile res = new GetProfile();
-		res.fromGBProfile(profile, engine);
-		
-		return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-				.build()
-			;
-	}
-
-	public static class UpdateProfile
-	{
-		public String name;
-		public String action;
-	}
-	
-	@Path("/update_profile")	
-    @POST
-    @Produces(MediaType.APPLICATION_JSON)
-	@Consumes(MediaType.APPLICATION_JSON)
-	public GetProfile updateProfile(UpdateProfile args)
-	{
-		Web4Session session = getWeb4Session();
-		GBProfile profile = session.currentProfile;
-		if (args.name != null)
-		{
-			profile.name = args.name.trim();
-		}
-		if ("reset".equals(args.action))
-		{
-			profile.votes.clear();
-			profile.invAffinities.clear();
-		}
-		return getProfile();
-	}	
-	/** saves the current profile. If it's a new profile, assigns an ID to it
-	 * and adds it ot the WebUser. Saves the current WebUser if needed.
-	 * 
-	 * @return
-	 */
-	@Path("/save_profile")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public Response saveProfile()
-	{
-		GBEngine engine = this.getGBEngine(); 
-		Web4Session session = getWeb4Session();
-		GBProfile profile = session.currentProfile;
-		if (session.user.ID == null)
-		{
-			throw new IllegalArgumentException("Only registered users can save profiles");
-		}
-		boolean updateWebUser = (profile.ID == null);
-		if (Utils.IsEmpty(profile.name))
-		{
-			profile.name = "Created on " + Utils.formatDateTime(new Date());
-		}
-		engine.saveProfile(profile);
-		
-		if (updateWebUser)
-		{
-			if (!session.user.profiles.contains(profile.ID))
-			{
-				session.user.profiles.add(profile.ID);
-			}
-			engine.saveWebUser(session.user);
-			
-		}
-		GetProfile res = new GetProfile();
-		res.fromGBProfile(profile, engine);
-		
-		return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-				.build()
-			;	
-	}
-	
-	@Path("/set_vote")	
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-	public Response setVote(@QueryParam("billID") Integer billID, @QueryParam("say") String say)
-	{
-		GBEngine engine = this.getGBEngine(); 
-
-		GBVote.SayEnum argSay = Utils.tryParseEnum(say, GBVote.SayEnum.NONE);
-		GBBill bill = engine.getBill(billID, true);
-		if (argSay == GBVote.SayEnum.NONE || bill == null)
-		{
-			throw new IllegalArgumentException("Invalid arguments: " + say + ", " + billID);
-		}
-		if (bill.status != GBBill.StatusEnum.PUBLISHED)
-		{
-			throw new IllegalArgumentException("Bill #" + billID + " is not open for voting (" + bill.status.name() + ")");
-		}
-		
-		Web4Session session = getWeb4Session();
-		GBProfile profile = session.currentProfile;
-		GBVote oldVote = profile.getVote(billID);
-		if (oldVote != null)
-		{
-			throw new IllegalArgumentException("Bill #" + billID 
-					+ " is already decided: " + oldVote.say.name()
-					+ " on " + Utils.formatDateTime(oldVote.sayDate)
-			);
-		}
-		GBVote newVote = new GBVote();
-		newVote.billID = bill.ID;
-		newVote.say = argSay;
-		newVote.sayDate = new Date();
-		profile.addVote(bill.getInvAffinityValues(engine.getSize()), newVote );
-		
-		GetProfile res = new GetProfile();
-		res.fromGBProfile(profile, engine);
-		
-		return Response.ok(res)
-				//.header("Access-Control-Allow-Origin", "*")
-				.build()
-			;	
 	}
 }

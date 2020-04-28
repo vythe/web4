@@ -12,8 +12,13 @@ public class GBGroupListXML
 	public static final String STORAGE_NAME = "groups"; 
 
 	@XmlAttribute
+	public Integer ID;
+	public String title;
+	public String description;
+
+	@XmlAttribute
 	public Date saveTime;
-	
+		
 	public static class GBGroupXML
 	{
 		@XmlAttribute
@@ -21,7 +26,7 @@ public class GBGroupListXML
 		public String name;
 		public List<GBAffinityXML> affinities;
 	
-		public void fromGBGroup(GBEngine engine, GBGroup group)
+		public void fromGBGroup(GBGroupSet gblist, GBGroup group)
 		{
 			this.moniker = group.moniker;
 			this.name = group.name;
@@ -29,7 +34,7 @@ public class GBGroupListXML
 			for (GBAffinity aff : group.getAffinities(false))
 			{
 				GBAffinityXML ax = new GBAffinityXML();
-				ax.fromGBAffinity(engine, aff);
+				ax.fromGBAffinity(gblist, aff);
 				this.affinities.add(ax);
 			}			
 		}
@@ -43,7 +48,7 @@ public class GBGroupListXML
 			return g;
 		}
 		
-		public GBGroup toGBGroupAffinities(GBEngine engine, GBGroup g)
+		public GBGroup toGBGroupAffinities(GBGroupSet gblist, GBGroup g)
 		{
 			if (g == null) g = new GBGroup();
 			
@@ -52,7 +57,7 @@ public class GBGroupListXML
 			{
 			for (GBAffinityXML ax : this.affinities)
 			{
-				GBAffinity aff = ax.toGBAffinity(engine);
+				GBAffinity aff = ax.toGBAffinity(gblist);
 				g.affinities.put(aff.toID(), aff);
 			}
 			}
@@ -62,30 +67,52 @@ public class GBGroupListXML
 	
 	public List<GBGroupXML> groups;
 	
-	public void fromEngine(GBEngine engine)
+	public void fromGroupSet(GBGroupSet set)
 	{
 		groups = new ArrayList<GBGroupXML>();
-		for (GBGroup g : engine.getGroups())
+		for (GBGroup g : set.getGroups())
 		{
 			GBGroupXML gx = new GBGroupXML();
-			gx.fromGBGroup(engine, g);
+			gx.fromGBGroup(set, g);
 			groups.add(gx);			
 		}
 		
+		this.ID = set.ID;
+		this.title = set.title;
+		this.description = set.description;
+		if (set.timestamp <= 0)
+		{
 		saveTime = new Date();
+		}
+		else
+		{
+			saveTime = set.getTimeModified();
+		}
 	}
 	
-	public void toEngine(GBEngine engine)
+	public void toGroupSet(GBGroupSet gblist)
 	{
 		int size = this.groups.size();
-		engine.setSize(size);
+		gblist.setSize(size);
 		for (int i = 0; i < size; i++)
 		{
-			this.groups.get(i).toGBGroupCore(engine.getGroup(i));
+			this.groups.get(i).toGBGroupCore(gblist.getGroup(i));
 		}
 		for (int i = 0; i < size; i++)
 		{
-			this.groups.get(i).toGBGroupAffinities(engine, engine.getGroup(i));
+			this.groups.get(i).toGBGroupAffinities(gblist, gblist.getGroup(i));
 		}
+		gblist.ID = Utils.NVL(this.ID, 0);
+		gblist.title = this.title;
+		gblist.description = this.description;
+		if (this.saveTime != null)
+		{
+			gblist.timestamp = this.saveTime.getTime();			
+		}
+		else
+		{
+			gblist.timestamp =new Date().getTime();
+		}
+		
 	}
 }

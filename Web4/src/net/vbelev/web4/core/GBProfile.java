@@ -17,6 +17,8 @@ public class GBProfile
 	 * note that profile IDs are primary keys, they are not mapped to anything
 	 */
 	public Integer ID;
+	public Integer setID;
+	public String groupListID;
 	public String name;
 	public Date saveDate;
 

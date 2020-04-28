@@ -17,7 +17,7 @@ if (mongoAttr instanceof net.vbelev.web4.GBMongoStorage)
 }
 else
 {
-	storage = new net.vbelev.web4.GBMongoStorage("test");
+	storage = new net.vbelev.web4.GBMongoStorage("mongodb://web4:vbelevweb4@vbelev.net:27017/web4?authSource=admin");
 	request.getSession().setAttribute("mongo", storage);
 }
 String query = request.getParameter("query");

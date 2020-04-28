@@ -158,4 +158,26 @@ public class Utils
 		}
 		return res;
 	}
+	
+	public static <T>boolean InList(T val, Iterable<T> list)
+	{
+		if (list == null) return false;
+		if (val == null)
+		{
+			for(T elem : list)
+			{
+				if (elem == null) return true;
+			}
+			return false;
+		}
+		else
+		{
+			for(T elem : list)
+			{
+				if (elem == null) continue;
+				if (val.equals(elem)) return true;
+			}
+			return false;
+		}
+	}
 }

@@ -2,9 +2,7 @@ package net.vbelev.web4;
 
 import java.util.*;
 
-import org.bson.BsonArray;
-import org.bson.BsonValue;
-import org.bson.Document;
+import org.bson.*;
 
 import java.io.*;
 import java.nio.file.Paths;
@@ -54,7 +52,8 @@ public class GBMongoStorage implements GBEngine.Storage
 				);
 
 		//  com.mongodb.internal.operation.SyncOperations
-		connectionString = new MongoClientURI("mongodb://web4:vbelevweb4@vbelev.net:27017/web4?authSource=admin");
+		//connectionString = new MongoClientURI("mongodb://web4:vbelevweb4@vbelev.net:27017/web4?authSource=admin");
+		connectionString = new MongoClientURI(url);
 
 		mongo = new com.mongodb.MongoClient(connectionString);
 		mongoDB = mongo.getDatabase(connectionString.getDatabase());
@@ -158,26 +157,6 @@ public class GBMongoStorage implements GBEngine.Storage
 	}
 	
 	
-	public static Document mdbDocument(Object... attrs)
-	{
-		Document d = new Document();
-		for (int i = 0; i < attrs.length;)
-		{
-			String attrName = (attrs[i] == null? "" : (attrs[i] instanceof String? (String)attrs[i] : attrs[i].toString()));
-			Object attrValue = (++i >= attrs.length || attrs[i] == null) ? "" : attrs[i];
-			i++;
-			d.append(attrName, attrValue);
-		}
-		return d;
-		
-	}
-	
-	public static Object[] mdbArray(Object... elems)
-	{
-		//Object[] res = new Object[elems.length];
-		return elems.clone();
-	}
-	
 	public void testMongo()
 	{
 		/*
@@ -200,37 +179,44 @@ public class GBMongoStorage implements GBEngine.Storage
 		coll.insertOne(doc);
 		*/
 	}
-	public GBGroupListXML getGroups()
+	public List<GBGroupListXML> getGroups()
 	{
 		ping(false);
 		MongoCollection<Document> coll = mongoDB.getCollection(GBGroupListXML.STORAGE_NAME); //GBGroupListXML.STORAGE_NAME);
 		//GBGroupListXML res = getOne(GBGroupListXML.class, coll.find());
 				
+		/*
 		Document d3 = coll.find().first();
 		if (d3 ==  null) return null;
 		d3.remove("_id");
 		GBGroupListXML res = xmliser.fromXML(GBGroupListXML.class, d3.toJson());
 		d3 = null;
+		return res;
+		*/
+		List<GBGroupListXML> res = getList(GBGroupListXML.class, coll.find());
 		
-		
-		//if (res == null)
-		//{
-		//	return new GBGroupListXML();
-		//}
 		return res;
 	}
 	
-	public void saveGroups(GBGroupListXML xml)
+	public void saveGroupList(GBGroupListXML xml)
 	{
+		if (xml.ID == null)
+		{
+			throw new IllegalArgumentException("Group list ID is missing");
+		}
 		ping(false);
 		//Bson c;
 		//mongoDB.runCommand(null)
 		String xmlStr = xmliser.toXMLString(xml);
 		Document d = Document.parse(xmlStr);
-		d.put("_id", 1);
+		d.put("ID", xml.ID);
 		GBGroupListXML xm2 = xmliser.fromXML(GBGroupListXML.class, d.toJson());
 		MongoCollection<Document> coll = mongoDB.getCollection(GBGroupListXML.STORAGE_NAME);
-		UpdateResult updRes = coll.replaceOne(Filters.eq("_id", 1), d, new ReplaceOptions().upsert(true)); // there is only one element, no filtering
+		UpdateResult updRes = coll.replaceOne(
+				Filters.eq("ID", 1), 
+				d, 
+				new ReplaceOptions().upsert(true)
+		); // there is only one element, no filtering
 		System.out.print(updRes.toString());
 		d = null;
 		/*
@@ -262,9 +248,11 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 	public List<GBBillXML> loadBills()
 	{
 		// here we read all bills into one list
-		List<GBBillXML> res = getList(GBBillXML.class, mongoDB.getCollection(GBBillXML.STORAGE_NAME).find().projection(new Document("_id", 0)));
+		List<GBBillXML> res = getList(GBBillXML.class, 
+				mongoDB.getCollection(GBBillXML.STORAGE_NAME).find().projection(new Document("_id", 0))
+		);
 		
-			return res;
+		return res;
 	}
 	
 
@@ -323,6 +311,27 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 				 Document.parse(json), 
 				 new ReplaceOptions().upsert(true)
 				 );	 
+	}
+	
+	public boolean deleteBill(int billID)
+	{
+		org.bson.BsonDocument cmd = MongoStorage.mdbDocument(
+				"delete", "bills",
+				"deletes", MongoStorage.mdbArray(
+					 MongoStorage.mdbDocument(
+							"q", MongoStorage.mdbDocument("ID", billID),
+						"limit", 1
+					)
+				)
+			);
+		Document res = mongoDB.runCommand(cmd);
+		Integer ok = Utils.AsClass(res.get("ok"), Integer.class);
+		if (ok != null && ok > 0)
+		{
+			Integer count = Utils.AsClass(res.get("count"), Integer.class);
+			return (count != null && count > 0);
+		}
+		return false;
 	}
 	
 	//==== GBProfile storage ====
@@ -410,9 +419,21 @@ UpdateResult result = collection.updateOne(query, toUpdate,
 				"batchSize: 999999,\r\n" +
 				"projection: { _id: 0, \"ID\" : 1, \"login\": 1}\r\n" + 
 				"}";
+		//Document d = mongoDB.runCommand(Document.parse(command));
+		
+		BsonDocument cmd1 = MongoStorage.mdbDocument(
+				"find", WebUserXML.STORAGE_NAME,
+				"filter", MongoStorage.mdbDocument(),
+				"batchSize", 99999,
+				"projection", MongoStorage.mdbDocument(
+						"_id", 0,
+						"ID",  1,
+						"login", 1
+				)
+		);
+		Document d = mongoDB.runCommand(cmd1);
 		
 		//mongoDB.getCollection("web_users").find();
-		Document d = mongoDB.runCommand(Document.parse(command));
 		for (Document item : ((Document)d.get("cursor")).getList("firstBatch", Document.class))
 		{
 			//Document webUser = (Document)item.get("web_user");

@@ -1,6 +1,8 @@
 package net.vbelev.web4.core;
 import java.util.*;
 
+import net.vbelev.web4.utils.Utils;
+
 /**
  * A statement or action that social groups approve of.
  * 
@@ -18,10 +20,14 @@ public class GBBill
 	}
 	
 	/**
-	 * note that profile IDs are primary keys, they are not mapped to anything.
+	 * note that bill IDs are primary keys, they are not mapped to anything.
 	 * ID will be null for non-saved bills
 	 */
 	public Integer ID;
+	/**
+	 * The GBGroupSet reference. It is not used in the bill itself, only for linking it withe group set.
+	 */
+	public Integer setID;
 	public String title;
 	public String description;
 	/** we will display the date only, but internally we store the date-time (for better sorting) */
@@ -116,9 +122,36 @@ public class GBBill
 		return res;
 	}
 	
-	public void calculateInvAffinities(GBEngine engine)
+	public double getScore(boolean assignedOnly)
 	{
-		int size = engine.getSize();
+		double res = 0;
+		double count = 0;
+		for (GBAffinity aff : this.invAffinities.values())
+		{
+			double affValue = 0;
+			if (aff == null) continue;
+			if (assignedOnly && aff.quality() != GBAffinity.QualityEnum.SET) continue;
+			affValue = aff.value();
+			if (affValue > 0.5)
+			{
+				affValue -= 0.5;
+				res += affValue * affValue  * 4;
+			}
+			else
+			{
+				affValue = 0.5 - affValue;
+				res -= affValue * affValue  * 4;
+			}
+			count++;
+		}
+
+		if (count == 0) return 0;
+		return Math.round(res * 1000. / count) / 1000.;
+	}
+	
+	public void calculateInvAffinities(GBGroupSet gblist)
+	{
+		int size = gblist.getSize();
 		// clear it first
 		for (int i = 0; i < size; i++)
 		{
@@ -140,7 +173,7 @@ public class GBBill
 				GBAffinity aff = invAffinities.getOrDefault(i, null);
 				if (aff != null && aff.quality() == GBAffinity.QualityEnum.SET) continue;
 				
-				Double[] listFrom = engine.getAffinitesFor(i);
+				Double[] listFrom = gblist.getAffinitesFor(i);
 				Double newValue = GBAffinity.calculateAffinity(listFrom, listTo);
 				if (newValue != null && (aff == null || aff.quality() == GBAffinity.QualityEnum.NONE || Math.abs(aff.value() - newValue) > 0.01))
 				{

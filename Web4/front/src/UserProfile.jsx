@@ -7,6 +7,7 @@ export class UserProfile extends React.Component
     constructor(props)
     {
         super(props);
+        // we don't keep the profile object here, only the profile ID. The object is stored in redux
         this.state = {
             gbTimestamp: null,
             profileID : null
@@ -35,29 +36,46 @@ export class UserProfile extends React.Component
 
     readContext() {
         let gbState = window.redux.getState();
+//console.log("UserProfile.readContext. gbState.gbProfileTS=" + gbState.gbProfileTS + ", my gbTimestamp=" + this.state.gbTimestamp);
+        if (!gbState.profile || !gbState.profile.ID) {
+            this.setState({
+                profileID: null,
+                gbTimestamp: gbState.gbTimestamp
+            });
 
-        if (!gbState.profile || gbState.profile.ID != this.state.profileID) {
-            this.load();
-        } else if (this.state.gbTimestamp == null || this.state.gbTimestamp < gbState.gbTimestamp) {
-            this.setState({gbTimestamp: gbState.gbTimestamp});
-        }        
+        } else if (!gbState.profile 
+            || gbState.profile.ID != this.state.profileID 
+            || this.state.gbTimestamp < (gbState.gbProfileTS || gbState.gbTimestamp)
+        ) {
+            //UserProfile.loadProfile(); // current user, no force
+            this.setState({
+                profileID: gbState.profile.ID,
+                gbTimestamp: (gbState.gbProfileTS || gbState.gbTimestamp)
+            });
+        } 
+        /*else if (this.state.gbTimestamp == null || this.state.gbTimestamp < gbState.gbTimestamp) {
+            //this.setState({gbTimestamp: gbState.gbTimestamp});
+            UserProfile.loadProfile(null, "Y"); // current user, force
+        } */       
     }
 
-    load() {
+    static loadProfile(profileID, force, callback) {
         axios({
             method: 'get',
             withCredentials: true,
             url: window.appconfig.apiurl + "get_profile", 
             timeout: 400000,    // 4 seconds timeout
-            params: {} 
+            params: {profileID: profileID, force: force} 
         })
         .then(response => {// handle the response
-            this.setState({profileID: response.data.ID});
+            if (typeof (callback) == "function") {
+                callback(response.data);
+            }
             window.redux.dispatch({
                 type: "PROFILE",
                 payload: {
                     profile: response.data,
-                    gbTimestamp: new Date()
+                    gbProfileTS: new Date()
                 }
             });
         })
@@ -66,7 +84,16 @@ export class UserProfile extends React.Component
         });
     }
 
+    load() {
+        let gbState = window.redux.getState();
+        if (!gbState.profile) {
+            UserProfile.loadProfile(null, "Y");
+        }
+    }
+
     reload(profileID) {
+        UserProfile.loadProfile(profileID, "Y")
+        /*
         axios({
             method: 'get',
             withCredentials: true,
@@ -90,6 +117,7 @@ export class UserProfile extends React.Component
         .catch(error => {//console.error('timeout exceeded')
             alert("Server call failed: " + error);
         });
+        */
     }
     
 
@@ -155,26 +183,31 @@ export class UserProfile extends React.Component
 
     render() {
         let gbState = window.redux.getState();
-
+//console.log("UserProfile.render: gbState.profile=" + Utils.squashStr(gbState.profile, 2));
         if (gbState.profile == null) {
             return (<div className="pageBand">Loading profile...</div>);
         } else if (gbState.groups == null) {
                 return (<div className="pageBand">Loading profile - groups...</div>);
         } else {
             let cells = [];
-            for (let g in gbState.groups) {
+            let groups = gbState.groups.groups || gbState.groups;
+            for (let g in groups) {
                 
-                let prof = gbState.profile.invAffinities.find(q => q.toMoniker == gbState.groups[g].moniker);
+                let prof = gbState.profile.invAffinities.find(q => q.toMoniker == groups[g].moniker);
                 let val = prof? prof.value: 0;
                 cells.push (
-                <span style={{backgroundColor: Utils.colourAffinity(val), color: 'white'}}> {gbState.groups[g].name}: {val}</span>
+                <span key={g} style={{backgroundColor: Utils.colourAffinity(val), color: 'white'}}> {groups[g].name}: {val}</span>
                 );
             }
             //return (<div className="pageBand">{JSON.stringify(gbState.profile)}</div>);
             return (
             <div className="pageBand">
+                {!gbState.profile.ID?
+                (<h3>Visitor Profile</h3>)
+                : (
                 <h3>Profile [{gbState.profile.name}]<br/><small>Saved on {gbState.profile.saveDate}</small></h3>
-                <h3>Approval numbers:</h3>
+                )}
+                <b>Approval numbers: </b>
                 {cells}
                 {(gbState.user != null && gbState.user.ID) != null && <button onClick={this.saveProfile}>Save Profile</button>}
                 <button onClick={this.reloadProfile}>Reload Profile</button>

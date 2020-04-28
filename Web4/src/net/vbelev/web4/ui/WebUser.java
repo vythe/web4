@@ -17,14 +17,24 @@ public class WebUser
 		INACTIVE
 	}
 	
+	public enum PasswordKindEnum
+	{
+		NONE,
+		PLAIN
+	}
+	
+	public static final java.util.regex.Pattern loginPattern = 
+			java.util.regex.Pattern.compile("^[a-z][a-z\\d_]+$");
 	
 	public Integer ID;
 	public String name;
 	public String login;
 	public String password;
 	public StatusEnum status;
-	public final List<Integer> profiles = new ArrayList<Integer>();
+	public PasswordKindEnum passwordKind;
 	
+	public final List<Integer> profiles = new ArrayList<Integer>();
+	/*
 	public static class Model
 	{
 		public int ID;
@@ -35,10 +45,11 @@ public class WebUser
 		
 		
 	}
-	
+	*/
 	public WebUser()
 	{
 		status = StatusEnum.VISITOR;
+		passwordKind = PasswordKindEnum.NONE;
 	}
 	
 }

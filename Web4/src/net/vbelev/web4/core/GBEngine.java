@@ -9,7 +9,7 @@ import net.vbelev.web4.utils.*;
 import net.vbelev.web4.xml.*;
 
 /**
- * A coherent storage for profiles and groups
+ * A coherent storage for profiles, groups and bills
  * @author vythe
  *
  */
@@ -19,13 +19,17 @@ public class GBEngine {
 	{
 		boolean ping(boolean force);
 		
-		GBGroupListXML getGroups();
-		void saveGroups(GBGroupListXML xml);
+		/** get all groupsets at once */
+		List<GBGroupListXML> getGroups();
+		//void saveGroups(List<GBGroupListXML> xml);
+		/** save one groupset at a time */
+		void saveGroupList(GBGroupListXML xml);
 		
 		List<GBBillXML> loadBills();
 		GBBillXML loadBill(int billID);
 		int getNewBillID(boolean withCreate);
 		void saveBill(GBBillXML xml);
+		boolean deleteBill(int billID);
 		
 		GBProfileXML loadProfile(int profileID);
 		int getNewProfileID(boolean withCreate);
@@ -36,8 +40,9 @@ public class GBEngine {
 		public int getNewWebUserID(boolean withCreate);
 		void saveWebUser(WebUserXML xml);
 	}
-	
-	private GBGroup[] groups = new GBGroup[0];
+
+	public final List<GBGroupSet> groupList = new ArrayList<GBGroupSet>();
+	//private GBGroup[] groups = new GBGroup[0];
 	public final Hashtable<Integer, GBBill> bills = new Hashtable<Integer, GBBill>();
 	
 	public final XMLiser xmliser = null;
@@ -46,8 +51,6 @@ public class GBEngine {
 	public final Random random = new Random();
 	
 	//public static final java.util.regex.Pattern xmlIdPattern = java.util.regex.Pattern.compile("^(\\d+).xml$");
-	public static final java.util.regex.Pattern webUserLoginPattern = 
-			java.util.regex.Pattern.compile("^[a-z][a-z\\d_]+$");
 	/*
 	private GBEngine(String root)
 	{
@@ -85,28 +88,125 @@ public class GBEngine {
 		
 	}
 	
+	public GBGroupSet getGroupSet(int setID)
+	{
+		if (groupList == null)
+		{
+			return null;
+		}
+		for (GBGroupSet set : groupList)
+		{
+			if (set.ID == setID) return set;
+		}
+		return null;
+	}
+	
+	public int getSize(int setID)
+	{
+		GBGroupSet set = getGroupSet(setID);
+		if (set == null) return 0;
+		
+		return set.getSize();
+	}
+	
 	public void loadGroups()
 	{
-		GBGroupListXML xml = storage.getGroups();
-		if (xml ==  null)
+		List<GBGroupListXML> xml = storage.getGroups();
+		
+		groupList.clear();
+		if (xml ==  null || xml.size() == 0)
 		{
-			this.testSet();
-			this.saveGroups();
+			groupList.add(this.testSet());
+			this.saveGroup(groupList.get(0));
 		}
 		else
 		{
-			xml.toEngine(this);
-			this.calculateAll();
+			for (GBGroupListXML xmlSet  : xml)
+			{
+				GBGroupSet set = new GBGroupSet();
+				xmlSet.toGroupSet(set);
+				set.calculateAll();
+				groupList.add(set);
+			}
 		}
 	}
 	
-	public void saveGroups()
+	public void saveGroup(GBGroupSet set)
 	{
-		GBGroupListXML xml = new GBGroupListXML();
-		xml.fromEngine(this);
-
+		/*
+		List<GBGroupListXML> xml = new ArrayList<GBGroupListXML>();
+		for (GBGroupSet set : groupList)
+		{
+			GBGroupListXML xmlSet = new GBGroupListXML();
+			xmlSet.fromGroupSet(set);
+			xml.add(xmlSet);
+		}
 		storage.saveGroups(xml);
+		*/
+		GBGroupSet engineSet =this.getGroupSet(set.ID);
+		if (engineSet == null)
+		{
+			synchronized(this.groupList)
+			{
+				this.groupList.add(set);
+			}			
+		}
+		else if (engineSet != set) // raw object comparison
+		{
+			synchronized(this.groupList)
+			{
+				this.groupList.remove(engineSet);
+				this.groupList.add(set);
+			}						
+		}
+		
+		GBGroupListXML xmlSet = new GBGroupListXML();
+		xmlSet.fromGroupSet(set);
+		storage.saveGroupList(xmlSet);
 	}
+
+	public GBGroupSet testSet()
+	{
+		GBGroupSet set = new GBGroupSet(4);
+				
+		GBGroup g1 = set.getGroup(0);
+		g1.moniker = "g1";
+		g1.name = "Group1";
+		g1.ID = 0;
+		g1.setAffinity(1,  0.2);
+		g1.setAffinity(2,  0.9);
+		//groups[0] = g1;
+				
+		GBGroup g2 = set.getGroup(1);
+		g2.moniker = "g2";
+		g2.name = "Group2";
+		g2.ID = 1;
+		g2.setAffinity(2,  0.6);
+		g2.setAffinity(3,  0.3);
+		//groups[1] = g2;
+		
+		
+		GBGroup g3 = set.getGroup(2);
+		g3.moniker = "g3";
+		g3.name = "Group3";
+		g3.ID = 2;
+		g3.setAffinity(3, 0.5);
+		g3.setAffinity(0, 0.5);
+		//groups[2] = g3;
+		
+		GBGroup g4 = set.getGroup(3);
+		g4.moniker = "g4";
+		g4.name = "Group4";
+		g4.ID = 3;
+		g4.setAffinity(0, 0.8);
+		g4.setAffinity(1,0.3);
+		//groups[3] = g4;
+		
+		return set;
+	}
+
+	
+	//==== GBBill storage ====
 	
 	/** 
 	 * for now, we'll load all bills at once and worry later.
@@ -120,8 +220,9 @@ public class GBEngine {
 		{
 			if (xml == null || xml.ID == null) continue;
 			
-			GBBill bill = xml.toGBBill(this, null);
-			bill.calculateInvAffinities(this);
+			GBGroupSet set = getGroupSet(Utils.NVL(xml.setID, 0));
+			GBBill bill = xml.toGBBill(set, null);
+			bill.calculateInvAffinities(set);
 			this.bills.put(bill.ID, bill);
 		}
 	}
@@ -131,8 +232,10 @@ public class GBEngine {
 		GBBillXML xml = storage.loadBill(billID);
 		if (xml == null) return null;
 		
-		GBBill bill = xml.toGBBill(this, null);
-		bill.calculateInvAffinities(this);
+		GBGroupSet set = getGroupSet(Utils.NVL(xml.setID, 0));
+		GBBill bill = xml.toGBBill(set, null);
+		
+		bill.calculateInvAffinities(set);
 		//this.bills.put(bill.ID, bill);
 		return bill;
 	}
@@ -157,12 +260,28 @@ public class GBEngine {
 		return bill;
 	}
 
+	public List<GBBill> getBills(int setID)
+	{
+		List<GBBill> res = new ArrayList<GBBill>();
+		for (GBBill bill : bills.values())
+		{
+			if (bill.setID == setID)
+			{
+				res.add(bill);
+			}
+		}
+		return res;
+	}
+	
 	public int getNewBillID(boolean withCreate) {
 		return storage.getNewBillID(withCreate);
 	}
 		
 	public void saveBill(GBBill bill) {
-		if (bill == null) return;
+		if (bill == null || bill.setID == null)
+		{
+			throw new IllegalArgumentException("Bill missing");
+		}
 		
 		if (bill.ID == null)
 		{
@@ -173,76 +292,25 @@ public class GBEngine {
 			bill.status = GBBill.StatusEnum.NEW;
 		}
 		GBBillXML xml = new GBBillXML();
-		xml.fromGBBill(this, bill);
+		GBGroupSet set = getGroupSet(bill.setID);
+		xml.fromGBBill(set, bill);
 		
-		storage.saveBill(xml);
+		storage.saveBill(xml);		
+	}
+	
+	public boolean deleteBill(Integer billID) {
+		if (billID == null) return false;
+		
+		boolean res = storage.deleteBill(billID.intValue());
+		if (res)
+		{
+			bills.remove(billID);
+		}
+		return res;
 	}
 
-	public int getSize()
-	{
-		if (groups == null) return 0;
-		return groups.length;
-	}
-	
-	public void setSize(int size)
-	{
-		int copySize = (groups == null)? null 
-				: groups.length < size? groups.length 
-				: size
-		;
-	
-		GBGroup[] newGroups = new GBGroup[size];
-		for (int i = 0; i < copySize; i++)
-		{
-			newGroups[i] = groups[i];
-			newGroups[i].ID = i;
-		}
-		for (int i = copySize; i < size; i++)
-		{
-			newGroups[i] = new GBGroup();
-			newGroups[i].ID = i;
-		}
-		this.groups = newGroups;
-	}
-	
-	public void testSet()
-	{
-		groups = new GBGroup[4];
-				
-		GBGroup g1 = new GBGroup();
-		g1.moniker = "g1";
-		g1.name = "Group1";
-		g1.ID = 0;
-		g1.setAffinity(1,  0.2);
-		g1.setAffinity(2,  0.9);
-		groups[0] = g1;
-				
-		GBGroup g2 = new GBGroup();
-		g2.moniker = "g2";
-		g2.name = "Group2";
-		g2.ID = 1;
-		g2.setAffinity(2,  0.6);
-		g2.setAffinity(3,  0.3);
-		groups[1] = g2;
-		
-		
-		GBGroup g3 = new GBGroup();
-		g3.moniker = "g3";
-		g3.name = "Group3";
-		g3.ID = 2;
-		g3.setAffinity(3, 0.5);
-		g3.setAffinity(0, 0.5);
-		groups[2] = g3;
-		
-		GBGroup g4 = new GBGroup();
-		g4.moniker = "g4";
-		g4.name = "Group4";
-		g4.ID = 3;
-		g4.setAffinity(0, 0.8);
-		g4.setAffinity(1,0.3);
-		groups[3] = g4;
-	}
 
+	/*
 	public boolean hasGroup(String moniker)
 	{
 		if (moniker == null) return false;
@@ -294,9 +362,10 @@ public class GBEngine {
 	public void calculateAll()
 	{
 		// clear all calculated values first
-		for (GBGroup g: groups)
+		int listSize = groupList.getSize();
+		for (GBGroup g: groupList.getGroups())
 		{
-			for (int g2 = 0; g2 < groups.length; g2++)
+			for (int g2 = 0; g2 < listSize; g2++)
 			{
 				//if (g2 == g.ID) continue;
 				GBAffinity aff = g.getAffinity(g2);
@@ -310,9 +379,9 @@ public class GBEngine {
 		// recalculate it all three times
 		for (int repeat = 0; repeat < 3; repeat++)
 		{
-		for (GBGroup g: groups)
+		for (GBGroup g: groupList.getGroups())
 		{
-			for (int g2 = 0; g2 < groups.length; g2++)
+			for (int g2 = 0; g2 < listSize; g2++)
 			{
 				//if (g2 == g.ID) continue;
 				GBAffinity aff = g.getAffinity(g2);
@@ -347,7 +416,7 @@ public class GBEngine {
 				continue;
 			}
 			double coef = aff.value() * aff.value();
-			GBAffinity aff2 = groups[aff.toID()].getAffinity(toGroup);
+			GBAffinity aff2 = groupList.getGroup(aff.toID()).getAffinity(toGroup);
 			if (aff2.quality() != GBAffinity.QualityEnum.NONE)
 			{
 				nom += coef * aff2.value();
@@ -360,80 +429,17 @@ public class GBEngine {
 		}
 		return nom / denom;
 	}
+*/	
 	
-	/**
-	 * returns an array of affinity values of group[forID] to all other groups.
-	 * values will be null for qualities NONE.
-	 * @return
-	 */
-	public Double[] getAffinitesFor(int forID)
-	{
-		Double[] res = new Double[groups.length];
-		GBGroup g = getGroup(forID);
-		
-		for(GBAffinity aff : g.getAffinities(true))
-		{
-			res[aff.toID()] = aff.value();
-		}	
-		
-		return res;
-	}
-	
-	/**
-	 * returns an array of affinity values of all groups to the group[forID].
-	 * values will be null for qualities NONE.
-	 * @return
-	 */
-	public Double[] getAffinitiesTo(int toID)
-	{
-		Double[] res = new Double[groups.length];
-		for (GBGroup g : groups)
-		{
-			GBAffinity aff = g.getAffinity(toID);
-			if (aff != null && aff.quality() != GBAffinity.QualityEnum.NONE)
-			{
-				res[g.ID] = aff.value();
-			}	
-		}
-		return res;
-	}
-		
-	public GBAffinity getAffinity(GBGroup group, int toGroup, boolean forceRecalc)
-	{
-		//GBGroup toGroup = getGroup(toMoniker);
-		//if (toGroup == null) return GBAffinity.EMPTY
-		if (toGroup < 0 || toGroup >= groups.length)
-		{
-			return GBAffinity.EMPTY;
-		}
-		
-		GBAffinity aff = group.getAffinity(toGroup);
-		if (aff.quality() != GBAffinity.QualityEnum.SET
-				 && (forceRecalc || aff.quality() == GBAffinity.QualityEnum.NONE)
-		)
-		{
-			Double newValue = calculateAffinity(group, toGroup);
-			if (newValue == null)
-			{
-				aff = group.setAffinity(toGroup, 0, GBAffinity.QualityEnum.NONE);
-			}
-			else
-			{
-			aff = group.setAffinity(toGroup, newValue, GBAffinity.QualityEnum.CALCULATED);
-			}
-		}
-		
-		return aff;
-	}
-
 	//==== GBProfile storage ====
 	public GBProfile loadProfile(int profileID)
 	{
 		GBProfileXML xml = storage.loadProfile(profileID);
 		
 		if (xml == null) return null;
+		GBGroupSet set = getGroupSet(Utils.NVL(xml.setID, 0));
 		
-		GBProfile profile = xml.toGBProfile(this, null);
+		GBProfile profile = xml.toGBProfile(set, null);
 		return profile;
 	}
 
@@ -457,9 +463,10 @@ public class GBEngine {
 		{
 			profile.ID = storage.getNewProfileID(true);
 		}
+		GBGroupSet set = getGroupSet(profile.setID);
 		GBProfileXML xml = new GBProfileXML();
 		profile.saveDate = new Date();
-		xml.fromGBProfile(this, profile);
+		xml.fromGBProfile(set, profile);
 		storage.saveProfile(xml);
 	}
 	

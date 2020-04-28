@@ -33,40 +33,50 @@ public class GBFileStorage implements GBEngine.Storage
 		dataFolder = root;
 	}
 	
-	public GBGroupListXML getGroups()
+	public List<GBGroupListXML> getGroups()
 	{
-		File groupList = Paths.get(dataFolder, GBGroupListXML.STORAGE_NAME + ".xml").toFile();
+		List<GBGroupListXML> res = new ArrayList<GBGroupListXML>();
+		
+		File groupList = Paths.get(dataFolder, GBGroupListXML.STORAGE_NAME).toFile();
 		if (!groupList.exists())
 		{
-			return null;
+			return res;
 		}
-		else if (!groupList.isFile())
+		else if (!groupList.isDirectory())
 		{
-			throw new IllegalArgumentException("Failed to load engine, this is not a file: " + groupList.getAbsolutePath());
+			throw new IllegalArgumentException("Failed to load engine, this is not a folder: " + groupList.getAbsolutePath());
 		}
 		else
 		{
-			
-			try(InputStream ioGroupList = new FileInputStream(groupList))
+			String errName;			
+			for (File gblistFile : groupList.listFiles((d, s) -> (s.toLowerCase().matches("^\\d+\\.xml"))))
 			{
-				GBGroupListXML xml = this.xmliser.fromXML(GBGroupListXML.class, ioGroupList);
-				ioGroupList.close();					
-				return xml;
-				
-			} catch (FileNotFoundException e) {
-				e.printStackTrace();
-				throw new IllegalArgumentException("Failed to load engine from lost file " + groupList.getAbsolutePath(), e);
-			} catch (IOException e) {
-				e.printStackTrace();
-				throw new IllegalArgumentException("Failed to load engine from "+ groupList.getAbsolutePath(), e);
+				errName = gblistFile.getAbsolutePath();
+				try(InputStream ioGroupList = new FileInputStream(groupList))
+				{
+					GBGroupListXML xml = this.xmliser.fromXML(GBGroupListXML.class, ioGroupList);
+					ioGroupList.close();
+					res.add(xml);	
+				} 
+				catch (FileNotFoundException e) 
+				{
+					e.printStackTrace();
+					throw new IllegalArgumentException("Failed to load engine from lost file " + errName, e);
+				} 
+				catch (IOException e) 
+				{
+					e.printStackTrace();
+					throw new IllegalArgumentException("Failed to load engine from "+ errName, e);
+				}
+				finally
+				{
+				}
 			}
-			finally
-			{
-			}				
 		}		
+		return res;
 	}
 	
-	public void saveGroups(GBGroupListXML xml)
+	public void saveGroupList(GBGroupListXML xml)
 	{
 		//storage
 		File groupList = Paths.get(dataFolder,  GBGroupListXML.STORAGE_NAME + ".xml").toFile();
@@ -164,7 +174,7 @@ public class GBFileStorage implements GBEngine.Storage
 		}
 	}	
 	
-	public int getNewBillID(boolean withCreate) {
+	public int getNewBillID( boolean withCreate) {
 		
 		//int newID = Utils.NVL(Utils.Max(this.bills.keys()), 0);
 		File billList = Paths.get(dataFolder, GBBillXML.STORAGE_NAME).toFile();
@@ -240,6 +250,11 @@ public class GBFileStorage implements GBEngine.Storage
 		finally
 		{
 		}	
+	}
+	
+	public boolean deleteBill(int billID)
+	{
+		return false; // not implemented
 	}
 	
 	//==== GBProfile storage ====

@@ -32,7 +32,15 @@ implements Filter
             response.addHeader("Access-Control-Allow-Headers", "X-Requested-With,Origin,Content-Type, Accept");
         }
         //response.addCookie(new Cookie("mystamp", new java.util.Date().toGMTString()));
-        filterChain.doFilter(request, response);			
+        try
+        {
+        filterChain.doFilter(request, response);
+        }
+        catch (Exception x)
+        {
+        	System.out.println("JavaAPI got an exception: " + x.getMessage());
+        	throw x;
+        }
 	}
 
 	//@Override

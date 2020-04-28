@@ -38,6 +38,8 @@ public class GBProfileXML
 	
 	@XmlAttribute
 	public Integer ID;
+	@XmlAttribute
+	public Integer setID;
 	public String name;
 	@XmlAttribute
 	public Date saveDate;
@@ -45,9 +47,10 @@ public class GBProfileXML
 	public List<GBAffinityXML> invAffinities;
 	public List<GBVoteXML> votes;
 
-	public void fromGBProfile(GBEngine engine, GBProfile profile)
+	public void fromGBProfile(GBGroupSet gblist, GBProfile profile)
 	{
 		this.ID = profile.ID;
+		this.ID = profile.setID;
 		this.name = Utils.NVL(profile.name, "");
 		this.saveDate = new Date();
 		
@@ -55,7 +58,7 @@ public class GBProfileXML
 		for (Integer id : profile.invAffinities.keySet())
 		{
 			GBAffinityXML ax = new GBAffinityXML();
-			ax.toMoniker = engine.getGroupMoniker(id);
+			ax.toMoniker = gblist.getGroupMoniker(id);
 			ax.value = profile.invAffinities.get(id);
 			ax.quality = null;
 			this.invAffinities.add(ax);
@@ -70,10 +73,12 @@ public class GBProfileXML
 		}
 	}
 	
-	public GBProfile toGBProfile(GBEngine engine, GBProfile profile)
+	public GBProfile toGBProfile(GBGroupSet gblist, GBProfile profile)
 	{
 		if (profile == null) profile = new GBProfile();
 		profile.ID = this.ID;
+		profile.setID = Utils.NVL(this.setID, 0);
+		
 		profile.name = Utils.NVL(this.name, "");
 		profile.saveDate = this.saveDate;
 		
@@ -82,7 +87,7 @@ public class GBProfileXML
 		{
 		for (GBAffinityXML ax : this.invAffinities)
 		{
-			GBAffinity aff = ax.toGBAffinity(engine);
+			GBAffinity aff = ax.toGBAffinity(gblist);
 			profile.invAffinities.put(aff.toID(), aff.value());
 		}
 		}

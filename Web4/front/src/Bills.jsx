@@ -24,17 +24,17 @@ export class Bills extends React.Component {
         // methods
         this.load = this.load.bind(this);
         this.readContext = this.readContext.bind(this);
-        this.testBillClick = this.testBillClick.bind(this);
-        this.testProfile = this.testProfile.bind(this);
+        //this.testBillClick = this.testBillClick.bind(this);
+        //this.testProfile = this.testProfile.bind(this);
 
         this.renderBill = this.renderBill.bind(this);
         this.clickVote = this.clickVote.bind(this);
         this.clickReloadBills = this.clickReloadBills.bind(this);
-        this.reloadBills = this.reloadBills.bind(this);
-        this.clickEditBill = this.clickEditBill.bind(this);
+        //this.reloadBills = this.reloadBills.bind(this);
+        //this.clickEditBill = this.clickEditBill.bind(this);
 
-        this.modalEditBill = React.createRef();
-        this.editBill = {};
+        //this.modalEditBill = React.createRef();
+        //this.editBill = {};
 
         if(window.redux) {
             window.redux.subscribe(this.readContext);
@@ -44,11 +44,55 @@ export class Bills extends React.Component {
     readContext() {
         let gbState = window.redux.getState();
 
-        if (this.state.gbTimestamp == null || this.state.gbTimestamp < gbState.gbTimestamp) {
-            this.setState({gbTimestamp: gbState.gbTimestamp});
-            this.load();
+        if (!gbState.bills) {
+            Bills.loadBills("Y");                
+        }
+        else if (!this.state.bills 
+            || this.state.gbTimestamp < gbState.gbTimestamp
+            || this.state.gbTimestamp < gbState.gbBillsTS
+        ) {
+            this.setState({
+                bills: gbState.bills,
+                gbTimestamp: gbState.gbBillsTS || gbState.gbTimestamp
+            });
+        } else {
+        //    this.setState({
+        //        gbTimestamp: gbState.gbBillsTS || gbState.gbTimestamp
+        //    });
         }        
     }
+
+
+    static loadBills(forceArg) {
+    
+        axios({
+            method: 'get',
+            withCredentials: true,
+            url: window.appconfig.apiurl + "get_bills", 
+            timeout: 400000,    // 4 seconds timeout
+            params: {force: forceArg} 
+        })
+        .then (res => {
+            //this.setState({bills: res.data});
+            window.redux.dispatch({
+                type: "BILLS",
+                payload: {
+                  bills: res.data
+                  //, gbTimestamp : new Date()
+                }
+              });
+                });
+    }
+
+    load() {
+        //this.reloadBills(null);
+        let gbState = window.redux.getState();
+
+        if (!gbState.bills || this.state.gbTimestamp < gbState.gbTimestamp) {
+            Bills.loadBills("Y");        
+        }
+    }
+
 
     clickVote(e1) {
         let billid = e1.target.getAttribute('billid') 
@@ -74,11 +118,11 @@ export class Bills extends React.Component {
                 window.redux.dispatch({
                     type: "PROFILE",
                     payload: {
-                        profile: res.data,
-                        gbTimestamp: new Date()
+                        profile: res.data
+                        //, gbTimestamp: new Date()
                     }
                 });
-              this.load();
+                Bills.loadBills(null);
             });
         } else {
             alert("select the vote for bill " + billid);
@@ -86,7 +130,8 @@ export class Bills extends React.Component {
     }
     
     clickReloadBills() {
-        this.reloadBills("Y");
+        //this.reloadBills("Y");
+        Bills.loadBills("Y");
     }
 
     // Bill would be happier as a separate component,
@@ -111,16 +156,17 @@ export class Bills extends React.Component {
         }
         */
         let cells = [];
-        for (let g in gbState.groups) {
-            let aff = bill.invAffinities.find(q => q.toMoniker == gbState.groups[g].moniker);
+        let groups = gbState.groups.groups;
+        for (let g in groups) {
+            let aff = bill.invAffinities.find(q => q.toMoniker == groups[g].moniker);
             if (aff) {
                 let val = aff.value;
                 cells.push (
-                    <td key={gbState.groups[g].moniker} style={{backgroundColor: Utils.colourApproval(val), color: 'white'}}>{val}</td>
+                    <td key={groups[g].moniker} style={{backgroundColor: Utils.colourApproval(val), color: 'white'}}>{val}</td>
                 );
             } else {
                 cells.push (
-                    <td key={gbState.groups[g].moniker} style={{backgroundColor: 'pink'}}>({gbState.groups[g].moniker})</td>
+                    <td key={groups[g].moniker} style={{backgroundColor: 'pink'}}>({groups[g].moniker})</td>
                 );        
             }
         }
@@ -142,113 +188,32 @@ export class Bills extends React.Component {
         } else {
             saySpan= <span>{bill.profileSay} on {bill.profileSayDate}</span>;
         }
-        return (<>
+        return (<React.Fragment key={bill.ID}>
         <tr key={bill.ID}>
             <td>{bill.ID}</td>
             <td>{bill.title}</td>
             <td>{bill.publishedDate}</td>
             {cells}
-            <td><button onClick={() => this.clickEditBill(bill.ID)}>Edit</button></td>
         </tr>
         <tr key={bill.iD + "_descr"}>
             <td></td>
-            <td colSpan={gbState.groups.length + 3}>{bill.description}</td>
+            <td colSpan={groups.length + 3} style={{textAlign: "left"}}>{bill.description}</td>
         </tr>
         <tr key={bill.ID + "_vote"}>
             <td></td>
-            <td colSpan={gbState.groups.length + 3}>{saySpan}</td>
+            <td colSpan={groups.length + 3}>{saySpan}</td>
         </tr>
-        </>);        
-    }
-
-    testBillClick() {
-
-        axios({
-            method: 'get',
-            withCredentials: true,
-            url: window.appconfig.apiurl + "test_bill", 
-            timeout: 400000,    // 4 seconds timeout
-            params: {} 
-        })
-        .then (res => {
-            //this.setState({bills: res.data});
-            this.load();
-        });
-    }
-
-    testProfile() {
-        /*
-        axios({
-            method: 'get',
-            withCredentials: true,
-            url: window.appconfig.apiurl + "get_profile", 
-            timeout: 400000,    // 4 seconds timeout
-            params: {} 
-        })
-        .then (res => {
-            //this.setState({bills: res.data});
-            //this.load();
-            alert(JSON.stringify(Utils.squash(res.headers)));
-        });
-        */
-       /*
-       fetch(window.appconfig.apiurl + "get_profile", {
-           withCredentials: true,
-           method: 'get',
-           credentials: 'include'
-       })
-       .then(response => {
-         //console.log(response.status);
-         alert(JSON.stringify(Utils.squash(response)));
-         return response.json();
-       })
-       .then(data => {
-        //alert(JSON.stringify(Utils.squash(data)));
-        })
-       .catch(error => console.error(error))
-       ; 
-       */      
-    }
-
-
-    voteClick() {
-
-    }
-
-    reloadBills(forceArg) {
-    
-        axios({
-            method: 'get',
-            withCredentials: true,
-            url: window.appconfig.apiurl + "get_bills", 
-            timeout: 400000,    // 4 seconds timeout
-            params: {force: forceArg} 
-        })
-        .then (res => {
-            this.setState({bills: res.data});
-        });
-    }
-
-    load() {
-        this.reloadBills(null);
+        </React.Fragment>);        
     }
 
     componentDidMount() {
+        /* there is hoping that redux will bring us groups and bills... eventually 
         Groups.loadGroups((res) => {
             //this.data = res;
             //this.setState({loadCount: this.state.loadCount + 1});
             this.load();
           });        
-    }
-
- 
-    clickEditBill(billID) {
-        //let gbState = window.redux.getState();
-this.editBill = this.state.bills.find(q =>q.ID == billID);
-//alert("Bill clicked,id=" + billID + ". : " + this.editBill);
-
-this.setState({editBill: this.editBill});
-        this.modalEditBill.current.setState({show: true, myval2: "test"});
+          */
     }
 
     render() {
@@ -256,12 +221,20 @@ this.setState({editBill: this.editBill});
         let bills = this.state.bills;
         let headerCells = [];
         if (!bills || !gbState.groups) {
+            if (!bills) {
+                Bills.loadBills("Y");
+            }
+
+            if (!gbState.groups) {
+                Groups.loadGroups("Y");
+            }
             return (
-                <div className="pageBand">Loading Bills... gbState = {JSON.stringify(gbState)}</div>
+                <div className="pageBand">Loading Bills...</div>
             );
         } else {
-            for (let g in gbState.groups) {
-                headerCells.push(<th key={gbState.groups[g].name}>{gbState.groups[g].name}</th>);
+            let groups = gbState.groups.groups;
+            for (let g in groups) {
+                headerCells.push(<th key={groups[g].name}>{groups[g].name}</th>);
             }
             return (
                 <div className="pageBand">
@@ -281,12 +254,12 @@ this.setState({editBill: this.editBill});
                             {bills.map(q => this.renderBill(q))}
                         </tbody>
                     </table>
-                    <div style={{textAlign: 'center'}}>
+                    {/*<div style={{textAlign: 'center'}}>
                     <button onClick={this.testBillClick}>Add Test Bill</button>
-                    {/*<br/>
+                    <br/>
                     <button onClick={this.testProfile}>Test PRofile</button>
-                    */}
                     </div>
+                    */}
                     <ModalBox ref={this.modalEditBill} closeOnVeil={true}>
                         <BillEdit bill={this.state.editBill}>                            
                         </BillEdit>

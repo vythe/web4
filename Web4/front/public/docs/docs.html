@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Practice website for React"
+    />
+        <title>Speaking Up Docs</title>
+        <!-- notice that %PUBLIC_URL% does not work here, this is a static html file-->
+    <link rel="stylesheet" type="text/css" href="../common.css"/>
+    <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+    <script src="..//appconfig.js"></script>
+    <script type="text/javascript">
+    function loadDoc(hashtag) {
+      if (!window.location.href.match(/^.+\/{1,1}/)) {
+        alert("Invalid document URL");
+        return;
+      }
+      let url = window.location.href.match(/^.+\/{1,1}/)[0] 
+        + hashtag.replace(":","\/")
+        + ".html";
+      $.get(url)
+      .done(function(data) {
+        $("#docfield").html(data);
+      })
+      .fail(function(jqXHR, textStatus, errorThrown) { //jqXHR jqXHR, String textStatus, String errorThrown
+        let msg = "<h2>Article not found: " + hashtag + "</h2><br/>"
+        + JSON.stringify(jqXHR);
+          $("#docfield").html(msg);
+      });
+    }
+    let currenthashtag = (window.location.hash || "#root").substr(1);
+    $(document).ready(function(){
+
+      $(document).on("click", "a", function(evt) {
+//          alert("clicked: " +  $(this).attr("href"))
+          let href = $(this).attr("href");
+          if (href.startsWith("#")) {
+            evt.preventDefault();
+		window.history.pushState({href: href}, "", href);
+
+            loadDoc(href.substr(1));
+          }
+      });
+
+	$(window).on("popstate", function(evt) {
+//	   alert("state is: " + JSON.stringify(evt.originalEvent.state));
+	if (!evt.originalEvent.state || !evt.originalEvent.state.href) {
+		loadDoc("root");
+	} else {
+		loadDoc(evt.originalEvent.state.href.substr(1));
+	}
+	});
+
+      if (currenthashtag) {
+        loadDoc(currenthashtag);
+      }
+
+    });
+
+    </script>
+  </head>
+  <body>
+    <h1>Here be My Docs</h1>
+    <br/>
+    <fielset style="width: 100%;" id="docfield" class="appdocs"> 
+    </fielset>
+    <hr/>
+    <small>Footer here</small>
+  </body>
+</html>

@@ -16,6 +16,7 @@ const mainReduxState = {
 // action must be {type: "action type", payload: "whatever"}
 function mainReduxReducer(state = mainReduxState, action) {
 
+    console.log("reducer called for action=" + JSON.stringify(action));
     //var newState = Object.assign({}, state);
     var newState = {};
     for (var k in state) {
@@ -26,6 +27,16 @@ function mainReduxReducer(state = mainReduxState, action) {
         for (var k in action.payload) {
             newState[k] = action.payload[k];
         }
+    }
+    if (action.type == "PROFILE") { 
+        newState["gbProfileTS"] = new Date();
+        //console.log("reducer PROFILE set gbProfileTS=" + newState.gbProfileTS + ", profile=" + JSON.stringify(newState.profile));
+    } else if (action.type == "GROUPS") {
+        newState["gbGroupsTS"] = new Date();
+    } else if (action.type == "BILLS") {
+        newState["gbBillsTS"] = new Date();
+    } else if (action.type == "USER") {
+        newState["gbUserTS"] = new Date();
     }
     return newState;
 }

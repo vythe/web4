@@ -24,17 +24,17 @@ public class GBAffinityXML
 	{
 	}
 	
-	public void fromGBAffinity(GBEngine engine, GBAffinity aff)
+	public void fromGBAffinity(GBGroupSet gblist, GBAffinity aff)
 	{
-		this.toMoniker = engine.getGroupMoniker(aff.toID());
+		this.toMoniker = gblist.getGroupMoniker(aff.toID());
 		this.value = aff.value();
 		this.quality = (aff.quality() == GBAffinity.QualityEnum.SET)? null : aff.quality().name();
 	}
 	
-	public GBAffinity toGBAffinity(GBEngine engine)
+	public GBAffinity toGBAffinity(GBGroupSet gblist)
 	{
 		GBAffinity.QualityEnum affQ = Utils.tryParseEnum(this.quality,  GBAffinity.QualityEnum.SET);
-		GBGroup g2 = engine.getGroup(this.toMoniker);
+		GBGroup g2 = gblist.getGroup(this.toMoniker);
 		if (g2 == null)
 		{
 			throw new IllegalArgumentException("Invalid group moniker: " + this.toMoniker);

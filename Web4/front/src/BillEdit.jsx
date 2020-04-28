@@ -17,10 +17,14 @@ export class BillEdit extends React.Component {
             rows: []
         }
 
+        this.updateAffQueue = []; // 
+
         this.updateBill = this.updateBill.bind(this);
         this.updateBillAff = this.updateBillAff.bind(this);
         this.onRowChange = this.onRowChange.bind(this);
-        this.onSave = this.onSave.bind(this);
+        this.onClickSave = this.onClickSave.bind(this);
+        this.pushAffQueue = this.pushAffQueue.bind(this);
+        this.runAffQueue = this.runAffQueue.bind(this);
 
         /* this is the bill record:
         {
@@ -33,6 +37,8 @@ export class BillEdit extends React.Component {
                 {"quality":"SET","toMoniker":"g4","value":0.938}
             ],
             "actions": ["vote", "save"],
+            "editScore": -0.1,
+            "billScore": 0.1,
             "publishedDate":"15/01/2020 23:51:15",
             "status":"PUBLISHED",
             "title":"Test 15/01/2020 23:51:15"
@@ -71,6 +77,7 @@ export class BillEdit extends React.Component {
                 data.invAffinities.push(dataAff);
             }
         });
+        this.updateAffQueue = []; // clear the aff queue: we are updating the whole bill
         axios({
             method: 'post',
             withCredentials: true,
@@ -88,11 +95,20 @@ export class BillEdit extends React.Component {
             bill.description = res.data.description;
             bill.status = res.data.status;
             bill.invAffinities = res.data.invAffinities;
-            alert("updated: " + JSON.stringify(bill));
+            //alert("updated: " + JSON.stringify(bill));
             this.setState({gbTimestamp: new Date()});
+
+            if (action == "save") {
+                this.props.onSave(bill);
+            }
         });
      }
 
+     /*
+     a "light" update that modifies only one invAffinity value, onle for the current bill.
+     It is needed to help with the editing process.
+     On the return, it updated the bill's state to provoke render.
+     */
     updateBillAff(moniker, value) {
         axios({
             method: 'get',
@@ -109,10 +125,39 @@ export class BillEdit extends React.Component {
             //this.setState({bills: res.data});
             let bill = this.props.bill;
             bill.invAffinities = res.data.invAffinities;
+            bill.editScore = res.data.editScore;
+            bill.billScore = res.data.billScore;
             //alert("updated add: " + JSON.stringify(bill));
             this.setState({gbTimestamp: new Date()});
+
+            this.runAffQueue();
         });
-    }     
+    }
+
+    pushAffQueue(moniker, value) {
+        let elem = {moniker: moniker, value: value};    
+        for (let k in this.pushAffQueue) {
+            if (this.pushAffQueue[k].moniker == elem.moniker) {
+                this.pushAffQueue[k].value = elem.value;
+                elem = null;
+                break;
+            }
+        }
+        if (elem != null) {
+            this.updateAffQueue.push(elem);
+        }
+        this.runAffQueue();
+    }
+
+    runAffQueue(){
+        let myQueue = this.updateAffQueue;
+        if(myQueue.length > 0) {
+            let elem = myQueue.pop();
+
+            this.updateBillAff(elem.moniker, elem.value)             
+        }
+    }
+
     onRowChange(moniker) {
         let editRow = this.state.rows.find(q => q.moniker == moniker);
         //let row = bill.rowRef.current;
@@ -138,13 +183,14 @@ export class BillEdit extends React.Component {
         if (needFullUpdate) {
             this.updateBill("");
         } else {
-            this.updateBillAff(moniker, aff.value);
+            //this.updateBillAff(moniker, aff.value);
+            this.pushAffQueue(moniker, aff.value);
         }
 
         //alert(Utils.squashStr(this.state.rows[1]));
     }
 
-    onSave() {
+    onClickSave() {
         this.props.bill.title = this.refs.billTitle.value;
         this.props.bill.description = this.refs.billDescription.value;
         //alert("to save bill: " + JSON.stringify(this.props.bill));
@@ -214,9 +260,11 @@ export class BillEdit extends React.Component {
          if ( !this.props.bill) {
              return (<div className="error">State not available, state={Utils.squashStr(this.state)}, props={Utils.squashStr(this.props)}</div>);
          }
+         console.log("render for editScore=" + this.props.bill.editScore);
          //let dt = new Date()+ "";
          return (<div style={{border: "1px solid black"}}>
-Here be some bill: {JSON.stringify(Utils.squash(this.props.bill))}}<br/>
+{/*Here be some bill: {JSON.stringify(Utils.squash(this.props.bill))}}<br/>*/}
+<h3>{this.props.bill.ID? "Bill #" + this.props.bill.ID + ", " + this.props.bill.status : "New Bill"}</h3>
 <table style={{width: "100%", padding: "1em"}}><tbody>
     <tr><td>Title</td>
     <td style={{width: "100%"}}><input ref="billTitle" defaultValue={this.props.bill.title} style={{width: "100%"}}/></td>
@@ -228,7 +276,16 @@ Here be some bill: {JSON.stringify(Utils.squash(this.props.bill))}}<br/>
 <table><tbody>
     {this.state.rows.map(q => this.renderBillRow(q))}
 </tbody></table>
-<div><button onClick={this.onSave}>Save</button></div>
+<div>
+    <span style={{backgroundColor: Utils.colourApproval((this.props.bill.editScore + 1.) / 2.), color: "White", width: "200px"}}>Bill edit score: {this.props.bill.editScore}</span>
+    &nbsp;&nbsp;
+    <span style={{backgroundColor: Utils.colourApproval((this.props.bill.billScore + 1.) / 2.), color: "White", width: "200px"}}>Bill total score: {this.props.bill.billScore}</span>
+</div>
+<div>
+    <button onClick={this.onClickSave}>Save</button>
+    <button onClick={() => {this.props.onSave(null); }}>Cancel</button>
+</div>
+<br/>
          </div>);
      }
 }

@@ -4,6 +4,7 @@ import javax.xml.bind.*;
 import javax.xml.bind.annotation.*;
 
 import net.vbelev.web4.ui.*;
+import net.vbelev.web4.ui.WebUser.PasswordKindEnum;
 import net.vbelev.web4.utils.*;
 
 @XmlRootElement(name = "web_user")
@@ -16,6 +17,8 @@ public class WebUserXML {
 	public String name;
 	@XmlAttribute
 	public String login;
+	@XmlAttribute
+	public String passwordKind;
 	public String password;
 	@XmlAttribute
 	public String status;
@@ -35,6 +38,7 @@ public class WebUserXML {
 		this.name = Utils.NVL(u.name, "");
 		this.login = Utils.NVL(u.login, "");
 		this.password = Utils.NVL(u.password, "");
+		this.passwordKind = (u.passwordKind  == null || u.passwordKind == WebUser.PasswordKindEnum.NONE)? null : u.passwordKind.name(); 
 		status = u.status.name();
 		profiles = new ArrayList<Integer>(u.profiles);
 	}
@@ -48,6 +52,7 @@ public class WebUserXML {
 		u.login = Utils.IsEmpty(this.login)? null : this.login;
 		u.password = Utils.IsEmpty(this.password)? null : this.password;
 		u.status = Utils.tryParseEnum(this.status, WebUser.StatusEnum.VISITOR);
+		u.passwordKind = Utils.tryParseEnum(this.passwordKind, WebUser.PasswordKindEnum.NONE);
 		u.profiles.clear();
 		if (!this.profiles.isEmpty())
 		{
