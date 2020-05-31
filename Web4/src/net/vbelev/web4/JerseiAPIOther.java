@@ -72,6 +72,10 @@ public class JerseiAPIOther extends JerseyAPI
 					session.editingBill = new GBBill();
 				}
 				bill = session.editingBill; 
+				if (bill.setID == null)
+				{
+					bill.setID = Utils.NVL(session.currentProfile.setID, 0);
+				}
 			}
 			else
 			{

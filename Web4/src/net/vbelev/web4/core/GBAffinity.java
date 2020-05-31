@@ -8,7 +8,8 @@ import java.util.*;
  * @author vythe
  *
  */
-public class GBAffinity {
+public class GBAffinity implements Cloneable 
+{
 
 	public static enum QualityEnum
 	{
@@ -40,6 +41,22 @@ public class GBAffinity {
 		m_toID = toID;
 		m_value = (int)(value * 1000);
 		m_quality = quality;
+		
+	}
+	
+	public synchronized Object clone()
+	{
+		GBAffinity res = new GBAffinity(); //this.m_toID, this.m_value, this.m_quality);
+		res.m_toID = this.m_toID;
+		res.m_value = this.m_value;
+		res.m_quality = this.m_quality;
+		
+		return res;
+	}
+	
+	public String toString() 
+	{
+		return "[to " + m_toID + ": " + value() + " " + m_quality.name() + "]"; 
 	}
 	
 	public int toID()

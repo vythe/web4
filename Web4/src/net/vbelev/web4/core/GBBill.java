@@ -9,7 +9,7 @@ import net.vbelev.web4.utils.Utils;
  * @author vythe
  *
  */
-public class GBBill 
+public class GBBill implements Cloneable
 {
 	public static enum StatusEnum
 	{
@@ -40,6 +40,29 @@ public class GBBill
 	 */
 	public final Hashtable<Integer, GBAffinity> invAffinities = new Hashtable<Integer, GBAffinity>();
 
+	public Object clone()
+	{
+		GBBill res = new GBBill();
+		res.setID = this.setID;
+		res.title = this.title;
+		res.description = this.description;
+		res.publishedDate = this.publishedDate;
+		res.status = this.status;
+		
+		for (Integer k : this.invAffinities.keySet())
+		{
+			GBAffinity src = invAffinities.get(k);
+			if (src == null)
+			{
+				res.invAffinities.put(k, null);
+			}
+			else
+			{
+				res.invAffinities.put(k, (GBAffinity)src.clone());
+			}
+		}
+		return res;
+	}
 	/**
 	 * returns null if the affinity is not set.
 	 * @param group

@@ -9,7 +9,8 @@ import java.util.*;
  * @author vythe
  *
  */
-public class GBGroup {
+public class GBGroup implements Cloneable 
+{
 
 	/** This ID is set by GBEngine to back-reference the position in groups[] */
 	public int ID;
@@ -20,6 +21,28 @@ public class GBGroup {
 	/** affinity[groupB] = 0.3 here means "30% of my members are also in groupB" */  
 	public final Hashtable<Integer, GBAffinity> affinities = new Hashtable<Integer, GBAffinity>();
 
+	public Object clone()
+	{
+		GBGroup res = new GBGroup();
+		res.ID = this.ID;
+		res.moniker = this.moniker;
+		res.name = this.name;
+		
+		for (Integer k : this.affinities.keySet())
+		{
+			GBAffinity src = this.affinities.get(k);
+			if (src == null)
+			{
+				res.affinities.put(k, null);
+			}
+			else
+			{
+				res.affinities.put(k, (GBAffinity)src.clone());
+			}
+		}
+		return res;
+	}
+	
 	/**
 	 * returns null if the affinity is not set.
 	 * @param group

@@ -148,8 +148,20 @@ public class GBMongoStorage implements GBEngine.Storage
 		for(Document d : coll)
 		{
 			String json = d.toJson();
+			//if (elementClass.equals(GBBillXML.class))
+			//{
+			//	System.out.println("mongo.loadBills: " + json);
+			//}
+			try
+			{
 			T elem = xmliser.fromXML(elementClass, json);
 			res.add(elem);
+			}
+			catch (Exception x)
+			{
+				System.out.println("fromXML failed for " + elementClass.getName() + ": " + json);
+				System.out.println("exception: " + x.getMessage());
+			}
 				//xmliser.fromXML(elementClass, d.toJson())
 			//);
 		}
@@ -213,7 +225,7 @@ public class GBMongoStorage implements GBEngine.Storage
 		GBGroupListXML xm2 = xmliser.fromXML(GBGroupListXML.class, d.toJson());
 		MongoCollection<Document> coll = mongoDB.getCollection(GBGroupListXML.STORAGE_NAME);
 		UpdateResult updRes = coll.replaceOne(
-				Filters.eq("ID", 1), 
+				Filters.eq("ID", xml.ID), 
 				d, 
 				new ReplaceOptions().upsert(true)
 		); // there is only one element, no filtering

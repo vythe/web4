@@ -65,8 +65,16 @@ public class GBBillXML {
 		{
 		for (GBAffinityXML ax : this.invAffinities)
 		{
+			try
+			{
 			GBAffinity aff = ax.toGBAffinity(gblist);
 			bill.invAffinities.put(aff.toID(), aff);
+			}
+			catch (Exception x)
+			{
+				System.out.println("Failed to parse affinity " + ax);
+			}
+			
 		}
 		}
 		return bill;

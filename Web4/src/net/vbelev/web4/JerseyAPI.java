@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import net.vbelev.web4.core.*;
+import net.vbelev.web4.core.GBAffinity.QualityEnum;
 import net.vbelev.web4.ui.*;
 import net.vbelev.web4.utils.Utils;
 
@@ -107,6 +108,7 @@ public class JerseyAPI
 					GBFileStorage storage = new GBFileStorage(dataFolder);
 					res = GBEngine.loadEngine(storage);
 				}
+				context.setAttribute(CONTEXT_ENGINE_PARAM, res);
 			}
 			else 
 			{
@@ -162,6 +164,11 @@ public class JerseyAPI
 			for (GBGroup g2 : gblist.getGroups())
 			{
 				GBAffinity gf = gblist.getAffinity(g,  g2.ID, false);
+				if (gf.quality() == QualityEnum.NONE)
+				{
+					gf = new GBAffinity(g2.ID, 0, QualityEnum.NONE);
+					
+				}
 				this.affinities.add(new GetAffinity(gf, gblist));
 			}			
 		}
@@ -298,7 +305,18 @@ public class JerseyAPI
 			res.add("vote");
 		}
 		
-		if (bill.status == GBBill.StatusEnum.NEW)
+		if (bill.status == null)
+		{
+			res.add("edit");
+			/*res.add("delete");
+			double editScore = bill.getScore(true);
+			if (editScore > - 0.1 && editScore < 0.1)
+			{
+				res.add("publish");
+			}
+			*/			
+		}
+		else if (bill.status == GBBill.StatusEnum.NEW)
 		{
 			res.add("edit");
 			res.add("delete");
@@ -306,8 +324,7 @@ public class JerseyAPI
 			if (editScore > - 0.1 && editScore < 0.1)
 			{
 				res.add("publish");
-			}
-			
+			}			
 		}
 		else if (bill.status == GBBill.StatusEnum.PUBLISHED)
 		{

@@ -8,7 +8,7 @@ import net.vbelev.web4.utils.Utils;
  * A set ot GBGroup's (social groups), cross-referencing each other.
  * It's a square matrix of group affinities.
  */
-public class GBGroupSet
+public class GBGroupSet implements Cloneable
 {
 	public Integer ID;
 	public String title;
@@ -24,6 +24,32 @@ public class GBGroupSet
 	public GBGroupSet(int size) {
 		 //groups = new GBGroup[size];
 		setSize(size);
+	}
+	
+	public Object clone()
+	{
+		GBGroupSet res = new GBGroupSet();
+
+		res.ID = this.ID;
+		res.title = this.title;
+		res.description = this.description;
+		res.timestamp = this.timestamp;
+		
+		if (this.groups == null)
+		{
+			res.groups = null;
+		}
+		else
+		{
+			res.groups = new GBGroup[this.groups.length];
+			for (int i = 0; i < this.groups.length; i++)
+			{
+				GBGroup elem = this.groups[i] == null? null : (GBGroup)this.groups[i].clone();
+				res.groups[i] = elem;
+			}
+		}
+	
+		return res;
 	}
 	
 	public Date getTimeModified() { return new Date(timestamp); }

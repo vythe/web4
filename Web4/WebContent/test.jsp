@@ -18,7 +18,7 @@ storage.loadWebUserIndex(wIndex);
 GBEngine engine = GBEngine.loadEngine(storage);
 engine.loadGroups();
 %>
-<h2>Engine groups: <%=engine.getSize() %></h2>
+<h2>Engine groups: <%=engine.groupList.size() %></h2>
 <h2>Up</h2>
 <%
 double val = 0;

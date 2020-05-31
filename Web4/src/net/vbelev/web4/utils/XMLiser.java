@@ -376,7 +376,7 @@ public class XMLiser
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <T>T fromXML(Class<T> elementClass, InputStream xml)
+	public synchronized <T>T fromXML(Class<T> elementClass, InputStream xml)
 	{
 		if (xml == null) return null;
 		

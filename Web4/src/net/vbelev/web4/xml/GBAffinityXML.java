@@ -24,6 +24,11 @@ public class GBAffinityXML
 	{
 	}
 	
+	public String toString()
+	{
+		return "GBAffinityXML: " + toMoniker + "=" + value;
+	}
+	
 	public void fromGBAffinity(GBGroupSet gblist, GBAffinity aff)
 	{
 		this.toMoniker = gblist.getGroupMoniker(aff.toID());

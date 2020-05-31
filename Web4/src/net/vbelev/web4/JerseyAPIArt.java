@@ -48,13 +48,40 @@ public class JerseyAPIArt extends JerseyAPI
 			{
 				throw new IllegalArgumentException("Invalid set ID: " + setID);
 			}
-			session.editingSet = gblist;
+			session.editingSet = (GBGroupSet)gblist.clone(); // need to clone this!
 		}
 		res.fromGBGroupSet(gblist);
 		return res;
 	}
 	
+	public static class UpdateGroupSet
+	{
+		public String title;
+		public String description;
+	}
 	
+	@Path("/update_group_set")	
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+	public GetGroupSet updateGroupSet(UpdateGroupSet gset)
+	{
+		//GBEngine engine = this.getGBEngine(false); 
+		Web4Session session = this.getWeb4Session();
+		GBGroupSet gblist = session.editingSet;
+
+		if (gblist == null)
+		{
+			throw new IllegalArgumentException("No group set selected for editing");
+		}
+
+		gblist.title = Utils.NVL(gset.title, "").trim();
+		gblist.description = Utils.NVL(gset.description, "").trim();
+		
+		GetGroupSet res = new GetGroupSet();
+		res.fromGBGroupSet(gblist);
+		return res;
+	}
 	
 	public static class UpdateGroup
 	{
@@ -68,7 +95,7 @@ public class JerseyAPIArt extends JerseyAPI
     @Produces(MediaType.APPLICATION_JSON)
 	public GetGroupSet updateGroup(UpdateGroup group)
 	{
-		GBEngine engine = this.getGBEngine(false); 
+		//GBEngine engine = this.getGBEngine(false); 
 		Web4Session session = this.getWeb4Session();
 		GBGroupSet gblist = session.editingSet;
 
@@ -160,14 +187,14 @@ public class JerseyAPIArt extends JerseyAPI
 		{
 			throw new IllegalArgumentException("Invalid group monikers provided");
 		}
-		if (value < 0 || value > 1) 
-		{
-			throw new IllegalArgumentException("Value must be between 0 and 1");
-		}
 		if (value == null) // can it be null?
 		{
 			g.setAffinity(g2.ID,  0, GBAffinity.QualityEnum.NONE);
 			aff = gblist.getAffinity(g, g2.ID, true);
+		}
+		else if (value < 0 || value > 1) 
+		{
+			throw new IllegalArgumentException("Value must be between 0 and 1");
 		}
 		else
 		{
@@ -191,6 +218,12 @@ public class JerseyAPIArt extends JerseyAPI
 		Web4Session session = this.getWeb4Session();
 		GBGroupSet gblist = session.editingSet;
 		
+		if("discard".equals(action)) {
+			//Integer setID = gblist.ID;
+			session.editingSet = null;			
+			return null;  
+		}
+		
 		if (gblist == null)
 		{
 			throw new IllegalArgumentException("No active updateable set");
@@ -202,14 +235,13 @@ public class JerseyAPIArt extends JerseyAPI
 			
 			return editGroupSet(setID); // this should force a reload or reinit of the set 
 		}
-		if("discard".equals(action)) {
-			//Integer setID = gblist.ID;
-			session.editingSet = null;
-			
-			return null;  
-		}
-		else if ("save".equals(action)) {
-			
+		else if ("save".equals(action)) 
+		{
+			if (Utils.IsEmpty(gblist.title))
+			{
+				throw new IllegalArgumentException("Title must not be empty");					
+			}
+	
 			if (gblist.ID == null)
 			{
 				int newID = 0;
@@ -223,6 +255,14 @@ public class JerseyAPIArt extends JerseyAPI
 				gblist.ID = newID;				
 			}
 			engine.saveGroup(gblist);
+			for (GBBill b : engine.bills.values())
+			{
+				if (b.setID == gblist.ID)
+				{
+					b.calculateInvAffinities(gblist);
+				}				
+			}
+					
 		}
 		else if ("newset".equals(action))
 		{
@@ -320,7 +360,7 @@ public class JerseyAPIArt extends JerseyAPI
 		bill.publishedDate = new Date();
 		bill.title = "Test " + Utils.formatDateTime(bill.publishedDate);
 		bill.description = "Description of " + bill.title;
-		bill.status = GBBill.StatusEnum.PUBLISHED;
+		bill.status = GBBill.StatusEnum.NEW;
 		bill.setID = set.ID;
 		
 		// give it two affinities
@@ -378,7 +418,7 @@ public class JerseyAPIArt extends JerseyAPI
 //			{
 //				throw new IllegalArgumentException("bill ID " + billID + " is " + bill.status + " and cannot be edited");
 //			}
-			session.editingBill = bill;
+			session.editingBill = (GBBill)bill.clone();
 		}
 		GetBill res = new GetBill();
 		res.fromGBBill(bill, engine, null);
@@ -550,6 +590,17 @@ public class JerseyAPIArt extends JerseyAPI
 			res.fromGBBill(bill, engine, null);
 			// delete it here
 		}
+		else if ("publish".equals(action))
+		{
+			if (!Utils.InList("publish", actions))
+			{
+				throw new IllegalArgumentException("The bill " + bill.ID + " cannot be published");
+			}
+			bill.status = GBBill.StatusEnum.PUBLISHED;
+			bill.publishedDate = new Date();
+			engine.saveBill(bill);
+			res.fromGBBill(bill, engine, null);
+		}
 		else if ("close".equals(action))
 		{
 			if (!Utils.InList("close", actions))
@@ -596,6 +647,18 @@ public class JerseyAPIArt extends JerseyAPI
 			
 			session.editingBill = bill;
 		}
+		else
+		{
+			set = engine.getGroupSet(bill.setID);
+		}
+		if (set == null) // a fallback scenario, it shouldn't happen
+		{
+			bill = new GBBill();
+			bill.setID = 0;
+			set = engine.getGroupSet(bill.setID);
+			session.editingBill = bill;
+		}
+		
 		GBGroup g = set.getGroup(moniker);
 		if (g != null)
 		{
