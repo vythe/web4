@@ -1,3 +1,4 @@
 window.appconfig = {
-    apiurl: "http://localhost:8080"
+    apiurl: "http://localhost:8080",
+    idleTimeoutSet: 100
 };

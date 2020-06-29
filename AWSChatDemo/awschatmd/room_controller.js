@@ -12,8 +12,8 @@ exports.Controller = function(context) {
                 context.rooms = []
             }
             let resData = [];
-            console.log("allrooms, context.rooms=" + Utils.squashStr(context.rooms, 99));
-            console.log("allrooms, context.users=" + Utils.squashStr(context.users, 99));
+            //console.log("allrooms, context.rooms=" + Utils.squashStr(context.rooms, 99));
+            //console.log("allrooms, context.users=" + Utils.squashStr(context.users, 99));
             context.rooms.forEach(r => {
                 let resRoom = {
                     roomID: r.roomID,
@@ -26,11 +26,14 @@ exports.Controller = function(context) {
                         let user = context.users.find(u => u.userID == q);
                         //console.log("")
                         if (user) {
-                            resRoom.users.push(user);
+                            resRoom.users.push({
+                                userID: user.userID,
+                                userName: user.userName
+                            });
                         }
                     });
                 }
-                resRoom.users = resRoom.users.sort((a, b) => { return a.login > b.login; });
+                resRoom.users = resRoom.users.sort((a, b) => { return a.userName > b.userName; });
                 resData.push(resRoom);
             });
             res.status(200).send(resData);	
@@ -82,7 +85,10 @@ exports.Controller = function(context) {
                 room.userIDs.forEach(q => {
                     let user = context.users.find(u => u.userID == q);
                     if (user) {
-                        resRoom.users.push(user);
+                        resRoom.users.push({
+                            userID: user.userID,
+                            userName: user.userName
+                        });
                     }
                 });
                 resRoom.users = resRoom.users.sort((a, b) => { return a.login > b.login; });
@@ -137,12 +143,14 @@ exports.Controller = function(context) {
                 if (!room.roomID) {
                     error = "Failed to join the room";
                 }
-
             }
+
             if (error) {
                 res.status(500).send({Error: error});
             }
             else{
+                context.SQSService.start();
+
                 if (req.session.roomID != room.roomID) {
                     RoomService.leave(req.session.userID, req.session.roomID);
                 }
@@ -150,7 +158,8 @@ exports.Controller = function(context) {
 
                 console.log("Rc.join, got roomid=" + room.roomID + ", all rooms: " + Utils.squashStr(context.rooms, 99));
                 room = context.rooms.find(q => q.roomID === room.roomID);
-                let sub = context.mymq.subscribe(room.roomID);
+                //let sub = context.mymq.subscribe(room.roomID);
+                let sub = null;
                 //console.log("RC.join, found ret room=" + Utils.squashStr(room, 99));
                 //console.log("join Room " + room.roomID + ", sub: " + JSON.stringify(sub));
                 let resData = {
@@ -158,16 +167,17 @@ exports.Controller = function(context) {
                     roomName: room.roomName,
                     subscriptionID: sub
                 };
-                console.log("joinRoom, resDAta="  + JSON.stringify(resData));
+                console.log("joinRoom, resData="  + JSON.stringify(resData));
                 res.status(200).send(resData);	
             }
         },
 
         leave: function(req, res) {
-            if (context.roomID && context.userID) {
-                RoomService.leave(context.userID, context.roomID);
+            console.log("leaveRoom, session.roomID=" + req.session.roomID);
+            if (req.session.roomID && req.session.userID) {
+                RoomService.leave(req.session.userID, req.session.roomID);
             }
-            context.roomID = null;
+            req.session.roomID = null;
             res.status(200).send({status: "OK"});
         }
 

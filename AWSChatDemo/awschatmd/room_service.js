@@ -61,6 +61,7 @@ function leave(context, userID, roomID) {
     let contextRoom = context.rooms.find(q => q.roomID == roomID);
     if (contextRoom) {
         contextRoom.userIDs = contextRoom.userIDs.filter(q => q != userID);
+        console.log("room_service.leave, filtered out userID=" + userID + ", remains=" + JSON.stringify(contextRoom.userIDs));
         return true;
     }
     return false;

@@ -100,7 +100,7 @@ export class Utils {
             }
           }
           if (count == 0) { // something immutable, like a Date
-            console.log("squash found immutable: " + JSON.stringify(obj));
+            //console.log("squash found immutable: " + JSON.stringify(obj));
             return obj;
           }
           else {

@@ -17,64 +17,69 @@ export class Main extends React.Component {
         super(props);
 
         this.state = {
-            rows: [],
-            users: [],
+            //users: [],
+            usersTS: null, // a timestamp on appState.users to keep track of changes
             userID: null, // current user
             roomID: null // current room
         };
-this.myIsMounted = false;
+//this.myIsMounted = false;
         this.readContext = this.readContext.bind(this);
         this.loadSession = this.loadSession.bind(this);
-        this.onSubmitInput = this.onSubmitInput.bind(this);
-        this.onSubmitLogin = this.onSubmitLogin.bind(this);
+        //this.onSubmitInput = this.onSubmitInput.bind(this);
+        this.onLoginClick = this.onLoginClick.bind(this);
         this.onLogoutClick = this.onLogoutClick.bind(this);
         window.redux.subscribe(this.readContext);
 
     }
 
     componentDidMount() {
+        //console.log("Main.componentDidMount starts");
         this.myIsMounted = true;
         //this.readContext(true);
         this.loadSession();
     }
     
+    shouldComponentUpdate(nextProps, nextState) {
+        if (this.state.userID == nextState.userID && this.state.roomID == nextState.roomID && this.state.usersTS >= nextState.usersTS) {
+            console.log("main.shouldComponentUpdate: FALSE next state" + JSON.stringify(nextState));
+            return false;
+        }
+        //console.log("main.shouldComponentUpdate: old state" + JSON.stringify(this.state));
+        //console.log("main.shouldComponentUpdate: TRUE next state" + JSON.stringify(nextState));
+
+        return true;
+    }
+
     readContext(fromDidMount) {
         if (!this.myIsMounted) {
             return;
         }
         let mainState = window.redux.getState();
         let newState = {
-            users: Utils.squash(mainState.users, 99),
-            rows: [],
-            userID: mainState.userID,
-            roomID: mainState.roomID
+            //users: Utils.squash(mainState.users, 99),
+            //rows: [],
+            usersTS: mainState.usersTS || null,
+            userID: mainState.userID || null,
+            roomID: mainState.roomID || null,
+            subscriptionID: null,
+            userName: null
         };
 
-        console.log("main readContext, found roomID=" + mainState.roomID);
+        if ((this.state.userID || null) != (mainState.userID || null)
+            || (this.state.roomID || null) != (mainState.roomID || null)
+            || this.state.usersTS != newState.usersTS) {
+        //console.log("main readContext, found old roomID=" + this.state.roomID + ", new roomID=" + mainState.roomID);
 //console.log("Main users found context: " + JSON.stringify(mainState.users));
 //console.log("Main users found new: " + JSON.stringify(newState.users));
         // convert messages into the display format
-        for (let k in mainState.rows) {
-            let stateRow = mainState.rows[k];
-            console.log("Main row found:" + Utils.squashStr(stateRow, 4));
-            let myRow = {
-                ID : stateRow.ID,
-                content: stateRow.content,
-                ts: Utils.formatDateTime(stateRow.messageTS)
-            };
-            let user = newState.users.find(q => q.userID == stateRow.userID);
-            if (user) {
-                myRow.title = user.userName;
-            } else {
-                myRow.title = "#" + stateRow.userID;
-            }
-            newState.rows.push(myRow);
-        }
         //if (fromDidMount) {
         //   this.state = newState;
         //} else {
             this.setState(newState);
         //}
+        } else {
+            //console.log("Main readContext - skip update. old userid=" + this.state.userID + ", new userID=" + mainState.userID);
+        }
     }
 
     loadSession() {
@@ -90,20 +95,28 @@ this.myIsMounted = false;
               //data: {login: txt} //JSON.stringify(data)
         })
         .then (res => {
-            console.log("got session: " + JSON.stringify(res.data));
+            //console.log("got session: " + JSON.stringify(res.data));
             this.setState({
-                userID: res.data.userID,
-                roomID: res.data.roomID,
+                userID: res.data.userID || null,
+                roomID: res.data.roomID || null,
                 subscriptionID: res.data.subscriptionID,
-                userName: res.data.login
+                userName: res.data.userName
+            }, () => {
+                console.log("main loadSession updated state: " + JSON.stringify(this.state));
             });
 
             if (res.data.userID) {
                 window.redux.dispatch({
                     type: "USER",
                     payload: {
-                      userID: res.data.userID,
-                      userName: res.data.login
+                        userID: res.data.userID,
+                        userName: res.data.userName,
+                        roomID: res.data.roomID,
+                        accessKey: res.data.accessKey,
+                        accessSecret: res.data.accessSecret,
+                        accessRegion: res.data.accessRegion,
+                        userQueueURL: res.data.userQueueURL,
+                        chatQueueURL: res.data.chatQueueURL
                     }
                 });    
             }
@@ -130,6 +143,7 @@ this.myIsMounted = false;
 
     }
 
+    /*
     onSubmitInput() {
         let txt = (this.refs.inputField.value || "").trim();
 
@@ -144,8 +158,9 @@ this.myIsMounted = false;
             this.refs.inputField.value = "";
         }
     }
+    */
 
-    onSubmitLogin() {
+    onLoginClick() {
         let txt = (this.refs.loginField.value || "").trim();
         let mythis = this;
         
@@ -161,16 +176,22 @@ this.myIsMounted = false;
               //data: {login: txt} //JSON.stringify(data)
         })
         .then (res => {
-            alert("got login: " + JSON.stringify(res.data));
+            //alert("got login: " + JSON.stringify(res.data));
             if (res.data.userID) {
                 mythis.setState({
-                    userID: res.data.userID
+                    userID: res.data.userID,
+                    roomID: null
                 });
                 window.redux.dispatch({
                     type: "USER",
                     payload: {
-                      userID: res.data.userID,
-                      userName: res.data.userName
+                        userID: res.data.userID,
+                        userName: res.data.userName,
+                        accessKey: res.data.accessKey,
+                        accessSecret: res.data.accessSecret,
+                        accessRegion: res.data.accessRegion,
+                        userQueueURL: res.data.userQueueURL,
+                        chatQueueURL: res.data.chatQueueURL
                     }
                 });
     
@@ -198,7 +219,8 @@ this.myIsMounted = false;
         })
         .then (res => {
             this.setState({
-                userID: null
+                userID: null,
+                roomID: null
             });
             window.redux.dispatch({
                 type: "USER",
@@ -211,7 +233,7 @@ this.myIsMounted = false;
             //this.refs.loginField.value = "";
         })
         .catch((err) => {
-            console.log("login catch:");
+            console.log("logout catch:");
             console.dir(err);
             alert("got logout catch: " + Utils.squashStr(err, 99));
         });
@@ -225,38 +247,27 @@ this.myIsMounted = false;
     }
 
     render() {
-        let myUser = this.state.users.find(q => q.userID == (this.state.userID || -3));
-        //console.log("main render, state.userID=" + this.state.userID + ", state users=" + Utils.squashStr(this.state.users, 2)) ;
+        let appState = window.redux.getState();
+        //let myUser = appState.users.find(q => q.userID == (this.state.userID || -3));
+        let myUser = appState.users.find(q => q.userID == (appState.userID || -3));
+        //console.log("main render, state.userID=" + this.state.userID + ", appstate users=" + Utils.squashStr(appState.users, 2)) ;
+        //console.log("main render, roomID=" + this.state.roomID + ", state=" + JSON.stringify(this.state));
         return(
         <div style={{display: "flex", flexDirection: "column", height: "500px"}}>
             <div className="wideMessage">{myUser? (<>
-                Hello, {myUser.login} (#{myUser.userID})
+                Hello, {myUser.userName} (#{myUser.userID})
                 <button onClick={this.onLogoutClick}>Change User</button>
                 <input ref="loginField" type="hidden" value=""/>
+                Your room is #{this.state.roomID}
             </>): (<>
                 Please Log in:  {/*Utils.squashStr(this.state.users, 99) + " / " + JSON.stringify(this.state.users)*/}
-                <input ref="loginField" type="text" style={{width: "10em"}} onKeyUp={ (evt) => {if (evt.code == 13) this.onSubmitLogin(); }}/>
-                <button onClick={this.onSubmitLogin}>Go!</button>
+                <input ref="loginField" type="text" 
+                style={{width: "10em"}} 
+                onKeyUp={ (evt) => {if (evt.keyCode == 13) this.onLoginClick(); }}
+                />
+                <button onClick={this.onLoginClick}>Go!</button>
             </>)}</div>
-            {/*}
-            <div className="wideMessage"style={{flexGrow: "1"}}>
-                <div style={{display: "flex", flexDirection: "row"}}>
-                    <div style={{flexGrow: "1"}}>
-                    {this.state.rows.map(q => this.renderRow(q))}
-                    </div>
-                    <div style={{width: "200px"}}>
-                        {this.state.users.map(q => 
-                        (<React.Fragment key={q.userID}><span>
-                            {q.login + " (" + q.userID + ")"}
-                            </span><br/>                            
-                        </React.Fragment>))}
-                    </div>
-                </div>
-            </div>
-            */}
-            {this.state.roomID? <Room roomid={this.state.roomID}/> 
-            : <RoomList/>
-            }
+            {(this.state.roomID && appState.userID)? <Room roomid={this.state.roomID}/> : <RoomList/>}
         </div>);
     }
 }

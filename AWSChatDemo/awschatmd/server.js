@@ -1,7 +1,8 @@
 
 var config = require("./config").config;
 var express = require("express");
-const session = require('express-session');
+const session = require("express-session");
+
 
 /*
 user record: {
@@ -18,15 +19,34 @@ room record: {
 }
 */
 
+/* 
+AWS credentials:
+
+root user:
+    AWS Account ID: 332275027261
+    Access Key ID: AKIAJN3ZLZYETVJKLQ4Q
+    Secret Access Key: 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
+
+user queue_aim1:
+	access key  AKIAU2XJCRU6ZHEHFRE3, 
+	secret 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
+
+test queue: awschatmain.fifo
+	queue URL:  	https://sqs.ap-southeast-2.amazonaws.com/332275027261/awschatmain.fifo
+*/
+
 var mymq = require("./mymq.js").MyMQ();
 
 var testSubscription = mymq.subscribe(null, null);
 
 var context = {
 	mymq: mymq,
+	SQSService: null,
 	users: [],
-	rooms: []
-	, testSubscription: testSubscription
+	rooms: [],
+	accessRegion: "ap-southeast-2",
+	//chatQueueURL: "https://sqs.ap-southeast-2.amazonaws.com/332275027261/awschatmain.fifo",
+	testUserQueueURL: "https://sqs.ap-southeast-2.amazonaws.com/332275027261/awschatmain.fifo"
 };
 
 /* session props: {
@@ -57,8 +77,20 @@ console.log("pull-7: " + context.mymq.pull(context.testSubscription));
 */
 
 context.users.push({
-	userID: 0,
+	userID: -1,
 	login:"SYSTEM_SERVER"
+});
+
+context.users.push({
+	userID: 0,
+	login:"EMPTY_USER"
+});
+
+context.SQSService = require("./sqs_service").SQSService(context);
+
+context.SQSService.clearAll(() => { 
+	console.log("clearAll successful");
+	context.SQSService.start();
 });
 
 var user_controller = require("./user_controller").Controller(context);
