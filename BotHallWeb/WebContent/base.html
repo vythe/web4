@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+<!-- 
+<script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+ -->
+ <script src="js/jquery-3.5.1.js"></script>
+ <script src="js/bhclient.js"></script>
+<script type="text/javascript">
+var apiURL = "/BotHallWeb/api/";
+var terrainURL = "/BotHallWeb/terrain/";
+var cellWidth = 30;
+var cellHeight = 30;
+var terrainTiles = {
+		"LAND": "/BotHallWeb/img/terrain/land.png",
+		"STONE": "/BotHallWeb/img/terrain/stone.png"
+};
+var spriteTiles = {
+		"HERO": "/BotHallWeb/img/sprites/sinnoh_2.png",
+		"GOLD": "/BotHallWeb/img/sprites/gold.png",
+		"MONSTER": "/BotHallWeb/img/sprites/sinnoh_3.png"
+};
+
+var fullApiURL = new URL(apiURL, window.location.href);
+/*
+alert("mybhurl=" + mybh.reportUrl());
+mybh.reportUrl2();
+mybh.reportUrl3();
+*/
+	//mybh.cycle(true);
+
+</script>
+<style type="text/css">
+button.movebutton {
+	width: 5em;
+}
+</style>
+</head>
+<body>
+<h1>Here be Bots</h1>
+<div style="width: 60%; display: inline-block;">
+<svg id="templateSVG" width="100" height="100" style="display: none;">
+<image id="templateTile" x="0" y="0" height="30" width="30" xlink:href="#"/>
+</svg>
+
+<svg id="mainSVG" width="700" height="700"></svg>
+</div>
+<div style="width: 30%; display: inline-block; vertical-align: top;">
+<!-- 
+<button id="btnLoad">Load terrain</button>
+<button id="btnLoadItems">Load items</button><br/>
+<button id="btnLoadItemsOnce">Load once</button><br/>
+<button id="btnMoveIt">Move it</button><br/>
+-->
+<input id="sessionid" type="text" value=""/>
+<button id="btnJoinSession">Join/Create Session</button><br/>
+
+<button id="btnConnectHero">Connect to Hero</button> 
+<button id="btnConnectMonster">Connect to Monster</button> 
+<button id="btnDisconnect">Disconnect</button><br/>
+
+<button id="btnStartBHCycling">Start Session</button> 
+<button id="btnBHCycleOnce">Session Once</button> 
+<button id="btnStopBHCycling">Stop Session</button><br/>
+
+<button id="btnStartCycling">Start Cycling</button> 
+<button id="btnCycleOnce">Cycle Once</button> 
+<button id="btnStopCycling">Stop Cycling</button><br/>
+<table>
+<tr>
+<td></td><td><button class="movebutton" bh_direction="6">Up</button></td><td></td>
+</tr>
+<tr>
+<td><button class="movebutton" bh_direction="2">Left</button></td>
+<td><button class="movebutton" bh_direction="0">Stop</button></td>
+<td><button class="movebutton" bh_direction="1">Right</button></td>
+</tr>
+<tr>
+<td></td><td><button class="movebutton" bh_direction="3">Down</button></td><td></td>
+</tr>
+</table>
+<hr/>
+<table>
+<tr><td>Last Poll:</td><td id="lastPollTime"></td><td>Session ID:</td><td id="sessionID"></td></tr>
+<tr><td>Timecode:</td><td id="serverTimecode"></td><td>controlled ID:</td><td id="controlledID"></td></tr>
+<tr><td>Load%::</td><td id="serverLoad"></td><td>Client Load%:</td><td id="clientLoad"></td></tr>
+<tr><td>Server Tick:</td><td id="serverMsec"></td><td>Client Tick:</td><td id="clientMsec"></td></tr>
+<tr><td>Tick msec:</td><td id="serverTick"></td></tr>
+<tr><td>Info:</td><td id="infoString" colspan="3"></td></tr>
+</table>
+Key pressed: <span id="keyPressSpan"></span><br/>
+<!--<fieldset>
+<legend>Me</legend>
+<div id="meData"></div>
+</fieldset>-->
+<hr/>
+<div id="meMessages" style="height: 100px; overflow: auto; white-space: nowrap; border: 1px;">
+</div>
+</div>
+<script type="text/javascript">
+
+var mybh = BHClient(fullApiURL.href);
+mybh.logger = function(message, messageLevel){ // the logger function, it will be called as logger(message, messageLevel);
+	if (messageLevel != "INFO") {
+		console.log("MyBH " + messageLevel + ": " + message);
+	}
+};
+
+var pacmanValidDirs = [1,2,3,6];
+
+/** 
+ * Monsters may choose a new direction if 
+ a) it is not currently moving;
+ b) the current direction is blocked;
+ c) it is on a crossroads (more than two exits).
+ */
+function mayTurnMonster(closest, currentDir) {
+
+	//if (currentDir != 0) return false;
+
+	if (currentDir == 0) return true;
+	if (!closest[currentDir]) {
+		console.log("INVALID currentDir: " + currentDir);
+		return true;
+	}
+	
+	if (closest[currentDir].terrain != "LAND") return true;
+	
+	var cnt = 0;
+	for (var k = 0; k < pacmanValidDirs.length && cnt < 3; k++) {
+		if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;		
+	}
+	return cnt != 2;		 
+}
+ 
+function randomDir(closest) {
+	var cnt = 0;
+	for (var k = 0; k < pacmanValidDirs.length; k++) {
+		if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;		
+	}
+	//console.log("randomDir, cnt=" + cnt);
+
+	if (cnt == 0) return 0;
+	var dir1 = Math.floor(Math.random() * cnt + 1);
+	//console.log("randomDir, dir1=" + dir1);
+	cnt = 0;
+	for (var k = 0; k < pacmanValidDirs.length; k++) {
+		if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;
+		if (cnt == dir1) return pacmanValidDirs[k];
+	}
+	return 0;
+}
+
+function bestDir(closest, dx, dy) {
+	return 0;
+}
+
+mybh.onUpdate = function(elementType, elementData) {
+	if (elementType == "STATUS") {
+		//addMessage("BH: update status: " + JSON.stringify(elementData));
+		// BH: update status: {"controlledMobileID":167,"cycleLoad":0,"cycleMsec":2000,"sessionID":1,"sessionStatus":"ACTIVE","timecode":60,"updateTS":0}
+		var lastLoadTime = new Date().getTime();
+		$("#lastPollTime").text(formatDateTime(new Date(lastLoadTime)));
+		$("#serverTimecode").text(elementData.timecode);
+		$("#sessionID").text(elementData.sessionID);
+		$("#controlledID").text(elementData.controlledMobileID);
+		$("#serverLoad").text(elementData.cycleLoad);
+		$("#clientLoad").text(mybh.loopLoad);
+		$("#serverMsec").text(elementData.cycleMsec);
+		$("#clientMsec").text(mybh.loopMilliseconds);
+		
+		if (elementData.controlledMobileID > 0 && mybh.mobiles[elementData.controlledMobileID]) 
+		{
+			var me = mybh.mobiles[elementData.controlledMobileID];
+			var closest = mybh.getClosest(me.x, me.y);
+			var closestTiles = closest.map(q => q.terrain);
+			var openTiles = [];
+			for (var p = 0; p < pacmanValidDirs.length; p++) {
+				if (closestTiles[pacmanValidDirs[p]] == "LAND") openTiles.push(mybh.cellShifts[pacmanValidDirs[p]][4]);
+			}
+			$("#infoString").text("My id=" + me.id + ", x=" + me.x + ", y=" + me.y
+					+ ", dir=" + me.dir
+					+ ", open=" + JSON.stringify(openTiles)
+					);
+			
+			var lastPos = mybh.clientData.lastPos || {};
+			
+			if (me.dir != 0 && me.x == lastPos.x && me.y == lastPos.y) {
+				// don't turn until at least one step is done
+			}
+			else if (mayTurnMonster(closest, me.dir)) {
+				var newDir = randomDir(closest);
+				console.log("on turn, newDir=" + newDir);
+				if (newDir > 0 && newDir != me.dir) {
+					mybh.clientData.lastPos = {x: me.x, y: me.y};
+					moveIt(newDir);
+				}
+			} else {
+				console.log("on turn - not allowed, current dir=" + me.dir);
+			}
+			
+		}
+		else {
+			$("#infoString").text("no controlled ID");
+		}
+
+	}
+	else if (elementType == "CELL") {
+		setTerrain(elementData.x, elementData.y, elementData.terrain);
+	}
+	else if (elementType == "ITEM") {
+		updateItem(elementData);
+	}
+	else if (elementType == "MOBILE") {
+		console.log("update mobile: " + JSON.stringify(elementData));
+		updateItem(elementData);
+	}
+	else if (elementType == "MESSAGE") {
+		addMessage(elementData);
+	}
+};
+
+
+
+var tiles = [];
+var itemTiles = {};
+//var items = {}; // all items have ids
+//var doPolling = false;
+//var pollTimeout = 100;
+//var mySession = {};
+//var myObj = null;
+
+$(document).ready(function() {
+	/*
+	$("#btnLoad").click(function(evt) {
+		evt.preventDefault();
+		loadAndRender();
+	});
+	$("#btnLoadItems").click(function(evt) {
+		evt.preventDefault();
+		//loadItems();
+		setPolling(!doPolling);			
+	});
+	$("#btnLoadItemsOnce").click(function(evt) {
+		evt.preventDefault();
+		//loadItems();
+		setPolling("once");			
+	});
+	
+	$("#btnMoveIt").click(function(evt) {
+		evt.preventDefault();
+		moveIt();
+	});
+*/
+
+	$("#btnJoinSession").click(function(evt) {
+		evt.preventDefault();
+		var sid =  $("#sessionid").val();
+		mybh.joinSession(sid);
+		addMessage("joinSession called");
+	});
+	
+	$(".movebutton").click(function(evt) {
+		evt.preventDefault();
+		var dir = $(this).attr("bh_direction");
+		moveIt(dir);
+	});
+
+	
+	$("#btnConnectHero").click(function(evt) {
+		evt.preventDefault();
+		if (!mybh.controlledMobileID) {
+			
+			mybh.joinMobile("HERO");
+			addMessage("join HERO called");
+		} else {
+			addMessage("join HERO ignored - you are already connect to " + mybh.controlledMobileID);
+		}
+	});
+	
+	$("#btnConnectMonster").click(function(evt) {
+		evt.preventDefault();
+		if (!mybh.controlledMobileID) {
+			
+			mybh.joinMobile("MONSTER");
+			addMessage("join MONSTER called");
+		} else {
+			addMessage("join MONSTER ignored - you are already connect to " + mybh.controlledMobileID);
+		}
+	});
+	
+	$("#btnDisconnect").click(function(evt) {
+		evt.preventDefault();
+		if (mybh.controlledMobileID) {
+			
+			mybh.joinMobile(null);
+			addMessage("disconnect called");
+		} else {
+			addMessage("disconnect ignored - you are not connected");
+		}
+	});
+	
+	
+	
+	$("#btnStartCycling").click(function(evt) {
+		evt.preventDefault();
+		if (mybh.sessionID) {
+			mybh.cycle(true);
+			addMessage("start cycling");
+		} else {
+			addMessage("cannot start cycling: no active session");
+		}
+	});
+	
+	$("#btnStopCycling").click(function(evt) {
+		evt.preventDefault();
+		if (mybh.sessionID) {
+			mybh.cycle(false);
+			addMessage("stop cycling");
+		} else {
+			addMessage("cannot stop cycling: no active session");
+		}
+		
+	});
+		
+	$("#btnCycleOnce").click(function(evt) {
+		evt.preventDefault();
+		//console.log("btnCycleOnce clicked");
+		if (mybh.sessionID) {
+			mybh.cycle("O");
+			addMessage("cycle once");
+		} else {
+			addMessage("cannot start cycling: no active session");
+		}
+		
+	});
+	
+	
+	
+	$("#btnStartBHCycling").click(function(evt) {
+		evt.preventDefault();
+		if (mybh.sessionID) {
+			mybh.bhcycle(true);
+			addMessage("start server cycling");
+		} else {
+			addMessage("cannot start server cycling: no active session");
+		}
+	});
+	
+	$("#btnStopBHCycling").click(function(evt) {
+		evt.preventDefault();
+		if (mybh.sessionID) {
+			mybh.bhcycle(false);
+			addMessage("stop server cycling");
+		} else {
+			addMessage("cannot stop server cycling: no active session");
+		}
+		
+	});
+	
+	
+	$("#btnBHCycleOnce").click(function(evt) {
+		evt.preventDefault();
+		console.log("btnBHCycleOnce clicked");
+		if (mybh.sessionID) {
+			mybh.bhcycle("O");
+			addMessage("server cycle once");
+		} else {
+			addMessage("cannot start server cycling: no active session");
+		}
+		
+	});
+	
+	$(document).on("keydown", function (evt) {
+		$("#keyPressSpan").text("keydown: " + evt.keyCode);
+	});
+});
+
+/*
+function setPolling(doit) {
+	if (doit) {
+	if (!doPolling) {
+		doPolling = true;
+		loadUpdate();
+	}
+	} else {
+		doPolling = false;
+	}
+	if (doit == "once") {
+		doPolling = false;
+	}
+}
+*/
+function getTile(x, y) {
+	for (var k in tiles) {
+		var tile = tiles[k];
+		if (tile && tile.x == x &&  tile.y == y) {
+			return tile;
+		}
+	}
+	var elem = $("#templateTile").clone();
+	elem.attr("x", x * cellWidth);
+	elem.attr("y", y * cellHeight);
+	elem.attr("xlink:href", terrainTiles["LAND"]);
+	
+	var res = {
+			x: x,
+			y: y,
+			terrain: "LAND",
+			image: elem
+	};
+	$("#mainSVG").append(elem);
+	tiles.push(res);
+	return res;
+}
+
+function setTerrain(x, y, terrain) {
+	var tile = getTile(x, y);
+	tile.terrain = terrain;
+	//tile.image.attr("xlink:href", tiles[terrain]);
+	tile.image.attr("xlink:href", terrainTiles[terrain]);
+}
+
+
+bhItemStatusDelete = 1;
+function updateItem(dataItem) {
+	//console.log("updateItem: " + JSON.stringify(dataItem) + ", tile=" +  spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
+	//console.log("updateItem, ID=" + dataItem.id + ", svg=" + JSON.stringify(itemTiles[dataItem.id]));
+	var svgItem = itemTiles[dataItem.id];
+	if (dataItem.status == bhItemStatusDelete) {
+		delete itemTiles[dataItem.id];
+		if (svgItem && svgItem.svg) {
+			svgItem.svg.remove();
+		}
+		
+	} else if (!svgItem) {
+		elem = $("#templateTile").clone();				
+		svgItem = {
+			//atom: dataItem,
+			svg: elem
+		};	
+		itemTiles[dataItem.id] = svgItem;
+		elem.attr("id", "sprite_" + dataItem.id);
+		elem.attr("x", dataItem.x * cellWidth);
+		elem.attr("y", dataItem.y * cellHeight);
+		elem.attr("xlink:href", spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
+		$("#mainSVG").append(elem);
+		
+	} else {
+		var elem = svgItem.svg;
+		//svgItem.atom = dataItem;
+		
+		elem.attr("x", dataItem.x * cellWidth);
+		elem.attr("y", dataItem.y * cellHeight);
+		$("#mainSVG").remove(elem);				
+		$("#mainSVG").append(elem);				
+	}
+}
+
+function addMessage(msg) {
+	var line = "";
+	if (typeof(msg) == "string") {
+		line = msg;
+	} else {
+		line = msg.target + ":" + msg.targetID + ": " + msg.message;
+	}
+	var pLine = $("<p/>");
+	pLine.text(line);
+	$("#meMessages").append(pLine);
+	//$("#meMessages").scrollTo(pLine);
+	pLine[0].scrollIntoView();
+}
+
+function moveIt(dir) {
+	/*
+	$.ajax({
+		method: "GET",
+		url: apiURL + "moveit",
+		data: {direction: dir},
+		dataType: "text"
+	}).done(function(data, textStatus, jqXHR) {
+		//alert("moveit: " + data);
+		console.log("moveit: " + data + " at " + new Date());
+	}).fail(function(jqXHR, textStatus, errorThrown ) {
+		alert("error: " + JSON.stringify(errorThrown));
+	}).always(function() {
+	});
+	*/
+	getJSON(mybh, "moveit", {direction: dir}, function() {
+		console.log("posted moveit, dir=" + dir);
+	});
+}
+
+</script>
+</body>
+</html>

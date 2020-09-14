@@ -3,7 +3,6 @@ var config = require("./config").config;
 var express = require("express");
 const session = require("express-session");
 
-
 /*
 user record: {
 	userID,
