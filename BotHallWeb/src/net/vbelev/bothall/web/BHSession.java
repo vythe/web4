@@ -173,6 +173,7 @@ public class BHSession
 		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
 		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
 		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
+		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
 		mobile.status = atom.getStatus();
 		mobile.mobiletype = atom.getType();
 		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
@@ -222,6 +223,7 @@ public class BHSession
 			}
 			else if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER || a.getGrade() == BHCollection.Atom.GRADE.HERO)
 			{
+				
 				BHClient.Mobile mobile = mobileExports.get(a.getID());
 				if (mobile == null)
 				{

@@ -225,25 +225,34 @@ public class BotHallAPI
 	@Path("/moveit")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public Integer moveit(@QueryParam("direction") int direction)
+	public String moveit(@QueryParam("direction") int direction, @QueryParam("id")Integer id)
 	{
 		BHClientAgent agent = getAgent();
 		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 
-		if (s == null || agent.controlledMobileID <= 0)
+		if (s == null)
+			return "";
+		
+		int mobileId;
+		if (id != null) 
+			mobileId = id;
+		else
+			mobileId = agent.controlledMobileID;
+		
+		if (mobileId <= 0)
 		{
 			//BHClient.Message msg = new BHClient.Message();
-			return null;
+			return "";
 		}
 		
-		Integer actionID = PacmanSession.doMove(s, agent.controlledMobileID, direction);
+		Integer actionID = PacmanSession.doMove(s, mobileId, direction);
 /*
 		if (actionID != null && s.engine.stage == BHEngine.CycleStageEnum.IDLE)
 		{
 			s.engine.startCycling();
 		}
 */		
-		return actionID;
+		return "" + actionID;
 	}
 
 	public String moveitOld(@QueryParam("direction") int direction)
@@ -342,7 +351,7 @@ public class BotHallAPI
 	//@Path("/createSession")
 	//@GET
 	//@Produces(MediaType.APPLICATION_JSON)
-	public String createSession()
+	public String createSessionOld()
 	{
 		// if there is an old client - disconnect
 		BHClientAgent oldAgent = getAgent();
@@ -380,7 +389,8 @@ public class BotHallAPI
 	/**
 	 * If sessionID is empty, it will reconnect to the existing client 
 	 * or create a new session if there is no current session and client
-	 * @param sessionID
+	 * sessionID = "N" - force-create a new session
+	 * sessionID = "S" - kill the current session
 	 * @return
 	 */
 	@Path("/joinSession")
@@ -404,6 +414,35 @@ public class BotHallAPI
 		{
 			s = PacmanSession.createSession();
 			// there is no old client
+		}
+		else if ("N".equals(sessionID)) // new session; if there exists an old session - kill it
+		{
+			if (oldAgent != null)
+			{
+				s = BHSession.getSession(oldAgent.sessionID);
+				if (s != null)
+				{
+					s.engine.stopCycling();
+					s.engine.getMessages().flushSubscriptions(-1); // kick them all out
+					s = null;
+				}
+				oldAgent = null;
+			}
+			s = PacmanSession.createSession();
+		}
+		else if ("S".equals(sessionID)) // stop the current session, do not create anything
+		{
+			if (oldAgent != null)
+			{
+				s = BHSession.getSession(oldAgent.sessionID);
+				if (s != null)
+				{
+					s.engine.stopCycling();
+					s.engine.getMessages().flushSubscriptions(-1); // kick them all out
+					s = null;
+				}
+				oldAgent = null;
+			}
 		}
 		else
 		{

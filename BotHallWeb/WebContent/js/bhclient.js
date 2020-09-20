@@ -59,6 +59,7 @@ function BHClient(url) {
 		url: url,
 		loopMilliseconds: 100,
 		loopLoad: 0, // the loop load in %
+		loopTimecode: 0, // count the loops
 		runLoop: false,
 		
 		logger: function(message, messageLevel){ // the logger function, it will be called as logger(message, messageLevel);
@@ -66,8 +67,13 @@ function BHClient(url) {
 		},
 		
 		onUpdate: function(elementType, elementData) {
+			//if (elementType == "STATUS") {
+			//	this.log("update status: " + JSON.stringify(elementData));
+			//}
+			this.trigger("update", elementType, elementData);
+			
 			if (elementType == "STATUS") {
-				this.log("update status: " + JSON.stringify(elementData));
+				this.trigger("status", elementData);
 			}
 		},
 		
@@ -76,7 +82,63 @@ function BHClient(url) {
 		items: {},
 		mobiles: {},
 		buffs: {},
-		clientData: {}, // a placeholder for the client data 
+		
+		events: {}, // events are stored as "eventname": [], 
+		// the array elements are functions (or objects with invoke() methods)  
+		subscribe: function(eventName, invoke) {
+			if (!invoke || !eventName) 
+				return;
+			else if (typeof(invoke) != "function" && !(typeof(invoke) == "object" && typeof(invoke.invoke) ==  "function")) {
+				throw "Invalid event subcriber for " + eventName;
+			}
+			else if (!this.events[eventName]) {
+				this.events[eventName] = [invoke];
+			} else {
+				var isThere = false;
+				for (var e in this.events[eventName]) {
+					if (this.events[eventName] === invoke) {
+						isThere = true;
+						break;
+					}
+				}
+				if (!isThere) {
+					this.events[eventName].push(invoke);
+				}
+			}
+		},
+		
+		unsubscribe: function(eventName, invoke) {
+			if (!invoke || !eventName) return;
+			var evt = this.events[eventName];
+			if (!evt || !evt.length) return;
+			var i;
+			for (i = 0; i < evt.length; i++) {
+				if (evt[i] === invoke) {
+					evt.splice(i, 1);
+				}
+			}			
+		},
+		
+		trigger: function(eventName) {
+			//console.log("trigger arguments: " + JSON.stringify(arguments));
+			var evt = this.events[eventName];
+			if (!evt || !evt.length) return;
+			//console.log("bhclient trigger " + eventName + ", sub count=" + evt.length);
+			for (var e in evt) {
+				var ef = (typeof(evt[e]) == "function") ? evt[e] : evt[e].invoke; 
+				//console.log("subscriber " + e + ": " + ef);
+				var args = [this];
+				//if (arguments) args = args.concat(arguments);
+				if (arguments && arguments.length > 0) {
+					for (var a = 1; a < arguments.length; a++) {
+						args.push(arguments[a]);
+					}
+				}
+				//console.log("call ef for " + JSON.stringify(args));
+				//console.log("call ef for count=" + args.length);
+				ef.apply(null, args);
+			}
+		},
 		
 		cellShifts: bhclient_cellShifts,
 		
@@ -109,11 +171,15 @@ function BHClient(url) {
 			}.bind(this));
 		},
 		
-		joinSession: function(sid) {
+		joinSession: function(sid, callback) {
 			//joinSession(this, sid);
 			getJSON(this, "joinSession", {id : sid}, function(res) {
 				//alert("my apiUrl is " + this.url + ", join res=" + res);
 				this.sessionID = res;
+				this.trigger("joinSession");
+				if (typeof(callback) == "function") {
+					callback();
+				}
 			}.bind(this));
 		},
 		
@@ -150,6 +216,7 @@ function mainLoop(bhclient) {
 		return;
 	}
 	var ts1 = new Date().getTime() + bhclient.loopMilliseconds;
+	bhclient.loopTimecode++;
 	
 	getUpdate(bhclient, function() {
 		var ts2 = new Date().getTime();

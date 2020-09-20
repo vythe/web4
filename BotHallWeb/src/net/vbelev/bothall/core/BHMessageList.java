@@ -125,7 +125,7 @@ public class BHMessageList
 		{
 			for (Subscription s : subscriptions.values())
 			{
-				if (s.lastQueryTS < cutoffTime)
+				if (s.lastQueryTS < cutoffTime || timeoutMS <= 0)
 				{
 					toDelete.add(s.ID);
 				}

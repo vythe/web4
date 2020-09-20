@@ -6,8 +6,10 @@
 <!-- 
 <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
  -->
- <script src="js/jquery-3.5.1.js"></script>
- <script src="js/bhclient.js"></script>
+<script src="js/jquery-3.5.1.js"></script>
+<script src="js/bhclient.js"></script>
+<script src="js/pacmonster.js"></script>
+
 <script type="text/javascript">
 var apiURL = "/BotHallWeb/api/";
 var terrainURL = "/BotHallWeb/terrain/";
@@ -105,59 +107,14 @@ var mybh = BHClient(fullApiURL.href);
 mybh.logger = function(message, messageLevel){ // the logger function, it will be called as logger(message, messageLevel);
 	if (messageLevel != "INFO") {
 		console.log("MyBH " + messageLevel + ": " + message);
+		if (messageLevel == "ERROR") {
+			throw message;
+		}
 	}
 };
 
-var pacmanValidDirs = [1,2,3,6];
-
-/** 
- * Monsters may choose a new direction if 
- a) it is not currently moving;
- b) the current direction is blocked;
- c) it is on a crossroads (more than two exits).
- */
-function mayTurnMonster(closest, currentDir) {
-
-	//if (currentDir != 0) return false;
-
-	if (currentDir == 0) return true;
-	if (!closest[currentDir]) {
-		console.log("INVALID currentDir: " + currentDir);
-		return true;
-	}
-	
-	if (closest[currentDir].terrain != "LAND") return true;
-	
-	var cnt = 0;
-	for (var k = 0; k < pacmanValidDirs.length && cnt < 3; k++) {
-		if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;		
-	}
-	return cnt != 2;		 
-}
- 
-function randomDir(closest) {
-	var cnt = 0;
-	for (var k = 0; k < pacmanValidDirs.length; k++) {
-		if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;		
-	}
-	//console.log("randomDir, cnt=" + cnt);
-
-	if (cnt == 0) return 0;
-	var dir1 = Math.floor(Math.random() * cnt + 1);
-	//console.log("randomDir, dir1=" + dir1);
-	cnt = 0;
-	for (var k = 0; k < pacmanValidDirs.length; k++) {
-		if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;
-		if (cnt == dir1) return pacmanValidDirs[k];
-	}
-	return 0;
-}
-
-function bestDir(closest, dx, dy) {
-	return 0;
-}
-
-mybh.onUpdate = function(elementType, elementData) {
+mybh.subscribe("update",  function(obj, elementType, elementData) {
+	//console.log("subscribed update called, elementType=" + elementType);
 	if (elementType == "STATUS") {
 		//addMessage("BH: update status: " + JSON.stringify(elementData));
 		// BH: update status: {"controlledMobileID":167,"cycleLoad":0,"cycleMsec":2000,"sessionID":1,"sessionStatus":"ACTIVE","timecode":60,"updateTS":0}
@@ -170,7 +127,26 @@ mybh.onUpdate = function(elementType, elementData) {
 		$("#clientLoad").text(mybh.loopLoad);
 		$("#serverMsec").text(elementData.cycleMsec);
 		$("#clientMsec").text(mybh.loopMilliseconds);
-		
+	}
+	else if (elementType == "CELL") {
+		setTerrain(elementData.x, elementData.y, elementData.terrain);
+	}
+	else if (elementType == "ITEM") {
+		updateItem(elementData);
+	}
+	else if (elementType == "MOBILE") {
+		//console.log("update mobile: " + JSON.stringify(elementData));
+		updateItem(elementData);
+	}
+	else if (elementType == "MESSAGE") {
+		addMessage(elementData);
+	}
+});
+
+/* The second subscription is for the hero control */
+//mybh.subscribe("status",  cowMonster());
+
+function oldOnUpdate(elementType, elementData) {		
 		if (elementData.controlledMobileID > 0 && mybh.mobiles[elementData.controlledMobileID]) 
 		{
 			var me = mybh.mobiles[elementData.controlledMobileID];
@@ -206,20 +182,6 @@ mybh.onUpdate = function(elementType, elementData) {
 			$("#infoString").text("no controlled ID");
 		}
 
-	}
-	else if (elementType == "CELL") {
-		setTerrain(elementData.x, elementData.y, elementData.terrain);
-	}
-	else if (elementType == "ITEM") {
-		updateItem(elementData);
-	}
-	else if (elementType == "MOBILE") {
-		console.log("update mobile: " + JSON.stringify(elementData));
-		updateItem(elementData);
-	}
-	else if (elementType == "MESSAGE") {
-		addMessage(elementData);
-	}
 };
 
 
@@ -255,11 +217,41 @@ $(document).ready(function() {
 	});
 */
 
+function handleJoinSession() {
+	console.log("handleJoinSession called");
+	for (var k in mybh.mobiles) {
+		var item = mybh.mobiles[k]; 
+		console.log("handleJoinSession, item=" + JSON.stringify(item)); //item.mobiletype);
+		if (item.mobiletype == "MONSTER") {
+			/*
+			var itemCow = cowMonster();
+			itemCow.itemId = item.id;
+			console.log("subscribe cow to id=" + item.id);
+	//		mybh.subscribe("status", itemCow.invoke.bind(itemCow));
+			mybh.subscribe("status", itemCow);
+			*/
+			var itemHound = houndMonster();
+			itemHound.itemId = item.id;
+			console.log("subscribe hound to id=" + item.id);
+			//mybh.subscribe("status", itemHound);
+		} else if (item.mobiletype == "HERO") {
+			console.log("call joinMobile, id=" + item.id);
+			mybh.joinMobile("HERO");
+		}
+	}
+	console.log("handleJoinSession unsubscribing");
+	mybh.unsubscribe("status", handleJoinSession);
+}
+
 	$("#btnJoinSession").click(function(evt) {
 		evt.preventDefault();
 		var sid =  $("#sessionid").val();
-		mybh.joinSession(sid);
-		addMessage("joinSession called");
+		mybh.joinSession(sid, function() {
+			mybh.subscribe("status", handleJoinSession);
+			mybh.cycle("O");
+			addMessage("joinSession called");
+		});
+		
 	});
 	
 	$(".movebutton").click(function(evt) {
@@ -375,6 +367,17 @@ $(document).ready(function() {
 	
 	$(document).on("keydown", function (evt) {
 		$("#keyPressSpan").text("keydown: " + evt.keyCode);
+		if (evt.keyCode == 39 || evt.keyCode == 68 || evt.keyCode == 102) { // right (68 = d)
+			moveIt(1);
+		} else if (evt.keyCode == 37 || evt.keyCode == 65 || evt.keyCode == 100) { // left (65 = a)
+			moveIt(2);
+		} else if (evt.keyCode == 38 || evt.keyCode == 87 || evt.keyCode == 104) { // up (87 = w)
+			moveIt(6);
+		} else if (evt.keyCode == 40 || evt.keyCode == 83 || evt.keyCode == 98) { // down (83 = s)
+			moveIt(3);
+		} else if (evt.keyCode == 32 || evt.keyCode == 101) { // stop (32 = space)
+			moveIt(0);
+		} 
 	});
 });
 
@@ -473,25 +476,6 @@ function addMessage(msg) {
 	pLine[0].scrollIntoView();
 }
 
-function moveIt(dir) {
-	/*
-	$.ajax({
-		method: "GET",
-		url: apiURL + "moveit",
-		data: {direction: dir},
-		dataType: "text"
-	}).done(function(data, textStatus, jqXHR) {
-		//alert("moveit: " + data);
-		console.log("moveit: " + data + " at " + new Date());
-	}).fail(function(jqXHR, textStatus, errorThrown ) {
-		alert("error: " + JSON.stringify(errorThrown));
-	}).always(function() {
-	});
-	*/
-	getJSON(mybh, "moveit", {direction: dir}, function() {
-		console.log("posted moveit, dir=" + dir);
-	});
-}
 
 </script>
 </body>

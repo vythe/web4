@@ -72,12 +72,38 @@ public class PacmanSession
 				&&  me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) != direction
 				)
 		{
+			//s.engine.g
+			// the way buff_move works: 
 			BHOperations.BHBuff moveBuff = new BHOperations.BHBuff();
 			moveBuff.actionType = BHOperations.BUFF_MOVE;
 			moveBuff.actorID = me.getID();
 			moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
-			moveBuff.intProps = Utils.intArray(s.engine.timecode, direction, 0, BHOperations.MOVE_SPEED);
-			s.engine.postBuff(moveBuff);
+			moveBuff.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+			
+			BHOperations.BHBuff oldBuff = null;
+			for (BHOperations.BHBuff b : s.engine.buffs)
+			{
+				if (!b.isCancelled 
+						&& b.actorID == moveBuff.actorID 
+						&& b.actionType == moveBuff.actionType
+						//&& b.intProps[1] == direction
+						)
+				{
+					oldBuff = b;
+					break;
+				}
+			}
+			
+			if (oldBuff != null && oldBuff.intProps[1] != direction)
+			{
+				oldBuff.isCancelled = true;
+				oldBuff = null;			
+			}
+
+			if (oldBuff == null)
+			{
+				s.engine.postBuff(moveBuff);
+			}
 			
 			return 0; // it's not null, but we do not know the action id yet
 		}

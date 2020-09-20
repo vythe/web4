@@ -240,6 +240,7 @@ public class BHOperations
 			me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
+			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
 			
 			engine.postAction(jump, delay);
 		}
@@ -276,7 +277,8 @@ public class BHOperations
 		int actionTimecode = buff.intProps[0];
 		int direction = buff.intProps[1];
 		int repeatFlag = buff.intProps[2];
-		int delay = (repeatFlag > 0 && buff.intProps.length > 3)? buff.intProps[3] : 0;
+		//int delay = (repeatFlag > 0 && buff.intProps.length > 3)? buff.intProps[3] : 0;
+		int delay = ( buff.intProps.length > 3)? buff.intProps[3] : 0;
 		int baseTimecode = me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC);
 		int baseDirection = me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
 		

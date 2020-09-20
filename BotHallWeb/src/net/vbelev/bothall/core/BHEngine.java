@@ -44,7 +44,8 @@ public class BHEngine
 	private DequeHelper.DequeHolder<BHOperations.BHAction> actionQueueHolder = new DequeHelper.DequeHolder<BHOperations.BHAction>(new ConcurrentLinkedDeque<BHOperations.BHAction>());
 	private DequeHelper.DequeHolder<BHOperations.BHAction> actionQueueHolderNext = new DequeHelper.DequeHolder<BHOperations.BHAction>(new ConcurrentLinkedDeque<BHOperations.BHAction>());
 	private PriorityBlockingQueue<BHOperations.BHTimer> timers = new PriorityBlockingQueue<BHOperations.BHTimer>();
-	private List<BHOperations.BHBuff> buffs = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
+	/** Buffs should become immutable, but the list needs to be visible */
+	public List<BHOperations.BHBuff> buffs = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
 	private List<BHOperations.BHBuff> buffsNext = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
 	
 	private BHMessageList messages = new BHMessageList();
@@ -275,7 +276,7 @@ public class BHEngine
 				}
 			}
 			newBuffs.addAll(this.buffsNext);
-			this.buffs = Collections.synchronizedList(newBuffs);
+			this.buffs = Collections.unmodifiableList(newBuffs);
 			this.buffsNext = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
 		}
 		
@@ -588,7 +589,7 @@ public class BHEngine
 		BHCollection.Atom actor = this.getCollection().getItem(action.actorID);
 		//System.out.println("postAction called for " + action + ", delay=" + delay + ", engine instance=" + this.engineInstance);
 		System.out.println("postAction called for " + action.actionType + ", delay=" + delay + ", engine instance=" + this.engineInstance
-				 + ", actor=" + actor.toString());
+				 + ", actor=" + (actor != null? actor.toString() : ("Not found actorID " + action.actorID)));
 		if (delay > 0)
 		{
 			BHOperations.BHTimer timer = new BHOperations.BHTimer();
@@ -624,6 +625,7 @@ public class BHEngine
 			buff.timecode = this.timecode;
 			System.out.println("postBuff called for " + buff + ", engine instance=" + this.engineInstance);
 			buffsNext.add(buff);
+			
 		}
 	}
 }

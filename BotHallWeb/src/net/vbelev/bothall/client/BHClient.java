@@ -202,8 +202,10 @@ public class BHClient
 		public int y;
 		public int z;
 		
-		public int dir; 
 		// here will be some movement info
+		public int dir; 
+		/** the tick when the movement will be completed */
+		public int moveTick; 
 		
 		public String mobiletype;
 		public String name;
@@ -218,6 +220,7 @@ public class BHClient
 			to.addShort(y);
 			to.addShort(z);
 			to.addByte(dir);
+			to.addInt(moveTick);
 			to.addMoniker(mobiletype);
 			to.addString(name);
 			to.addObjectStart((short)(buffs == null? 0 : buffs.length));
@@ -236,6 +239,7 @@ public class BHClient
 			y = (Short)from.next().value;
 			z = (Short)from.next().value;
 			dir = (Byte)from.next().value;
+			moveTick = (Integer)from.next().value;
 			mobiletype = (String)from.next().value;
 			name = (String)from.next().value;
 			short key = (Short)from.next().value;
