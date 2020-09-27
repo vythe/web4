@@ -197,6 +197,11 @@ public class BHLandscape
 		return res;
 	}
 	
+	public Cell getCell(Coords c)
+	{
+		return findCell(cells, c.getX(), c.getY(), c.getZ(), true);
+	}
+	
 	public Cell getCell(int x, int y, int z)
 	{
 		/*Cell res = cells.stream()

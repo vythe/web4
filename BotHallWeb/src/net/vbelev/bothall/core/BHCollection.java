@@ -184,7 +184,7 @@ public class BHCollection
 		public boolean setZ(int val) { return setIntProp(INT_PROPS.Z, val); }
 		public boolean setCoords(BHLandscape.Coords c)
 		{
-			return  setIntProp(INT_PROPS.X, c.getX()) && setIntProp(INT_PROPS.Y, c.getY()) && setIntProp(INT_PROPS.Z, c.getZ());
+			return  setIntProp(INT_PROPS.X, c.getX()) & setIntProp(INT_PROPS.Y, c.getY()) & setIntProp(INT_PROPS.Z, c.getZ());
 		}
 		public boolean setStatus(int val) { return setIntProp(INT_PROPS.STATUS, val); }
 		

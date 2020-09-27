@@ -14,8 +14,8 @@ import net.vbelev.bothall.core.BHOperations.BHAction;
 //import net.vbelev.bothall.core.BHLandscape.Cell;
 import net.vbelev.bothall.web.*;
 
-@Path("/")
-public class BotHallAPI
+//@Path("/")
+public class BotHallAPIOld
 {
 	@Context 
 	private HttpServletRequest request;
@@ -58,7 +58,7 @@ public class BotHallAPI
 	public List<BHLandscape.Cell> getTerrain(@QueryParam("full") String full) 
 	{
 		BHWebContext app = BHWebContext.getApplication(request.getServletContext());
-		BHWebSession.getSession(request); // this will create the session if it is missing
+		BHWebSession session = BHWebSession.getSession(request);
 		// everything is visible for now
 		boolean isFull = !Utils.IsEmpty(full);
 		ArrayList<BHLandscape.Cell> res = new ArrayList<BHLandscape.Cell>();
@@ -164,33 +164,71 @@ public class BotHallAPI
 	@Path("/getUpdate")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public BHStorage.UpdateBin getUpdate() 
+	public BHSession.UpdateBin getUpdate() 
 	{
 		BHClientAgent agent = getAgent();
-		PacmanSession s = agent == null? null : PacmanSession.getSession(agent.sessionID);
+		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 
 		if (s == null)
 		{
-			BHStorage.UpdateBin dummy = new BHStorage.UpdateBin();
+			BHSession.UpdateBin dummy = new BHSession.UpdateBin();
 			dummy.status = new BHClient.Status();
 			dummy.status.sessionStatus = BHClient.Status.SessionStatus.NONE;
 			return dummy;
 		}
 		
-		BHStorage.UpdateBin res = s.storage.getUpdate(s.getEngine(), agent.timecode, agent.subscriptionID, agent.controlledMobileID);
+		BHSession.UpdateBin res = s.getUpdate(agent.timecode, agent.subscriptionID, agent.controlledMobileID);
 		agent.timecode = s.getEngine().timecode;
 		res.status.controlledMobileID = agent.controlledMobileID;
 		
 		return res;
 }
 	
+	public UpdateSet getUpdateOld() 
+	{
+		BHWebContext app = BHWebContext.getApplication(request.getServletContext());
+		BHWebSession session = BHWebSession.getSession(request);
+		
+		UpdateSet res = new UpdateSet();
+		
+		// everything is visible for now
+		res.items = new ArrayList<BHCollection.Atom>();
+		res.items.addAll(app.engine.getCollection().allByTimecode(session.timecode + 1));
+		res.cycleMsec = (int)app.engine.CYCLE_MSEC;
+		res.cycleLoad = app.engine.cycleLoad;
+		res.timecode = app.engine.timecode;
+		
+		res.cells = new ArrayList<BHLandscape.Cell>();
+		
+		for (BHLandscape.Cell c : app.engine.getLandscape().cells)
+		{
+			if (c.getTimecode() > session.timecode)
+			{
+				res.cells.add(c);
+			}
+		}
+		
+		res.messages = app.engine.getMessages().getMessages(session.subscriptionID);
+		if (res.messages == null)
+		{
+			session.subscriptionID = app.engine.getMessages().addSubscription();
+			res.messages = new ArrayList<BHMessageList.Message>();
+		}
+		
+		if (res.items.size() > 0 || res.messages.size() > 0 || res.cells.size() > 0)
+		{
+			session.timecode = app.engine.timecode;
+		}
+		
+		return res;
+	}	
 	@Path("/moveit")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public String moveit(@QueryParam("direction") int direction, @QueryParam("id")Integer id)
 	{
 		BHClientAgent agent = getAgent();
-		PacmanSession s = agent == null? null : PacmanSession.getSession(agent.sessionID);
+		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 
 		if (s == null)
 			return "";
@@ -203,10 +241,11 @@ public class BotHallAPI
 		
 		if (mobileId <= 0)
 		{
+			//BHClient.Message msg = new BHClient.Message();
 			return "";
 		}
 		
-		Integer actionID = s.doMove(mobileId, direction);
+		Integer actionID = BHSession.doMove(s, mobileId, direction);
 /*
 		if (actionID != null && s.engine.stage == BHEngine.CycleStageEnum.IDLE)
 		{
@@ -216,36 +255,43 @@ public class BotHallAPI
 		return "" + actionID;
 	}
 
-	@Path("/dieit")
-	@GET
-	@Produces(MediaType.APPLICATION_JSON)
-	public String dieit(@QueryParam("id")Integer id)
+	public String moveitOld(@QueryParam("direction") int direction)
 	{
-		BHClientAgent agent = getAgent();
-		PacmanSession s = agent == null? null : PacmanSession.getSession(agent.sessionID);
-
-		if (s == null)
-			return "";
-		
-		int mobileId;
-		if (id != null) 
-			mobileId = id;
+		BHWebContext app = BHWebContext.getApplication(request.getServletContext());
+		BHWebSession session = BHWebSession.getSession(request);
+		BHCollection.Atom me = app.engine.getCollection().getItem(session.myID);
+		if (me == null)
+		{
+			return "No atom id" + session.myID;
+		}
+		if (direction < 0 || direction >= BHLandscape.cellShifts.length)
+		{
+			return "Invalid direction: " + direction;
+		}
+		/*
 		else
-			mobileId = agent.controlledMobileID;
-		
-		if (mobileId <= 0)
 		{
-			return "";
+			me.setY(me.getY() - 1);
+			app.engine.publish();
+			return "Moved";
 		}
+		*/
 		
-		int actionID = s.processActionDie(mobileId);
-/*
-		if (actionID != null && s.engine.stage == BHEngine.CycleStageEnum.IDLE)
+		BHOperations.BHAction action = new BHOperations.BHAction();
+		action.actionType = BHOperations.ACTION_MOVE;
+		action.actorID = session.myID;
+		action.intProps = Utils.intArray(app.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+		
+		if (app.engine.stage == BHEngine.CycleStageEnum.IDLE)
 		{
-			s.engine.startCycling();
+			app.engine.startCycling();
 		}
-*/		
-		return "" + actionID;
+			
+		app.engine.postAction(action, 0);
+		return "action ID=" + action.ID;
+		
+		//BHOperations.doMove(app.engine, me, direction, 4);
+		//return "Moved";
 	}
 
 	@Path("/engineInfo")
@@ -271,6 +317,24 @@ public class BotHallAPI
 		return "OK";
 	}
 
+	@Path("/start")
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	public String start(@QueryParam("doStart") String doStart)
+	{
+		BHWebContext app = BHWebContext.getApplication(request.getServletContext());
+		//return "Engine id=" + app.engine.engineInstance + ", stage=" + app.engine.stage;
+		if ("Y".equals(doStart) && !app.engine.isRunning)
+		{
+			app.engine.startCycling();
+		}
+		else if ("N".equals(doStart))
+		{
+			app.engine.stopCycling();
+		}
+		return app.engine.status();
+	}
+
 	public static final String BOTHALL_SESSION_ID_ATTR = "botHall";
 	public static final String BOTHALL_AGENT_ID_ATTR = "botHallAgent";
 
@@ -283,8 +347,46 @@ public class BotHallAPI
 		}
 		return null;
 	}
+
+	//@Path("/createSession")
+	//@GET
+	//@Produces(MediaType.APPLICATION_JSON)
+	public String createSessionOld()
+	{
+		// if there is an old client - disconnect
+		BHClientAgent oldAgent = getAgent();
+		if (oldAgent != null)
+		{
+			oldAgent.detach();
+		}				
+		
+		/*
+		BHSession oldS = null;
+		Object oid = request.getSession().getAttribute(BOTHALL_SESSION_ID_ATTR);
+		if (oid instanceof Integer)
+		{
+			oldS = BHSession.getSession((int)oid);
+		}
+		if (oldS != null)
+		{
+			throw new IllegalArgumentException("Session " + oldS.getID() + " already exists");
+		}		
+		*/
+		BHEngine e = BHEngine.loadFileEngine("/../data/pacman.txt");
+		BHSession s = BHSession.createSession(e);
+		BHClientAgent agent = createAgent(s);
+		
+		//agent.attachTo(s);
+		// it's a pull client, we don't need to do anything with it
+		//s.addAgent(agent);
+		//request.getSession().setAttribute(BOTHALL_SESSION_ID_ATTR, s.getID());
+		request.getSession().setAttribute(BOTHALL_AGENT_ID_ATTR, agent.getID());
+		
+		// it creates an agent, but it returns the session ID
+		return s.getID() + "";
+	}
 	
-	private BHClientAgent createAgent(PacmanSession s)
+	private BHClientAgent createAgent(BHSession s)
 	{
 		BHClientAgent agent = BHClientAgent.createAgent();
 		agent.sessionID = s.getID();
@@ -293,19 +395,6 @@ public class BotHallAPI
 		return agent;
 	}
 
-	private void detachAgent(BHClientAgent agent)
-	{
-		if (agent == null  || agent.getID() == 0) return;
-		
-		PacmanSession s = PacmanSession.getSession(agent.sessionID);	
-		if (s != null)
-		{
-			s.getEngine().getMessages().removeSubscription(agent.subscriptionID);
-		}
-		agent.subscriptionID = 0;
-		agent.sessionID = 0;
-		agent.detach();
-	}
 	/**
 	 * If sessionID is empty, it will reconnect to the existing client 
 	 * or create a new session if there is no current session and client
@@ -319,27 +408,27 @@ public class BotHallAPI
 	public String joinSession(@QueryParam("id") String sessionID)
 	{
 		Integer id = Utils.tryParseInt(sessionID);
-		PacmanSession s = null;
+		BHSession s = null;
 		BHClientAgent agent = null;
 		BHClientAgent oldAgent = getAgent();
 		
 		if (id == null && oldAgent != null)
 		{
-			s = PacmanSession.getSession(oldAgent.sessionID);
+			s = BHSession.getSession(oldAgent.sessionID);
 			agent = oldAgent;
 			oldAgent = null;
 			agent.timecode = 0; // force full update
 		}
 		else if (id == null)
 		{
-			s = PacmanSession.createSession();
+			s = BHSession.createSession();
 			// there is no old client
 		}
 		else if ("N".equals(sessionID)) // new session; if there exists an old session - kill it
 		{
 			if (oldAgent != null)
 			{
-				s = PacmanSession.getSession(oldAgent.sessionID);
+				s = BHSession.getSession(oldAgent.sessionID);
 				if (s != null)
 				{
 					s.getEngine().stopCycling();
@@ -348,13 +437,13 @@ public class BotHallAPI
 				}
 				oldAgent = null;
 			}
-			s = PacmanSession.createSession();
+			s = BHSession.createSession();
 		}
 		else if ("S".equals(sessionID)) // stop the current session, do not create anything
 		{
 			if (oldAgent != null)
 			{
-				s = PacmanSession.getSession(oldAgent.sessionID);
+				s = BHSession.getSession(oldAgent.sessionID);
 				if (s != null)
 				{
 					s.getEngine().stopCycling();
@@ -366,7 +455,7 @@ public class BotHallAPI
 		}
 		else
 		{
-			s = PacmanSession.getSession(id);
+			s = BHSession.getSession(id);
 		}
 		
 		if  (s == null)
@@ -394,7 +483,7 @@ public class BotHallAPI
 	public String joinMobile(@QueryParam("name") String name)
 	{
 		BHClientAgent agent = getAgent();
-		PacmanSession s = agent == null? null : PacmanSession.getSession(agent.sessionID);
+		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 
 		if (s == null)
 		{
@@ -414,18 +503,12 @@ public class BotHallAPI
 		}
 		else
 		{
-			Integer id = Utils.tryParseInt(name);
 			BHCollection.Atom hero = null; 
 			int nameGrade = BHCollection.Atom.GRADE.fromString(name);
 			for (BHCollection.Atom a : s.getEngine().getCollection().all())
 			{
-				
-				boolean isGood = 
-						(id != null && a.getID() == id)
-						|| name.equals(a.getStringProp(BHCollection.Atom.STRING_PROPS.NAME))
-						|| a.getGrade() == nameGrade
-				;
-				if (isGood)
+				if (name.equals(a.getStringProp(BHCollection.Atom.STRING_PROPS.NAME))
+						|| a.getGrade() == nameGrade) 
 				{
 					int hID = a.getID();
 					BHClientAgent heroAgent = BHClientAgent.getAgents()
@@ -460,7 +543,7 @@ public class BotHallAPI
 	public String cycleMode(@QueryParam("run") String run)
 	{
 		BHClientAgent agent = getAgent();
-		PacmanSession s = agent == null? null : PacmanSession.getSession(agent.sessionID);
+		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 		
 		if (s == null || s.getEngine() == null || run == null)
 		{

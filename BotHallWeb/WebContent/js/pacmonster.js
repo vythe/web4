@@ -114,11 +114,16 @@ function bestDir(mybh, closest, dx, dy) {
 	for (var k = 0; k < pacmanValidDirs.length; k++) {
 		if (closest[pacmanValidDirs[k]].terrain == "LAND") {
 			
-			var shift = mybh.cellShifts[pacmanValidDirs[k]];		
-			var testProd = shift[0] * dx + shift[1] * dy;
-			if (testProd > resProd) {
-				res = pacmanValidDirs[k];
-				resProd = testProd;
+			var shift = mybh.cellShifts[pacmanValidDirs[k]];
+			//console.log("bestDir, closest[0]
+			var mobs = mybh.getMobiles(closest[0].x + shift[0], closest[0].y + shift[1]);
+			if (mobs.length == 0) {
+			
+				var testProd = shift[0] * dx + shift[1] * dy;
+				if (testProd > resProd) {
+					res = pacmanValidDirs[k];
+					resProd = testProd;
+				}
 			}
 		}
 	}
@@ -143,7 +148,7 @@ function houndMonsterMove(mybh, statusData) {
 	//console.log("cowInvoke, this="); // + JSON.stringify(this));
 	//console.dir(this);
 	//if (elementType != "STATUS") return;
-	console.log("hound invoked, itemId=" + this.itemId + ", tick=" + mybh.loopTimecode);
+	//console.log("hound invoked, itemId=" + this.itemId + ", tick=" + mybh.loopTimecode);
 	var ind;
 	var mobileId = this.itemId; // || elementData.controlledMobileID;
 	if (!mobileId) {
@@ -165,7 +170,7 @@ function houndMonsterMove(mybh, statusData) {
 	//console.log("cow, lastPos=" + JSON.stringify(lastPos));
 	if (me.dir != 0 && me.x == lastPos.x && me.y == lastPos.y) {
 		// don't turn until at least one step is done
-		console.log("hound defer turning, lastpos=" + JSON.stringify(lastPos));
+		//console.log("hound defer turning, lastpos=" + JSON.stringify(lastPos));
 		return;
 	}
 	
@@ -194,18 +199,18 @@ function houndMonsterMove(mybh, statusData) {
 	
 	if (mayTurnMonster(closest, me.dir)) {
 		var newDir = bestDir(mybh, closest, hero.x - me.x, hero.y - me.y);
-		console.log("hound id=" + me.id + " on turn, newDir=" + newDir);
+		console.log("hound id=" + me.id + " on turn, newDir=" + newDir + ", tick=" + mybh.loopTimecode);
+		if (newDir == 0) {
+			console.log("closest: " + closest);
+		}
 		if (newDir > 0 && newDir != me.dir) {
 			this.lastPos = {x: me.x, y: me.y};
 			moveIt(newDir, mobileId);
 		}
 	} else {
-		console.log("hound id=" + me.id + ": turn not allowed, current dir=" + me.dir);
+		console.log("hound id=" + me.id + ": turn not allowed, current dir=" + me.dir + ", tick=" + mybh.loopTimecode);
 	}
 }
-
-
-
 
 function moveIt(dir, id) {
 	/*

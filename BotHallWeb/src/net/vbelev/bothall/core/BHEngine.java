@@ -27,9 +27,12 @@ public class BHEngine
 		PUBLISH
 	}
 	
-	public interface IPublishCallback
+	public interface IClientCallback
 	{
 		void onPublish(int timecode);
+		void processAction(BHOperations.BHAction action);
+		void processTriggers();
+		boolean processBuff(BHOperations.BHBuff buff);
 	}
 	
 	//public static final long CYCLE_MSEC = 2500;
@@ -56,7 +59,7 @@ public class BHEngine
 	public int cycleLoad = 0;
 	public int cycleCount = 0;
 
-	public IPublishCallback onPublish = null;
+	public IClientCallback clientCallback = null;
 	
 	/** Landscape property cannot be made final, because of re-publishing it,
 	 * but it should be protected from damage.
@@ -280,15 +283,15 @@ public class BHEngine
 			this.buffsNext = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
 		}
 		
-		if (onPublish != null)
+		if (clientCallback != null)
 		{
-			onPublish.onPublish(timecode);
+			clientCallback.onPublish(timecode);
 		}
 		return timecode;
 	}
 	
 	/** java8+ : interface with a single method can be instantiated as a lambda */
-	public static interface IQueueProcessorDoneNotify
+	private static interface IQueueProcessorDoneNotify
 	{
 		void done(boolean complete);
 	}
@@ -349,7 +352,11 @@ public class BHEngine
 					{
 						BHOperations.BHAction action = holder.iterator().next();
 					//myEngine.getMessages().addMessage(action.targetType, action.targetID, "Action " + action.ID + ": " + action.message);
-						BHOperations.processAction(BHEngine.this, action);
+						//BHOperations.processAction(BHEngine.this, action);
+						if (clientCallback != null)
+						{
+							clientCallback.processAction(action);
+						}
 						//System.out.println("Action processed by queueProcessor " + instanceID + ": #" + action.ID + " " + action.message);
 						Thread.yield();
 					}
@@ -467,7 +474,11 @@ public class BHEngine
 		{
 			// 1) active stage: listen to the actionqueue and process it for CYCLE_MSEC milliseconds;
 			// 1.1) triggers - triggers complete the previous cycle, so they are processed first here
-			BHOperations.processTriggers(this);
+			if (clientCallback != null)
+			{
+				clientCallback.processTriggers();
+				//BHOperations.processTriggers(this);
+			}
 			 
 			// 1.2) process timers - move their actions to the processing queue
 			BHOperations.BHTimer t;
@@ -488,12 +499,23 @@ public class BHEngine
 				}
 			}
 			// 1.3) buffs - to be implemented later
-			for (BHOperations.BHBuff buff : this.buffs)
+			if (clientCallback != null)
 			{
-				if (!BHOperations.processBuff(this, buff))
+				for (BHOperations.BHBuff buff : this.buffs)
+				{
+					//if (!BHOperations.processBuff(this, buff))
+					if (!clientCallback.processBuff(buff))
+					{
+						buff.isCancelled = true;
+					}					
+				}
+			}
+			else
+			{
+				for (BHOperations.BHBuff buff : this.buffs)
 				{
 					buff.isCancelled = true;
-				}					
+				}
 			}
 			
 			// this tick absorbs the time of the previous rollover stage 
@@ -588,8 +610,12 @@ public class BHEngine
 		if (action == null) return;
 		BHCollection.Atom actor = this.getCollection().getItem(action.actorID);
 		//System.out.println("postAction called for " + action + ", delay=" + delay + ", engine instance=" + this.engineInstance);
+		/*
 		System.out.println("postAction called for " + action.actionType + ", delay=" + delay + ", engine instance=" + this.engineInstance
-				 + ", actor=" + (actor != null? actor.toString() : ("Not found actorID " + action.actorID)));
+				 + ", actor=" + (actor != null? actor.toString() : ("Not found actorID " + action.actorID))
+				 + ", props[1]=" + action.intProps[1]
+		);
+		*/
 		if (delay > 0)
 		{
 			BHOperations.BHTimer timer = new BHOperations.BHTimer();

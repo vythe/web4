@@ -112,6 +112,15 @@ public class BHOperations
 		}
 	}
 	
+	public static void doStop(BHEngine engine, BHCollection.Atom me)
+	{
+		me.setIntProp(BHCollection.Atom.INT_PROPS.DX, 0);
+		me.setIntProp(BHCollection.Atom.INT_PROPS.DY, 0);
+		me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, 0);
+		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
+		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, 0);
+	}
+	
 	/** 
 	 * get the atom, update it to "moving", set the timer to jump after the delay.
 	 */
@@ -128,15 +137,9 @@ public class BHOperations
 		//	return; // quietly ignore it end return
 		//}
 		
-		int[] shift = BHLandscape.cellShifts[direction];
-		
 		if (direction == 0) // the special case of "move nowhere", it means stop
 		{
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DX, 0);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DY, 0);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, 0);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, 0);
+			doStop(engine, me);
 			return;
 		}
 		
@@ -145,13 +148,17 @@ public class BHOperations
 			return; 
 		}
 			
+		int[] shift = BHLandscape.cellShifts[direction];
+		
 			
 		BHLandscape.Cell targetCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
+		//System.out.println("doMove: id=" + me.getID() + ", dir=" + direction + ", targetCell=" + targetCell);
 		if (targetCell.getTerrain() != BHLandscape.TerrainEnum.LAND) 
 		{
 			if (baseTimecode == 0) // we are not moving, so there is no point starting a buff 
 			{
-			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM!");
+				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM!");
+				System.out.println("BOMM");
 			}
 			else
 			{
@@ -162,6 +169,7 @@ public class BHOperations
 				moveBuff.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 				engine.postBuff(moveBuff);
 				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "Posted buff to move to " + direction);
+				//System.out.println("Posted buff move, delay=" + delay);
 			}
 			return;
 		}
@@ -179,6 +187,7 @@ public class BHOperations
 		
 		engine.postAction(jump, delay - 1); // 1 tick is already spent on doMove
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "I am moving to " + targetCell + " (" + direction + ")");
+		System.out.println("Posted jump action, delay=" + delay + ", timecode=" + engine.timecode);
 		
 	}
 
@@ -191,23 +200,43 @@ public class BHOperations
 		int delay = (repeatFlag > 0 && action.intProps.length > 3)? action.intProps[3] : 0;
 		int baseTimecode = me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC);
 		
+		//System.out.println("doJump, id=" + me.getID() + ", dir=" + direction);		
 		if (actionTimecode > 0 && baseTimecode > 0 && actionTimecode != baseTimecode)
 		{
+			//System.out.println("timecode does not match, returning. actionTimecode" + actionTimecode + ", me.timecode=" + baseTimecode);
 			return; // quietly ignore it end return
 		}
 		
 		int[] shift = BHLandscape.cellShifts[direction];
+		BHLandscape.CoordsBase newPos = new BHLandscape.CoordsBase(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
 		
-		BHLandscape.Cell targetCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
+		//BHLandscape.Cell targetCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
+		BHLandscape.Cell targetCell = engine.getLandscape().getCell(newPos);
 		if (targetCell.getTerrain() != BHLandscape.TerrainEnum.LAND) 
 		{
 			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM-M!");
+			doStop(engine, me);
+			//System.out.println("Hit the wall, escape, target=" + targetCell);
 			return;
 		}
+		for (BHCollection.Atom a : engine.getCollection().atCoords(newPos))
+		{
+			if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER) // don't move into another monster... hero is okay
+			{
+				doStop(engine, me);
+				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM-M-M!");
+				System.out.println("Hit a monster, escaping, target=" + targetCell);
+				return;
+				
+			}
+		}
 		
+		me.setCoords(newPos);
+		/*
 		me.setX(me.getX() + shift[0]);
 		me.setY(me.getY() + shift[1]);
 		me.setZ(me.getZ() + shift[2]);
+		*/
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "I moved to " + direction);
 		
 		boolean shallRepeat = false;
@@ -246,11 +275,14 @@ public class BHOperations
 		}
 		else
 		{
+			doStop(engine, me);
+			/*
 			me.setIntProp(BHCollection.Atom.INT_PROPS.DX, 0);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.DY, 0);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, 0);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, 0);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, 0);
+			*/
 		}		
 	}
 

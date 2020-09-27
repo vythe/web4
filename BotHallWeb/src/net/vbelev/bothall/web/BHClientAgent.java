@@ -13,7 +13,7 @@ public class BHClientAgent
 {
 	private static int agentInstanceSeq = 0;
 	
-	public final int agentID;
+	private int agentID;
 	
 	public int timecode;
 	public int subscriptionID;
@@ -30,27 +30,9 @@ public class BHClientAgent
 	
 	private BHClientAgent()
 	{
-		agentID = ++agentInstanceSeq;
 	}
 	
-	public void detach()
-	{
-		synchronized(agentList)
-		{
-			agentList.remove(this);
-		}
-		BHSession s = BHSession.getSession(this.sessionID);
-		if (s != null && this.subscriptionID > 0)
-		{
-			s.engine.getMessages().removeSubscription(this.subscriptionID);
-		}
-	}
-	
-	public void attachTo(BHSession s)
-	{
-		this.sessionID = s.getID();
-		this.subscriptionID = s.engine.getMessages().addSubscription();
-	}
+	public int getID() { return agentID; }
 	
 	public static BHClientAgent getClient(int id)
 	{
@@ -64,9 +46,55 @@ public class BHClientAgent
 		return null;		
 	}
 	
+	
 	public static Stream<BHClientAgent> getAgents() 
 	{
 		return agentList.stream();
+	}
+
+	public static BHClientAgent createAgent()
+	{
+		BHClientAgent agent = new BHClientAgent();
+		agent.agentID = ++agentInstanceSeq;
+		synchronized(agentList)
+		{
+			agentList.add(agent);
+		}
+		return agent;
+	}
+
+	public void detach()
+	{
+		synchronized(agentList)
+		{
+			agentList.remove(this);
+		}
+		this.agentID = 0;
+		//BHSession s = BHSession.getSession(this.sessionID);
+		//if (s != null && this.subscriptionID > 0)
+		//{
+		//	s.getEngine().getMessages().removeSubscription(this.subscriptionID);
+		//}
+	}
+	
+	/*
+	public void detach()
+	{
+		synchronized(agentList)
+		{
+			agentList.remove(this);
+		}
+		BHSession s = BHSession.getSession(this.sessionID);
+		if (s != null && this.subscriptionID > 0)
+		{
+			s.getEngine().getMessages().removeSubscription(this.subscriptionID);
+		}
+	}
+	
+	public void attachTo(BHSession s)
+	{
+		this.sessionID = s.getID();
+		this.subscriptionID = s.getEngine().getMessages().addSubscription();
 	}
 	
 	public static BHClientAgent createAgent(BHSession s)
@@ -79,4 +107,5 @@ public class BHClientAgent
 		}
 		return agent;
 	}
+	*/
 }

@@ -144,7 +144,8 @@ function BHClient(url) {
 		
 		getCell: function (x, y) { return getCell(this, x, y); },
 		getClosest: function(x, y)  { return getClosest(this, x, y); },
-				
+		getMobiles: function (x, y) { return getMobiles(this, x, y); },
+		
 		log: function(message, messageLevel) {
 			if (typeof(this.logger) == "function") this.logger(message, messageLevel);
 		},
@@ -244,7 +245,7 @@ function getJSON(bhclient, action, args, callback) {
 	{
 		var oUrl = new URL(url);
 		for (var k in args) {
-			oUrl.searchParams.append(k, args[k]);
+			oUrl.searchParams.append(k, args[k] || "");
 		}
 		console.dir(oUrl);
 		url = oUrl.href;				
@@ -404,6 +405,18 @@ function getClosest(bh, x, y) { // here, z = 0 and it returns only the first 9 c
 			};
 		}
 	}
+	return res;
+}
+
+function getMobiles(bh, x, y) {
+	var res = [];
+	for (var k in bh.mobiles) {
+		var mob = bh.mobiles[k];
+		if (mob.x == x && mob.y == y) {
+			res.push(mob);
+		}
+	}
+	//console.log("getMobiles, x=" + x + ", y=" + y + ", res.length=" + res.length);
 	return res;
 }
 
