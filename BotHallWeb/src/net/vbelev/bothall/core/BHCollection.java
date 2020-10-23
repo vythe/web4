@@ -17,8 +17,11 @@ public class BHCollection
 {
 	public enum EntityTypeEnum
 	{
+		@Utils.EnumElement(code=0)
 		GLOBAL,
+		@Utils.EnumElement(code=1)
 		ITEM,
+		@Utils.EnumElement(code=2)
 		LANDSCAPE
 	}
 		
@@ -80,18 +83,18 @@ public class BHCollection
 			
 		public static class INT_PROPS
 		{
-			private static final int COUNT = 10;
-			public static final int X = 0;
-			public static final int Y = 1;
-			public static final int Z = 2;
-			public static final int DX = 3;
-			public static final int DY = 4;
-			public static final int DZ = 5;
+			private static final int COUNT = 6;
+			public static final int STATUS = 0;
+			public static final int X = 1;
+			public static final int Y = 2;
+			public static final int Z = 3;
+			//public static final int DX = 3;
+			//public static final int DY = 4;
+			//public static final int DZ = 5;
 			/** base timecode for movements */
-			public static final int MOVE_TC = 6;
-			public static final int MOVE_DIR = 7;
-			public static final int STATUS = 8;
-			public static final int HERO_GOLD = 9;
+			public static final int MOVE_TC = 4;
+			public static final int MOVE_DIR = 5;
+			//public static final int HERO_GOLD = 6;
 			
 			private INT_PROPS() {}
 		}
@@ -102,27 +105,55 @@ public class BHCollection
 			public static final int NAME = 0;
 		}
 		
-		private final int[] intProps = new int[INT_PROPS.COUNT];
-		private final int[] intPropsNew = new int[INT_PROPS.COUNT];
+		private final int[] intProps; //= new int[INT_PROPS.COUNT];
+		private final int[] intPropsNew; //= new int[INT_PROPS.COUNT];
 
-		private final String[] stringProps = new String[STRING_PROPS.COUNT];
-		private final String[] stringPropsNew = new String[STRING_PROPS.COUNT];
+		private final String[] stringProps; //= new String[STRING_PROPS.COUNT];
+		private final String[] stringPropsNew; //= new String[STRING_PROPS.COUNT];
 
 		private int id;
 		private int grade;
+		private int gradeNew;
 		private String type;
+		private String typeNew;
+		
 		private long timecode = 0;
 		private boolean m_isChanged;
 
 		private MovementModeEnum movementMode = MovementModeEnum.STANDING;
 		private MovementModeEnum movementModeNew = MovementModeEnum.STANDING;
 	
+		public Atom()
+		{
+			intProps = new int[INT_PROPS.COUNT];
+			intPropsNew = new int[INT_PROPS.COUNT];
+
+			stringProps = new String[STRING_PROPS.COUNT];
+			stringPropsNew = new String[STRING_PROPS.COUNT];
+			
+			setIntProp(INT_PROPS.STATUS, ITEM_STATUS.OK);
+			movementMode = MovementModeEnum.STANDING;			
+		}
+	
+		public Atom(int intPropCount, int strPropCount)
+		{
+			intProps = new int[intPropCount];
+			intPropsNew = new int[intPropCount];
+
+			stringProps = new String[strPropCount];
+			stringPropsNew = new String[strPropCount];
+			
+			setIntProp(INT_PROPS.STATUS, ITEM_STATUS.OK);
+			movementMode = MovementModeEnum.STANDING;			
+		}
+	
+		
 		public String toString()
 		{
 			return "[" + type + "#" + id + "(" + intProps[INT_PROPS.X] + "," + intProps[INT_PROPS.Y] + ")]";
 		}
 		
-		public int getIntProp(int ind)
+		public final int getIntProp(int ind)
 		{
 			return intProps[ind]; // if he used an index out of bounds, it's his own fault
 		}
@@ -167,27 +198,41 @@ public class BHCollection
 		}
 		
 		public int getID() { return id; }
-		public int getGrade() { return grade; }
 		public long getTimecode() { return timecode; }
 		public boolean isChanged() { return m_isChanged || timecode == 0; }
-		public int getX() { return intProps[INT_PROPS.X];}
-		public int getY() { return intProps[INT_PROPS.Y];}
-		public int getZ() { return intProps[INT_PROPS.Z];}
 		public int getStatus() { return intProps[INT_PROPS.STATUS];}
 		public int[] getProps() { return this.intProps; }
+		
+		public int getGrade() { return grade; }
+		public boolean setGrade(int grade) {
+			this.gradeNew = grade;
+			if (this.grade != grade)
+			{
+				m_isChanged = true;
+			}
+			else
+			{
+				updateIsChanged();
+			}
+			return m_isChanged;
+		}
+		
 		/** "type" should always be an interned string, so we can compare directly */
 		public String getType() { return this.type; }
-		public MovementModeEnum getMovementMode() { return movementMode; }
-		
-		public boolean setX(int val) { return setIntProp(INT_PROPS.X, val); }
-		public boolean setY(int val) { return setIntProp(INT_PROPS.Y, val); }
-		public boolean setZ(int val) { return setIntProp(INT_PROPS.Z, val); }
-		public boolean setCoords(BHLandscape.Coords c)
-		{
-			return  setIntProp(INT_PROPS.X, c.getX()) & setIntProp(INT_PROPS.Y, c.getY()) & setIntProp(INT_PROPS.Z, c.getZ());
+		public boolean setType(String type) {
+			this.typeNew = type;
+			if (this.type != type)
+			{
+				m_isChanged = true;
+			}
+			else
+			{
+				updateIsChanged();
+			}
+			return m_isChanged;
 		}
-		public boolean setStatus(int val) { return setIntProp(INT_PROPS.STATUS, val); }
 		
+		public MovementModeEnum getMovementMode() { return movementMode; }
 		public boolean setMovementMode(MovementModeEnum mode)
 		{
 			this.movementModeNew = mode;
@@ -203,17 +248,25 @@ public class BHCollection
 			
 		}
 		
-		public Atom()
+		
+		public int getX() { return intProps[INT_PROPS.X];}
+		public int getY() { return intProps[INT_PROPS.Y];}
+		public int getZ() { return intProps[INT_PROPS.Z];}
+		public boolean setX(int val) { return setIntProp(INT_PROPS.X, val); }
+		public boolean setY(int val) { return setIntProp(INT_PROPS.Y, val); }
+		public boolean setZ(int val) { return setIntProp(INT_PROPS.Z, val); }
+		public boolean setCoords(BHLandscape.Coords c)
 		{
-			setIntProp(INT_PROPS.STATUS, ITEM_STATUS.OK);
-			movementMode = MovementModeEnum.STANDING;
+			return  setIntProp(INT_PROPS.X, c.getX()) & setIntProp(INT_PROPS.Y, c.getY()) & setIntProp(INT_PROPS.Z, c.getZ());
 		}
-	
+
+		public boolean setStatus(int val) { return setIntProp(INT_PROPS.STATUS, val); }
+		
 		private boolean updateIsChanged() 
 		{
 			synchronized (this) 
 			{
-				for (int i = 0; i < INT_PROPS.COUNT; i++)
+				for (int i = 0; i < intProps.length; i++)
 				{
 					if (intProps[i] != intPropsNew[i])
 					{
@@ -221,7 +274,7 @@ public class BHCollection
 						return true;
 					}	
 				}
-				for (int i = 0; i < STRING_PROPS.COUNT; i++)
+				for (int i = 0; i < stringProps.length; i++)
 				{
 					if (!Utils.equals(stringProps[i], stringPropsNew[i]))
 					{
@@ -232,6 +285,8 @@ public class BHCollection
 				// check other properties
 				m_isChanged = (
 						movementMode != movementModeNew
+						|| type != typeNew
+						|| grade != gradeNew
 				);
 				return m_isChanged;
 			}
@@ -239,22 +294,23 @@ public class BHCollection
 		
 		public Atom publish (long timecode)
 		{
-			Atom res = new Atom();
+			Atom res = new Atom(this.intProps.length, this.stringProps.length);
+			
 			res.id = this.id;
-			res.type = this.type;
 			res.timecode = timecode;
-			res.grade = this.grade;
+			res.typeNew = res.type = this.typeNew;
+			res.gradeNew = res.grade = this.gradeNew;
+			res.movementModeNew = res.movementMode = this.movementModeNew;
 			res.m_isChanged = false;
-			for (int i = 0; i < INT_PROPS.COUNT; i++)
+			for (int i = 0; i < this.intPropsNew.length; i++)
 			{
 				res.intPropsNew[i] = res.intProps[i] = this.intPropsNew[i];
 			}
-			for (int i = 0; i < STRING_PROPS.COUNT; i++)
+			for (int i = 0; i < this.stringPropsNew.length; i++)
 			{
 				res.stringPropsNew[i] = res.stringProps[i] = this.stringPropsNew[i];
 			}
 						
-			res.movementMode = this.movementModeNew;
 			
 			return res;
 		}
@@ -320,30 +376,32 @@ public class BHCollection
 		Atom test = new Atom();
 		test.id = 0;
 		test.timecode = minTimecode;
-		SortedSet<Atom> res0 = atomsByTimecode.headSet(test);
+		//SortedSet<Atom> res0 = atomsByTimecode.headSet(test);
 		SortedSet<Atom> res = atomsByTimecode.tailSet(test);
 		
 		return res;
 	}
 	
-	public Collection<Atom> atCoords(int x, int y, int z)
-	{
-		return atCoords(new BHLandscape.CoordsBase(x, y, z));
-	}
-	
-	public Collection<Atom> atCoords(BHLandscape.Coords c)
+	public Collection<Atom> atCoords(int x, int y, int z, boolean withDeleted)
 	{
 		ArrayList<Atom> res = new ArrayList<Atom>();
 		for (Atom a : atoms.values())
 		{
-			if (a.getX() == c.getX()
-			&& a.getY() == c.getY()
-			&& a.getZ() == c.getZ())
+			if (!withDeleted && a.getStatus() == Atom.ITEM_STATUS.DELETE) continue;
+			
+			if (a.getX() == x
+			&& a.getY() == y
+			&& a.getZ() == z)
 			{
 				res.add(a);
 			}				
 		}
 		return res;
+	}
+	
+	public Collection<Atom> atCoords(BHLandscape.Coords c, boolean withDeleted)
+	{
+		return atCoords(c.getX(), c.getY(), c.getZ(), withDeleted);
 	}	
 	
 	public Atom addAtom(String type, int grade)
@@ -363,6 +421,21 @@ public class BHCollection
 			atoms.put(res.id, res);
 		}
 		return res;		
+	}
+	
+	public Atom addAtom(Atom from)
+	{
+		Atom res = from.publish(0);
+		synchronized(atoms)
+		{
+			do
+			{
+				res.id = ++latestAtomID;
+			} 
+			while (atoms.containsKey(res.id));
+			atoms.put(res.id, res);
+		}
+		return res;
 	}
 	
 	public BHCollection publish(long timecode)

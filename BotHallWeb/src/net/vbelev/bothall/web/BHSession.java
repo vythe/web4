@@ -365,7 +365,7 @@ public class BHSession
 			boolean canMove = true;
 			if (me.getGrade() == BHCollection.Atom.GRADE.MONSTER)
 			{
-				for(BHCollection.Atom a : s.engine.getCollection().atCoords(tCell))
+				for(BHCollection.Atom a : s.engine.getCollection().atCoords(tCell, false))
 				{
 					if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER 
 						&& (a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == 0

@@ -58,6 +58,7 @@ function BHClient(url) {
 	return {
 		url: url,
 		loopMilliseconds: 100,
+		ping: 0, //
 		loopLoad: 0, // the loop load in %
 		loopTimecode: 0, // count the loops
 		runLoop: false,
@@ -115,6 +116,7 @@ function BHClient(url) {
 			for (i = 0; i < evt.length; i++) {
 				if (evt[i] === invoke) {
 					evt.splice(i, 1);
+					i--;
 				}
 			}			
 		},
@@ -129,7 +131,7 @@ function BHClient(url) {
 				//console.log("subscriber " + e + ": " + ef);
 				var args = [this];
 				//if (arguments) args = args.concat(arguments);
-				if (arguments && arguments.length > 0) {
+				if (arguments && arguments.length > 1) {
 					for (var a = 1; a < arguments.length; a++) {
 						args.push(arguments[a]);
 					}
@@ -189,9 +191,9 @@ function BHClient(url) {
 				//alert("my apiUrl is " + this.url + ", join res=" + res);
 				//this.sessionID = res;
 			}.bind(this));
-		},
-		
-		reportUrl: function() {
+		}
+		/*
+		, reportUrl: function() {
 			return this.url;
 		},
 		useCallback: function(callback) {
@@ -207,6 +209,7 @@ function BHClient(url) {
 				alert("async3: " + this.url + ", func: " + this.reportUrl());
 			}.bind(this));
 		}
+		*/
 	}
 }
 
@@ -279,9 +282,11 @@ function getUpdate(bhclient, callback)
 	//var url = new URL(bhclient.url + "getUpdate");
 	//url.searchParams.append("sessionID", bhclient.sessionID);
 	var url = bhclient.url + "getUpdate";
-	
+	var pingTS = new Date().getTime();
 	fetch(url
 	).then(function(response) {
+		bhclient.ping = new Date().getTime() - pingTS;
+		
 		if (response) return response.json();
 		else {
 			bhclient.log("getUpdate failed", "ERROR");
@@ -317,6 +322,34 @@ function getUpdate(bhclient, callback)
 				bhclient.onUpdate("MESSAGE", msg);
 			}
 		}
+		
+		var newBuffs = {};
+		var buff;
+		var b;
+		for (b in resp.buffs) {
+			buff = resp.buffs[b];
+			buff.isCancelled = b.isCancelled || false;
+			newBuffs[buff.id] = buff;
+		}
+		
+		for (var b in bhclient.buffs) {
+			if (!newBuffs[b]) {
+				buff = bhclient.buffs[b];
+				buff.isCancelled = true;
+				bhclient.onUpdate("BUFF", buff);
+			}
+		}
+		
+		bhclient.buffs = {}; //newBuffs;
+		for (b in newBuffs) {
+			buff = newBuffs[b];
+			//buff.isCancelled = false;
+			if (!buff.isCancelled) {
+				bhclient.buffs[buff.id] = buff;
+			}
+			bhclient.onUpdate("BUFF", buff);
+		}
+		
 		bhclient.onUpdate("STATUS", resp.status || {});	
 		bhclient.log("getUpdate complete", "INFO");
 		if (typeof(callback) == "function") {

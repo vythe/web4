@@ -21,30 +21,7 @@ public class BotHallAPI
 	private HttpServletRequest request;
 
 	@Context
-	private ServletContext context;
-	
-	@Path("/hello")
-    @GET
-    @Produces(MediaType.TEXT_HTML) //.APPLICATION_JSON)
-	public String Hello(@QueryParam("name") String name)
-	{
-		String res = "Hello, " + name + ", land=" + Utils.getEnumDescription(BHLandscape.TerrainEnum.LAND) + "<br/>";
-		
-		int size = 20;
-		BHLandscape sc = BHEngine.testLandscape(size);
-		
-		res += "<h3>Test:</h3><br/>";
-		
-		for (int y = 0; y < size; y++)
-		{
-			for (int x = 0; x < size; x++)
-			{
-				res += " " + Utils.getEnumCode(sc.getCell(x, y, 0).getTerrain());
-			}
-			res += "<br/>\n";
-		}
-		return res;
-	}
+	private ServletContext context;	
 	
 	/**
 	 * Returns the list of terrain cells, visible to the current session.
@@ -182,7 +159,7 @@ public class BotHallAPI
 		res.status.controlledMobileID = agent.controlledMobileID;
 		
 		return res;
-}
+	}
 	
 	@Path("/moveit")
 	@GET
@@ -206,7 +183,7 @@ public class BotHallAPI
 			return "";
 		}
 		
-		Integer actionID = s.doMove(mobileId, direction);
+		Integer actionID = s.commandMove(mobileId, direction);
 /*
 		if (actionID != null && s.engine.stage == BHEngine.CycleStageEnum.IDLE)
 		{
@@ -238,7 +215,7 @@ public class BotHallAPI
 			return "";
 		}
 		
-		int actionID = s.processActionDie(mobileId);
+		int actionID = s.actionDie(mobileId);
 /*
 		if (actionID != null && s.engine.stage == BHEngine.CycleStageEnum.IDLE)
 		{
@@ -248,6 +225,22 @@ public class BotHallAPI
 		return "" + actionID;
 	}
 
+	@Path("/pacmanit")
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)
+	public String pacmanit(@QueryParam("id")Integer id)
+	{
+		BHClientAgent agent = getAgent();
+		PacmanSession s = agent == null? null : PacmanSession.getSession(agent.sessionID);
+
+		if (s == null)
+			return "0";
+		
+		s.triggerPacman();
+		
+		return "0";
+	}	
+	
 	@Path("/engineInfo")
 	@GET
 	@Produces(MediaType.TEXT_PLAIN)

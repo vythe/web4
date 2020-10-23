@@ -40,7 +40,7 @@ public class BHLandscape
 		private int m_y;
 		private int m_z;
 		
-		public CoordsBase() 
+		private CoordsBase() 
 		{
 		}
 				
@@ -59,22 +59,22 @@ public class BHLandscape
 		}
 				
 		@Override
-		public int getX()
+		public final int getX()
 		{
 			return m_x;
 		}
 		@Override
-		public int getY()
+		public final int getY()
 		{
 			return m_y;
 		}
 		@Override
-		public int getZ()
+		public final int getZ()
 		{
 			return m_z;
 		}
 		
-		public CoordsBase setX(int x) 
+		public final CoordsBase setX(int x) 
 		{
 			CoordsBase res = new CoordsBase();
 			res.m_x = x; //this.m_x;
@@ -83,7 +83,7 @@ public class BHLandscape
 			return res;
 		}
 		
-		public CoordsBase setY(int y) 
+		public final CoordsBase setY(int y) 
 		{
 			CoordsBase res = new CoordsBase();
 			res.m_x = this.m_x;
@@ -92,7 +92,7 @@ public class BHLandscape
 			return res;
 		}
 		
-		public CoordsBase setZ(int z) 
+		public final CoordsBase setZ(int z) 
 		{
 			CoordsBase res = new CoordsBase();
 			res.m_x = this.m_x;
@@ -100,6 +100,26 @@ public class BHLandscape
 			res.m_z = z; //this.m_z;
 			return res;
 		}
+	}
+	
+	public static Coords coordsPoint(int x, int y, int z)
+	{
+		return new CoordsBase(x, y, z);
+	}
+	
+	public static Coords coordsPoint(Coords c)
+	{
+		return new CoordsBase(c);
+	}
+	
+	public static boolean equalCoords(Coords c1, Coords c2)
+	{
+		if (c1 == c2) return true;
+		if (c1 == null || c2 == null) return false;
+		return (c1.getX() == c2.getX()
+				&& c1.getY() == c2.getY()
+				&& c1.getZ() == c2.getZ()
+		);
 	}
 	
 	/** cellShifts[ind] = {dx, dx, dz, reverseDir} */
@@ -302,6 +322,11 @@ public class BHLandscape
 		}
 		*/
 		return res;
+	}
+	
+	public Cell[] closestCells(Coords c)
+	{
+		return closestCells(c.getX(), c.getY(), c.getZ());
 	}
 	
 	public void setCell(Cell cell)

@@ -124,6 +124,13 @@ function bestDir(mybh, closest, dx, dy) {
 					res = pacmanValidDirs[k];
 					resProd = testProd;
 				}
+			} else {
+				for (var m in mobs) {
+					if (mobs[m].mobiletype == "HERO") { // got him!
+						res = pacmanValidDirs[k];
+						return res;
+					}
+				}
 			}
 		}
 	}

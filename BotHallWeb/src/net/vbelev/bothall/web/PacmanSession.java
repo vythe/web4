@@ -1,7 +1,9 @@
 package net.vbelev.bothall.web;
 
 import java.util.*;
+import java.io.*;
 import net.vbelev.bothall.core.*;
+import net.vbelev.bothall.core.BHCollection.EntityTypeEnum;
 import net.vbelev.bothall.core.BHOperations.BHAction;
 import net.vbelev.bothall.core.BHOperations.BHBuff;
 import net.vbelev.utils.Utils;
@@ -12,9 +14,54 @@ import net.vbelev.utils.Utils;
  */
 public class PacmanSession 
 {
+	
+	public static class INT_PROPS //extends BHCollection.Atom.INT_PROPS
+	{
+		private static final int COUNT = 8;
+		public static final int STATUS = 0;
+		public static final int X = 1;
+		public static final int Y = 2;
+		public static final int Z = 3;
+		//public static final int DX = 3;
+		//public static final int DY = 4;
+		//public static final int DZ = 5;
+		/** base timecode for movements */
+		public static final int MOVE_TC = 4;
+		public static final int MOVE_DIR = 5;
+		public static final int HERO_GOLD = 6;
+		public static final int HERO_LIVES = 7;
+		
+		private INT_PROPS() {}
+	}
+	
+	public static class ATOM
+	{
+		public static final String GOLD = "GOLD".intern(); 
+		public static final String MONSTER = "MONSTER".intern(); 
+		public static final String HERO = "HERO".intern(); 
+		public static final String PAC = "PAC".intern(); 
+		public static final String PORTAL = "PORTAL".intern(); 
+	}
+	
+	public static class STRING_PROPS
+	{		
+		private static final int COUNT = 1;
+		public static final int NAME = 0;
+	}
+		
 	public static final String ACTION_DIE = "DIE".intern();
-	public static final String BUFF_DIE = "DIE".intern();
+	public static final String BUFF_RESURRECT = "RESURRECT".intern();
+	public static final String BUFF_PACMONSTER = "PACMONSTER".intern();
+	public static final String BUFF_PACHERO = "PACHERO".intern();
+	/**
+	 * Port properties [target portal item ID, moveTC, post-shift direction, phase].
+	 * When entering the portal cell, set the buff with phase=0 (leaving);
+	 * after porting, set phase=1. The buff with phase==1 stays on until you leave the cell
+	 * and prevents further porting. 
+	 */
+	public static final String BUFF_PORT = "PORT".intern();
 
+	public static final int PACMAN_DURATION = 1000;
 	
 	private static int sessionInstanceSeq = 0;
 	private static final ArrayList<PacmanSession> sessionList = new ArrayList<PacmanSession>();
@@ -30,7 +77,7 @@ public class PacmanSession
 	
 	public static PacmanSession createSession()
 	{
-		BHEngine e = BHEngine.loadFileEngine("/../data/pacman.txt");
+		BHEngine e = PacmanSession.loadFile("/../data/pacman.txt");
 		e.CYCLE_MSEC = 200;
 		PacmanSession s =  PacmanSession.createSession(e);
 		
@@ -55,7 +102,7 @@ public class PacmanSession
 		{
 			if (a.getGrade() != BHCollection.Atom.GRADE.ITEM)
 			{
-				s.startingPoints.put(a.getID(), new BHLandscape.CoordsBase(a));
+				s.startingPoints.put(a.getID(), BHLandscape.coordsPoint(a));
 			}
 		}
 		
@@ -78,6 +125,111 @@ public class PacmanSession
 	
 	public BHEngine getEngine() { return engine; }
 
+	private static BHCollection.Atom addAtom(BHCollection coll, String type, int grade)
+	{
+		BHCollection.Atom res = new BHCollection.Atom(INT_PROPS.COUNT, STRING_PROPS.COUNT);
+		res.setType(type);
+		res.setGrade(grade);
+		res = coll.addAtom(res);
+		
+		return res;
+		
+	}
+	
+	public static BHEngine loadFile(String fileName)
+	{
+		BHEngine res = new BHEngine();
+		
+		try
+		{
+		InputStream is = BHEngine.class.getResourceAsStream(fileName);
+		BufferedReader br = new BufferedReader(new InputStreamReader(is));
+		String line = null;
+		int x = -1;
+		int y = -1;
+		int z = 0;
+		//BHCollection.Atom hero = null;
+		BHLandscape landscape = res.getLandscape();
+		BHCollection collection = res.getCollection();
+		
+		while ((line = br.readLine()) != null)
+		{
+			y++;
+			StringReader sr = new StringReader(line);
+			int c;
+			x = -1;
+			while ((c = sr.read())!= -1)
+			{
+				x++;
+				BHLandscape.TerrainEnum terrain;
+				if (c == '#')
+				{
+					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.STONE));					
+				}
+				else if (c == ' ')
+				{
+					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));					
+				}
+				else if (c == '@')
+				{
+					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
+					BHCollection.Atom hero = addAtom(collection, ATOM.HERO, BHCollection.Atom.GRADE.HERO);
+					hero.setX(x);
+					hero.setY(y);
+					hero.setZ(z);
+				}
+				else if (c == 'M')
+				{
+					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
+					BHCollection.Atom hero = addAtom(collection, ATOM.MONSTER, BHCollection.Atom.GRADE.MONSTER);
+					hero.setX(x);
+					hero.setY(y);
+					hero.setZ(z);
+				}
+				else if (c == '.')
+				{
+					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
+					BHCollection.Atom item = addAtom(collection, ATOM.GOLD, BHCollection.Atom.GRADE.ITEM);
+					item.setX(x);
+					item.setY(y);
+					item.setZ(z);
+				}
+				else if (c == '*')
+				{
+					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
+					BHCollection.Atom item = addAtom(collection, ATOM.PAC, BHCollection.Atom.GRADE.ITEM);
+					item.setX(x);
+					item.setY(y);
+					item.setZ(z);
+				}
+				else if (c == '=')
+				{
+					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
+					BHCollection.Atom item = addAtom(collection, ATOM.PORTAL, BHCollection.Atom.GRADE.ITEM);
+					item.setX(x);
+					item.setY(y);
+					item.setZ(z);
+				}
+				else
+				{
+					//res.landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.VOID));
+					System.out.println("Unsupported mark [" + (char)c + "] when reading " + fileName);
+				}
+			}
+				
+		}
+		}
+		catch (IOException x)
+		{
+			System.out.println("Failed to read " + fileName);
+			x.printStackTrace();
+		}
+		res.publish();
+		res.timecode++; // make it at least 1 so the clients will load it
+		return res;
+	}
+	
+	
 	
 	public class EngineCallback implements BHEngine.IClientCallback
 	{
@@ -118,7 +270,7 @@ public class PacmanSession
 			}
 			if (action.actionType == PacmanSession.ACTION_DIE)
 			{
-				PacmanSession.this.processActionDie(action.actorID);
+				PacmanSession.this.actionDie(action.actorID);
 			}
 			else
 			{
@@ -129,9 +281,21 @@ public class PacmanSession
 
 		public boolean processBuff(BHBuff buff)
 		{
-			if (buff.actionType == PacmanSession.BUFF_DIE)
+			if (buff.actionType == PacmanSession.BUFF_RESURRECT)
 			{
-				return PacmanSession.this.processBuffDie(buff);
+				return PacmanSession.this.processBuffResurrect(buff);
+			}
+			else if (buff.actionType == PacmanSession.BUFF_PACMONSTER)
+			{
+				return PacmanSession.this.processBuffPacMonster(buff);
+			}
+			else if (buff.actionType == PacmanSession.BUFF_PACHERO)
+			{
+				return PacmanSession.this.processBuffPacHero(buff);
+			}
+			else if (buff.actionType == PacmanSession.BUFF_PORT)
+			{
+				return PacmanSession.this.processBuffPortal(buff);
 			}
 			else
 			{
@@ -164,20 +328,33 @@ public class PacmanSession
 			*/
 			for (BHCollection.Atom a : engine.getCollection().all())
 			{
+				if (a.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE) continue;
+				
 				if (a.getGrade() == BHCollection.Atom.GRADE.HERO)
 				{
 					// *) eat the gold here
-					Collection<BHCollection.Atom> spot = engine.getCollection().atCoords(a);
+					Collection<BHCollection.Atom> spot = engine.getCollection().atCoords(a, false);
 					if (spot.size() <= 1) continue;  // nothing to see here
 					for (BHCollection.Atom it : spot)
 					{
 						if (it.getID() == a.getID()) continue;
-						if (it.getType() == "GOLD" && it.getStatus() != BHCollection.Atom.ITEM_STATUS.DELETE)
+						if (it.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE) continue;
+						
+						if (it.getType() == PacmanSession.ATOM.GOLD)
 						{
-							int goldCount = a.getIntProp(BHCollection.Atom.INT_PROPS.HERO_GOLD) + 1;
-							a.setIntProp(BHCollection.Atom.INT_PROPS.HERO_GOLD, goldCount);
+							int goldCount = a.getIntProp(PacmanSession.INT_PROPS.HERO_GOLD) + 1;
+							a.setIntProp(PacmanSession.INT_PROPS.HERO_GOLD, goldCount);
 							engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  a.getID(), "Yum! Count=" + goldCount);
 							it.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
+						}
+						else if (it.getType() == PacmanSession.ATOM.PAC) 
+						{
+							triggerPacman();
+							it.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
+						}
+						else if (it.getType() == PacmanSession.ATOM.PORTAL)
+						{
+							triggerPortal(a);
 						}
 					}
 				}
@@ -185,7 +362,7 @@ public class PacmanSession
 				{
 					int moveDir = a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
 					// *) eat the hero here					
-					Collection<BHCollection.Atom> spot = engine.getCollection().atCoords(a);
+					Collection<BHCollection.Atom> spot = engine.getCollection().atCoords(a, false);
 					if (spot.size() <= 1) continue;  // nothing to see here
 					for (BHCollection.Atom it : spot)
 					{
@@ -202,7 +379,18 @@ public class PacmanSession
 							PacmanSession.this.getEngine().postAction(action, 0);
 							//return action.ID; //"action ID=" + action.ID;
 							*/
-							processActionDie(it.getID());
+							
+							BHBuff monsterBuff = engine.getBuff(BHCollection.EntityTypeEnum.ITEM, a.getID(), BUFF_PACMONSTER);
+							if (monsterBuff != null && !monsterBuff.isCancelled)
+							{
+								it.setIntProp(INT_PROPS.HERO_GOLD, it.getIntProp(INT_PROPS.HERO_GOLD) + 100);
+								engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  it.getID(), "CHOMP!");
+								actionDie(a.getID());
+							}
+							else
+							{
+								actionDie(it.getID());
+							}
 						}
 						else if (it.getGrade() == BHCollection.Atom.GRADE.MONSTER
 								&& moveDir != 0
@@ -224,7 +412,7 @@ public class PacmanSession
 	 * if the direction is not open, but the mobile is moving - post the movement buff;
 	 * else return null. 
 	 */
-	public Integer doMove(int mobileID, int direction)
+	public Integer commandMove(int mobileID, int direction)
 	{
 		PacmanSession s = this;
 		
@@ -248,7 +436,7 @@ public class PacmanSession
 			boolean canMove = true;
 			if (me.getGrade() == BHCollection.Atom.GRADE.MONSTER)
 			{
-				for(BHCollection.Atom a : s.engine.getCollection().atCoords(tCell))
+				for(BHCollection.Atom a : s.engine.getCollection().atCoords(tCell, false))
 				{
 					if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER 
 						&& (a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == 0
@@ -326,7 +514,116 @@ public class PacmanSession
 		return null;
 	}
 	
-	public int processActionDie(int mobileID)
+	/** 
+	 * Start the pacman mode
+	 */
+	public void triggerPacman()
+	{
+		for(BHCollection.Atom a : engine.getCollection().all())
+		{
+			if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER)			
+			{
+				BHOperations.BHBuff b = engine.getBuff(EntityTypeEnum.ITEM, a.getID(), BUFF_PACMONSTER);
+				if (b == null)
+				{
+					b = new BHOperations.BHBuff();
+					b.actionType = PacmanSession.BUFF_PACMONSTER;
+					b.isVisible = true;
+					b.actorID = a.getID();
+					b.actorType = BHCollection.EntityTypeEnum.ITEM;
+					b.ticks = PACMAN_DURATION;
+					engine.postBuff(b);
+				}
+				else
+				{
+					b.ticks = PACMAN_DURATION;
+				}
+			}
+			else if (a.getGrade() == BHCollection.Atom.GRADE.HERO)
+			{
+				BHOperations.BHBuff b = engine.getBuff(EntityTypeEnum.ITEM, a.getID(), BUFF_PACHERO);
+				if (b == null)
+				{
+					b = new BHOperations.BHBuff();
+					b.actionType = PacmanSession.BUFF_PACHERO;
+					b.isVisible = true;
+					b.actorID = a.getID();
+					b.actorType = BHCollection.EntityTypeEnum.ITEM;
+					b.ticks = PACMAN_DURATION;
+					engine.postBuff(b);
+				}
+				else
+				{
+					b.ticks = PACMAN_DURATION;
+				}
+			}
+		}
+	}
+
+	public void triggerPortal(BHCollection.Atom me)
+	{
+		// 0) check for a pre-existing buff
+		BHOperations.BHBuff oldBuff = engine.getBuff(EntityTypeEnum.ITEM, me.getID(), PacmanSession.BUFF_PORT);
+		if (oldBuff != null && !oldBuff.isCancelled)
+		{
+			return;
+		}				
+		int direction = me.getIntProp(PacmanSession.INT_PROPS.MOVE_DIR);
+		
+		// 1) find the other portal and set up the buff
+		BHCollection.Atom thePortal = null;
+		for (BHCollection.Atom item : engine.getCollection().all())
+		{
+			if (item.getGrade() == BHCollection.Atom.GRADE.ITEM
+					&& item.getType() == ATOM.PORTAL
+					&& !BHLandscape.equalCoords(item, me)
+					)
+			{
+				thePortal = item;
+				break;
+			}
+		}
+		
+		if (thePortal == null)
+		{
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "destination portal not found!");
+			return;
+		}
+		
+		if (direction == 0)
+		{
+			BHLandscape.Cell[] closest = engine.getLandscape().closestCells(thePortal.getX(), thePortal.getY(), thePortal.getZ());
+			for (int d = 1; d < closest.length; d++) 
+			{
+				BHLandscape.Cell c = closest[d];
+				if (c.getTerrain() == BHLandscape.TerrainEnum.LAND)
+				{
+					direction = d;
+					break;
+				}
+			}
+		}
+		if (direction == 0)
+		{
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "destination portal is broken!");
+			return;
+		}
+		
+		BHOperations.BHBuff portBuff = new BHOperations.BHBuff();
+		portBuff.actionType = PacmanSession.BUFF_PORT;
+		portBuff.actorID = me.getID();
+		portBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
+		portBuff.intProps = Utils.intArray(thePortal.getID(), engine.timecode, direction, 0);
+		portBuff.isVisible = true;
+		portBuff.ticks = BHOperations.MOVE_SPEED - 1;
+		engine.postBuff(portBuff);
+		
+		// 2) add fake move props to imitate movement
+		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
+		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);				
+	}
+	
+	public int actionDie(int mobileID)
 	{
 		BHCollection.Atom me = engine.getCollection().getItem(mobileID);
 		if (me == null || me.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE)
@@ -336,8 +633,13 @@ public class PacmanSession
 		me.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  mobileID, "You got died!");
 		
+		for (BHOperations.BHBuff b : engine.getBuffs(BHCollection.EntityTypeEnum.ITEM, mobileID, null))
+		{
+			b.isCancelled = true;
+		}
+		
 		BHOperations.BHBuff dieBuff = new BHOperations.BHBuff();
-		dieBuff.actionType = PacmanSession.BUFF_DIE;
+		dieBuff.actionType = PacmanSession.BUFF_RESURRECT;
 		dieBuff.actorID = mobileID;
 		dieBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
 		//moveBuff.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
@@ -349,7 +651,7 @@ public class PacmanSession
 		return dieBuff.ID;
 	}
 	
-	public boolean processBuffDie(BHBuff buff)
+	public boolean processBuffResurrect(BHBuff buff)
 	{
 		if (buff.ticks > 0)
 		{
@@ -367,5 +669,86 @@ public class PacmanSession
 			}		
 			return false;
 		}
+	}
+		
+	public boolean processBuffPacMonster(BHBuff buff)
+	{
+		return true; // let's handle pacman in PacHero
+	}	
+
+	public boolean processBuffPacHero(BHBuff buff)
+	{
+		/*
+		BHCollection.Atom me = engine.getCollection().getItem(buff.actorID);
+		if (me == null) return false;
+		
+		for (BHCollection.Atom a : engine.getCollection().atCoords(me))
+		{
+			if (a.getID() == me.getID()) continue;
+			if (a.getType() != ATOM.MONSTER) continue;
+			BHBuff monsterBuff = engine.getBuff(BHCollection.EntityTypeEnum.ITEM, me.getID(), BUFF_PACMONSTER);
+			if (monsterBuff == null || monsterBuff.isCancelled) continue;
+			
+			me.setIntProp(INT_PROPS.HERO_GOLD, me.getIntProp(INT_PROPS.HERO_GOLD) + 100);
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "CHOMP!");
+			processActionDie(a.getID());
+		}
+		*/
+		return true;
+	}
+
+	/** props: [target portal item ID, moveTC, post-shift direction, phase] */
+	public boolean processBuffPortal(BHBuff buff)
+	{
+		BHCollection.Atom me = engine.getCollection().getItem(buff.actorID);
+		if (me == null) return false;
+		
+		int direction = buff.intProps[2];
+		int phase = buff.intProps[3];
+		
+		if (phase == 0 && buff.intProps[1] != me.getIntProp(INT_PROPS.MOVE_TC)
+				//&& direction != me.getIntProp(INT_PROPS.MOVE_DIR)
+				)
+		{
+			return false; // another move happened
+		}
+		
+		if (buff.ticks > 0)
+		{
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Beaming! " + buff.ticks);
+			return true;
+		}
+		BHCollection.Atom dest = engine.getCollection().getItem(buff.intProps[0]);
+		
+		if (phase == 0)
+		{
+			// finally, do the port
+			if (dest == null || dest.getType() != ATOM.PORTAL)
+			{
+				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Beaming failed! ");
+				return false;
+			}
+			me.setCoords(dest);
+			buff.intProps[3] = 1;
+			
+			//doMove(me.getID(), buff.intProps[2]);
+			BHOperations.BHAction action = new BHOperations.BHAction();
+			action.actionType = BHOperations.ACTION_JUMP;
+			action.actorID = me.getID();
+			action.intProps = Utils.intArray(engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+			
+			engine.postAction(action, BHOperations.MOVE_SPEED);
+			me.setIntProp(INT_PROPS.MOVE_TC, engine.timecode);
+			me.setIntProp(INT_PROPS.MOVE_DIR, engine.timecode);
+			
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Beamed! " + me.toString());			
+		}
+
+		if (phase == 1 && !BHLandscape.equalCoords(dest, me)) // check if it's time to remove the buff
+		{
+			return false;
+		}
+		
+		return true;
 	}
 }

@@ -220,6 +220,21 @@ public class BHStorage
 			res.messages.add(message);
 		}
 
+		for (BHOperations.BHBuff b : engine.buffs)
+		{
+			if (!b.isVisible || b.isCancelled) continue;
+			BHClient.Buff b2 = new BHClient.Buff();
+			b2.id = b.ID;
+			//b2.isCancelled = b.isCancelled;
+			b2.ticks = b.ticks;
+			b2.timecode = b.timecode;
+			b2.type = b.actionType;
+			b2.actorID = b.actorID;
+			b2.actorType = Utils.getEnumCode(b.actorType);
+			
+			res.buffs.add(b2);
+			
+		}
 		return res;
 	}
 

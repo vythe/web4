@@ -5,6 +5,10 @@ import java.util.*;
 import net.vbelev.bothall.core.BHCollection.EntityTypeEnum;
 import net.vbelev.utils.Utils;
 
+/**
+ * A collection of classes used by BHEngine and
+ * some standard action handlers 
+ */
 public class BHOperations
 {
 
@@ -15,10 +19,13 @@ public class BHOperations
 	// when the movement is processed, we check that its basetimecode matches the atom's prop.
 	// if there are two movements in the (timers) queue, only the last one will be processed.
 	
-	/** move after a delay; props: [basetimecode, direction, repeatflag, delay] */
+	/** 
+	 * move after a delay; props: [basetimecode, direction, repeatflag, delay] 
+	 * */
 	public static final String ACTION_MOVE = "MOVE".intern();
-	/** immediate move; props: [basetimecode, direction, repeatflag, delay]
-	 *  "delay" is only needed if repeatflag > 0, it will be used to repeat the move
+	/** 
+	 * immediate move; props: [basetimecode, direction, repeatflag, delay]
+	 * "delay" is only needed if repeatflag > 0, it will be used to repeat the move
 	 *  */
 	public static final String ACTION_JUMP = "JUMP".intern();
 	
@@ -33,7 +40,7 @@ public class BHOperations
 	
 	public static class BHAction
 	{
-		public static int instanceCounter = 0;
+		private static int instanceCounter = 0;
 		public final int ID = ++instanceCounter;
 		
 		/** actionType should be interned or set from BHOperations constants */
@@ -53,7 +60,7 @@ public class BHOperations
 		}
 	}
 
-	public static class BHTimer implements Comparable<BHTimer>
+	public final static class BHTimer implements Comparable<BHTimer>
 	{
 		public BHAction action;
 		public long timecode;
@@ -79,8 +86,11 @@ public class BHOperations
 		 * for reporting it to the clients
 		 */
 		public long timecode;
+		/** ticks are decremented every tick until 0, then stay at 0 forever */
 		public int ticks;
+		/** buffs stay alive (processed every tick) until cancelled */
 		public boolean isCancelled;
+		public boolean isVisible;
 	}
 	
 	public static void processAction(BHEngine engine, BHAction action)
@@ -100,11 +110,11 @@ public class BHOperations
 		}
 		if (action.actionType == ACTION_MOVE)
 		{
-			doMove(engine, me, action);
+			processActionMove(engine, me, action);
 		}
 		else if (action.actionType == ACTION_JUMP)
 		{
-			doJump(engine, me, action);
+			processActionJump(engine, me, action);
 		}
 		else if (action.actionType == ACTION_STOPCYCLING)
 		{
@@ -114,17 +124,18 @@ public class BHOperations
 	
 	public static void doStop(BHEngine engine, BHCollection.Atom me)
 	{
-		me.setIntProp(BHCollection.Atom.INT_PROPS.DX, 0);
-		me.setIntProp(BHCollection.Atom.INT_PROPS.DY, 0);
-		me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, 0);
-		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
+		//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, 0);
+		//me.setIntProp(BHCollection.Atom.INT_PROPS.DY, 0);
+		//me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, 0);
+		//me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
+		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + 1);
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, 0);
 	}
 	
 	/** 
 	 * get the atom, update it to "moving", set the timer to jump after the delay.
 	 */
-	public static void doMove(BHEngine engine, BHCollection.Atom me, BHAction action)
+	public static void processActionMove(BHEngine engine, BHCollection.Atom me, BHAction action)
 	{
 		//[basetimecode, direction, repeatflag, delay]
 		int actionTimecode = action.intProps[0];
@@ -169,7 +180,7 @@ public class BHOperations
 				moveBuff.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 				engine.postBuff(moveBuff);
 				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "Posted buff to move to " + direction);
-				//System.out.println("Posted buff move, delay=" + delay);
+				System.out.println("Posted buff move, delay=" + delay);
 			}
 			return;
 		}
@@ -179,19 +190,19 @@ public class BHOperations
 		jump.actorType = BHCollection.EntityTypeEnum.ITEM;
 		jump.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 		
-		me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
-		me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
-		me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
+		//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
+		//me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
+		//me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
 		
 		engine.postAction(jump, delay - 1); // 1 tick is already spent on doMove
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "I am moving to " + targetCell + " (" + direction + ")");
-		System.out.println("Posted jump action, delay=" + delay + ", timecode=" + engine.timecode);
+		System.out.println("Posted jump action for id=" + jump.actorID + ", dir=" + direction + ", delay=" + delay + ", timecode=" + engine.timecode);
 		
 	}
 
-	public static void doJump(BHEngine engine, BHCollection.Atom me, BHAction action)
+	public static void processActionJump(BHEngine engine, BHCollection.Atom me, BHAction action)
 	{
 		//[basetimecode, direction, repeatflag, delay]
 		int actionTimecode = action.intProps[0];
@@ -208,7 +219,7 @@ public class BHOperations
 		}
 		
 		int[] shift = BHLandscape.cellShifts[direction];
-		BHLandscape.CoordsBase newPos = new BHLandscape.CoordsBase(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
+		BHLandscape.Coords newPos = BHLandscape.coordsPoint(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
 		
 		//BHLandscape.Cell targetCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
 		BHLandscape.Cell targetCell = engine.getLandscape().getCell(newPos);
@@ -219,7 +230,10 @@ public class BHOperations
 			//System.out.println("Hit the wall, escape, target=" + targetCell);
 			return;
 		}
-		for (BHCollection.Atom a : engine.getCollection().atCoords(newPos))
+		// don't let monsters move into each other
+		if (me.getGrade() == BHCollection.Atom.GRADE.MONSTER)
+		{
+		for (BHCollection.Atom a : engine.getCollection().atCoords(newPos, false))
 		{
 			if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER) // don't move into another monster... hero is okay
 			{
@@ -230,7 +244,7 @@ public class BHOperations
 				
 			}
 		}
-		
+		}
 		me.setCoords(newPos);
 		/*
 		me.setX(me.getX() + shift[0]);
@@ -265,9 +279,9 @@ public class BHOperations
 			jump.actorType = BHCollection.EntityTypeEnum.ITEM;
 			jump.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 			
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
+			//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
+			//me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
+			//me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
 			
@@ -286,10 +300,12 @@ public class BHOperations
 		}		
 	}
 
+	
+	
 	/** Return false to mark the buff as disabled and subject to removal.
 	 * [basetimecode, direction, repeatflag, delay]
 	 *  */
-	public static boolean doBuffMove(BHEngine engine, BHBuff buff)
+	public static boolean processBuffMove(BHEngine engine, BHBuff buff)
 	{
 		if (buff.isCancelled || buff.actorID <= 0) 
 		{
@@ -340,26 +356,28 @@ public class BHOperations
 			jump.actorType = BHCollection.EntityTypeEnum.ITEM;
 			jump.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 			
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
-			me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
+			//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
+			//me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
+			//me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
-			System.out.println("buffMove: posted action " + jump + ", stopping");
+			//System.out.println("buffMove: posted action " + jump + ", stopping");
 			engine.postAction(jump, delay - 1);
 			return false;
 		}
 		else if (baseTimecode == 0 || baseDirection == 0) // not moving anywhere
 		{
-			System.out.println("buffMove: baseTimecod=" + baseTimecode + ", baseDirection=" + baseDirection + ", no movement - stopping buff");
+			//System.out.println("buffMove: baseTimecode=" + baseTimecode + ", baseDirection=" + baseDirection + ", no movement - stopping buff");
+			return false;
 		}
 		// if it's not land, skip and try again later
-		System.out.println("buffMove: try again next tick"); 
+		//System.out.println("buffMove: try again next tick"); 
 		return true;
 	}
 	
 	/** some actions are taken automatically on some conditions, without anybody posting them */
 	public static void processTriggers(BHEngine engine)
 	{
+		/*
 		// *) eat the gold here
 		for (BHCollection.Atom hero : (Iterable<BHCollection.Atom>)engine.getCollection().all().stream().filter(q -> q.getType() == "HERO")::iterator)
 		{
@@ -378,13 +396,14 @@ public class BHOperations
 			}
 			
 		}
+		*/
 	}
 	
 	public static boolean processBuff(BHEngine engine, BHBuff buff)
 	{
 		if (buff.actionType == BUFF_MOVE)
 		{
-			return doBuffMove(engine, buff);
+			return processBuffMove(engine, buff);
 		}
 		else
 		{

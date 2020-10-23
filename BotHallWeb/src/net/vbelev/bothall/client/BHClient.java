@@ -17,9 +17,10 @@ public class BHClient
 {
 	public static class Buff
 	{
-		public int id;
-		
+		public int id;		
 		public String type;
+		public int actorID;
+		public int actorType;
 		/** ticks are not guaranteed to be published every time it changes */
 		public int ticks;
 		public long timecode;
@@ -30,6 +31,8 @@ public class BHClient
 		{
 			to.addInt(id);
 			to.addMoniker(type);
+			to.addInt(actorID);
+			to.addInt(actorType);
 			to.addInt(ticks);
 			to.addLong(timecode);
 			to.addByte(isCancelled?1 : 0);
@@ -39,6 +42,8 @@ public class BHClient
 		{
 			id = (Integer)from.next().value;
 			type = (String)from.next().value;
+			actorID = (Integer)from.next().value;
+			actorType = (Integer)from.next().value;
 			ticks = (Integer)from.next().value;
 			timecode = (Long)from.next().value;
 			byte bc = (Byte)from.next().value;

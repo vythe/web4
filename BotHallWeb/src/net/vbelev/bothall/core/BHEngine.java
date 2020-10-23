@@ -44,8 +44,8 @@ public class BHEngine
 	private BHCollection items = null;
 	//private ConcurrentLinkedDeque<BHOperations.BHAction> actionQueue = new ConcurrentLinkedDeque<BHOperations.BHAction>();
 	//private ConcurrentLinkedDeque<BHOperations.BHAction> actionQueueNext = new ConcurrentLinkedDeque<BHOperations.BHAction>();
-	private DequeHelper.DequeHolder<BHOperations.BHAction> actionQueueHolder = new DequeHelper.DequeHolder<BHOperations.BHAction>(new ConcurrentLinkedDeque<BHOperations.BHAction>());
-	private DequeHelper.DequeHolder<BHOperations.BHAction> actionQueueHolderNext = new DequeHelper.DequeHolder<BHOperations.BHAction>(new ConcurrentLinkedDeque<BHOperations.BHAction>());
+	private QueueHelper.QueueHolder<BHOperations.BHAction> actionQueueHolder = new QueueHelper.QueueHolder<BHOperations.BHAction>(new ConcurrentLinkedQueue<BHOperations.BHAction>());
+	private QueueHelper.QueueHolder<BHOperations.BHAction> actionQueueHolderNext = new QueueHelper.QueueHolder<BHOperations.BHAction>(new ConcurrentLinkedQueue<BHOperations.BHAction>());
 	private PriorityBlockingQueue<BHOperations.BHTimer> timers = new PriorityBlockingQueue<BHOperations.BHTimer>();
 	/** Buffs should become immutable, but the list needs to be visible */
 	public List<BHOperations.BHBuff> buffs = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
@@ -60,6 +60,12 @@ public class BHEngine
 	public int cycleCount = 0;
 
 	public IClientCallback clientCallback = null;
+	
+	public BHEngine()
+	{
+		this.landscape = new BHLandscape();
+		this.items = new BHCollection();			
+	}
 	
 	/** Landscape property cannot be made final, because of re-publishing it,
 	 * but it should be protected from damage.
@@ -101,9 +107,7 @@ public class BHEngine
 	public static BHEngine loadFileEngine(String fileName)
 	{
 		BHEngine res = new BHEngine();
-		res.landscape = new BHLandscape();
-		res.items = new BHCollection();
-		
+
 		try
 		{
 		InputStream is = BHEngine.class.getResourceAsStream(fileName);
@@ -307,13 +311,13 @@ public class BHEngine
 	{
 		public final int instanceID = ++queueProcessorCounter;
 		
-		private DequeHelper.DequeHolder<BHOperations.BHAction> holder;
+		private QueueHelper.QueueHolder<BHOperations.BHAction> holder;
 		//private Iterator<BHAction> queue;
 		private IQueueProcessorDoneNotify notifyMethod;
 		//private BHEngine myEngine;
 		private boolean isRunning = false;
 
-		public QueueProcessor(DequeHelper.DequeHolder<BHOperations.BHAction> holder, IQueueProcessorDoneNotify onNotify)
+		public QueueProcessor(QueueHelper.QueueHolder<BHOperations.BHAction> holder, IQueueProcessorDoneNotify onNotify)
 		{
 			this.holder = holder;
 			this.notifyMethod = onNotify;
@@ -540,7 +544,7 @@ public class BHEngine
 			// we continue processing actionQueue to completion
 			///actionQueueNext = new ConcurrentLinkedDeque<BHOperations.BHAction>();
 			//DequeHelper.DequeHolder<BHOperations.BHAction> nextHolder
-			this.actionQueueHolderNext = new DequeHelper.DequeHolder<BHOperations.BHAction>(new ConcurrentLinkedDeque<BHOperations.BHAction>());
+			this.actionQueueHolderNext = new QueueHelper.QueueHolder<BHOperations.BHAction>(new ConcurrentLinkedQueue<BHOperations.BHAction>());
 			QueueProcessor actorNext = new QueueProcessor(this.actionQueueHolderNext, (boolean isDone) -> {
 				// what should we do if it's interrupted (isDone false)?
 				synchronized(cycleLock)
@@ -587,7 +591,7 @@ public class BHEngine
 	private Thread cycleThread = null;
 	public void startCycling()
 	{
-		if (cycleThread != null)
+		if (cycleThread != null && cycleThread.isAlive())
 		{
 			return;
 		}
@@ -608,9 +612,9 @@ public class BHEngine
 	public void postAction(BHOperations.BHAction action, int delay)
 	{
 		if (action == null) return;
+		/*
 		BHCollection.Atom actor = this.getCollection().getItem(action.actorID);
 		//System.out.println("postAction called for " + action + ", delay=" + delay + ", engine instance=" + this.engineInstance);
-		/*
 		System.out.println("postAction called for " + action.actionType + ", delay=" + delay + ", engine instance=" + this.engineInstance
 				 + ", actor=" + (actor != null? actor.toString() : ("Not found actorID " + action.actorID))
 				 + ", props[1]=" + action.intProps[1]
@@ -625,7 +629,7 @@ public class BHEngine
 		}		
 		else if (this.stage == BHEngine.CycleStageEnum.ROLLOVER || this.stage == BHEngine.CycleStageEnum.PUBLISH)
 		{
-			this.actionQueueHolderNext.deque().add(action);
+			this.actionQueueHolderNext.getQueue().add(action);
 			/* no processing the "next" queue?
 			synchronized (this.actionQueueHolderNext) 
 			{
@@ -635,7 +639,7 @@ public class BHEngine
 		}
 		else
 		{
-			this.actionQueueHolder.deque().add(action);
+			this.actionQueueHolder.getQueue().add(action);
 			synchronized(this.actionQueueHolder)
 			{
 				this.actionQueueHolder.notify();
@@ -654,4 +658,44 @@ public class BHEngine
 			
 		}
 	}
+	
+	public List<BHOperations.BHBuff> getBuffs(BHCollection.EntityTypeEnum entityType, int entityID, String actionType)
+	{
+		ArrayList<BHOperations.BHBuff> res = new ArrayList<BHOperations.BHBuff>();
+		synchronized (this.buffs)
+		{
+			for (BHOperations.BHBuff b : this.buffs)
+			{
+				if (b.actorType != entityType || b.actorID != entityID) continue;
+				if (actionType == null || actionType == b.actionType)
+					res.add(b);				
+			}
+		}
+		return res;
+	}
+	
+	/**
+	 * returns the first matching buff record or null, serving as a "has buff" check.
+	 * @param entityType
+	 * @param entityID
+	 * @param actionType
+	 * @return
+	 */
+	public BHOperations.BHBuff getBuff(BHCollection.EntityTypeEnum entityType, int entityID, String actionType)
+	{
+		BHOperations.BHBuff res = null;
+		synchronized (this.buffs)
+		{
+			for (BHOperations.BHBuff b : this.buffs)
+			{
+				if (b.actorType != entityType || b.actorID != entityID) continue;
+				if (actionType == null || actionType == b.actionType)
+				{
+					res = b;
+					break;
+				}
+			}
+		}
+		return res;
+	}	
 }

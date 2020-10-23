@@ -1,10 +1,10 @@
 package net.vbelev.utils;
 import java.util.*;
 
-public class DequeHelper
+public class QueueHelper
 {
 	/** Only static helper methods and classes here */
-	private DequeHelper() {}
+	private QueueHelper() {}
 
 	/**
 	 * A persistent iterator that skips over null elements and can continue from empty
@@ -15,14 +15,15 @@ public class DequeHelper
 	 */
 	public static class PersistentIterator<T> implements Iterator<T>
 	{
-		private Deque<T> queue;
+		private Queue<T> queue;
 		private T head = null;
-		public PersistentIterator(Deque<T> queue)
+		public PersistentIterator(Queue<T> queue)
 		{
 			this.queue = queue;
 		}
 		private void getHead()
 		{
+			// elements cannot be null in normal queues, but things happen
 			while (head == null && !queue.isEmpty())
 			{
 				head = queue.poll();
@@ -46,19 +47,19 @@ public class DequeHelper
 	}
 
 	
-	public static class DequeHolder<T>
+	public static class QueueHolder<T>
 	{
 		public boolean isOpen = true;
 		private final Iterator<T> iter;
-		private final Deque<T> deq;
+		private final Queue<T> qq;
 		
-		public DequeHolder(Deque<T> deq)
+		public QueueHolder(Queue<T> deq)
 		{
-			this.deq = deq;
+			this.qq = deq;
 			this.iter = new PersistentIterator<T>(deq);
 		}
 		
-		public Deque<T> deque() { return this.deq; }
+		public Queue<T> getQueue() { return this.qq; }
 		public Iterator<T> iterator() { return iter; }
 	}	
 }

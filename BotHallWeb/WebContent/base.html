@@ -22,6 +22,8 @@ var terrainTiles = {
 var spriteTiles = {
 		"HERO": "/BotHallWeb/img/sprites/sinnoh_2.png",
 		"GOLD": "/BotHallWeb/img/sprites/gold.png",
+		"PAC": "/BotHallWeb/img/sprites/pac.png",
+		"PORTAL": "/BotHallWeb/img/sprites/portal.png",
 		"MONSTER": "/BotHallWeb/img/sprites/sinnoh_3.png"
 };
 
@@ -47,7 +49,7 @@ button.movebutton {
 <image id="templateTile" x="0" y="0" height="30" width="30" xlink:href="#"/>
 </svg>
 
-<svg id="mainSVG" width="700" height="700"></svg>
+<svg id="mainSVG" style="width: 700px; height: 700px;"></svg>
 </div>
 <div style="width: 30%; display: inline-block; vertical-align: top;">
 <!-- 
@@ -98,8 +100,12 @@ Key pressed: <span id="keyPressSpan"></span><br/>
 <div id="meData"></div>
 </fieldset>-->
 <button id="btnDie">Die</button><br/>
+<button id="btnPacman">Pacman</button><br/>
 <hr/>
-<div id="meMessages" style="height: 100px; overflow: auto; white-space: nowrap; border: 1px;">
+<div id="meMessages" style="height: 100px; width: 40%; display: inline-block; overflow: auto; white-space: nowrap; border: 1px;"></div>
+<div id="meBuffs" style="width: 40%; display: inline-block;">
+<ul id="meBuffsList">
+</ul>
 </div>
 </div>
 <script type="text/javascript">
@@ -114,7 +120,10 @@ mybh.logger = function(message, messageLevel){ // the logger function, it will b
 	}
 };
 
-mybh.subscribe("update",  function(obj, elementType, elementData) {
+mybh.subscribe("update",  onBHUpdate);
+
+
+function onBHUpdate(obj, elementType, elementData) {
 	//console.log("subscribed update called, elementType=" + elementType);
 	if (elementType == "STATUS") {
 		//addMessage("BH: update status: " + JSON.stringify(elementData));
@@ -141,8 +150,23 @@ mybh.subscribe("update",  function(obj, elementType, elementData) {
 	}
 	else if (elementType == "MESSAGE") {
 		addMessage(elementData);
-	}
-});
+	} 
+	else if (elementType == "BUFF") {
+		//addMessage(elementData);
+		console.log("BUFF: " + JSON.stringify(elementData));
+		var buffElem = $("#meBuffsList li#buff_" + elementData.id);
+		if (elementData.isCancelled) {
+			buffElem.remove();
+		} else {
+			if (buffElem.length == 0) {
+				buffElem = $("<li/>");
+				buffElem.attr("id", "buff_" + elementData.id);
+				$("#meBuffsList").append(buffElem);
+			}
+			buffElem.text(elementData.actorID + ": " + elementData.ticks + " " + elementData.type);
+		}
+	} 
+}
 
 /* The second subscription is for the hero control */
 //mybh.subscribe("status",  cowMonster());
@@ -378,6 +402,17 @@ function handleJoinSession() {
 		
 	});
 	
+	$("#btnPacman").click(function(evt) {
+		evt.preventDefault();
+		console.log("btnPacman clicked");
+		
+		getJSON(mybh, "pacmanit", {id: $("#controlledID").text()}, function(res) {
+			//alert("my apiUrl is " + this.url + ", join res=" + res);
+			console.log("pacmanit returns buff id=" + res, "INFO");
+		}.bind(this));
+		
+	});
+	
 	$(document).on("keydown", function (evt) {
 		$("#keyPressSpan").text("keydown: " + evt.keyCode);
 		if (evt.keyCode == 39 || evt.keyCode == 68 || evt.keyCode == 102) { // right (68 = d)
@@ -480,7 +515,7 @@ function addMessage(msg) {
 	if (typeof(msg) == "string") {
 		line = msg;
 	} else {
-		line = msg.target + ":" + msg.targetID + ": " + msg.message;
+		line = (msg.target || "") + ":" + msg.targetID + ": " + msg.message;
 	}
 	var pLine = $("<p/>");
 	pLine.text(line);
