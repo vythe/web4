@@ -100,6 +100,17 @@ public class BHLandscape
 			res.m_z = z; //this.m_z;
 			return res;
 		}
+		
+		public String toString()
+		{
+			return print(this);
+		}
+		
+		public static String print(Coords c) 
+		{
+			if (c == null) return "[]";
+			return "[" + c.getX() + ", " + c.getY() + ", "+ c.getZ() + "]";
+		}
 	}
 	
 	public static Coords coordsPoint(int x, int y, int z)

@@ -56,16 +56,40 @@
 
 function BHClient(url) {
 	return {
+		// == config, status ==
 		url: url,
 		loopMilliseconds: 100,
-		ping: 0, //
-		loopLoad: 0, // the loop load in %
-		loopTimecode: 0, // count the loops
 		runLoop: false,
 		
+		// == statistics and misc ==
+		info: {
+			ping: 0, // server ping, tested in getUpdate()
+			serverLoopMsec: 0, // server loop time, msec
+			loopLoad: 0, // the loop load in %
+			loopTimecode: 0, // count the loops
+		},
+		
+		// == session props ==
+		sessionID: null,
+		sessionKey: null,
+		clientKey: null, 
+		controlledMobileID: null, 
+
+		cells: {},
+		items: {},
+		mobiles: {},
+		buffs: {},
+		
+		
+		// == utility, events ==
 		logger: function(message, messageLevel){ // the logger function, it will be called as logger(message, messageLevel);
 			console.log("bhclient " + messageLevel + ": " + message);
 		},
+		
+		log: function(message, messageLevel) {
+			if (typeof(this.logger) == "function") this.logger(message, messageLevel);
+		},
+		
 		
 		onUpdate: function(elementType, elementData) {
 			//if (elementType == "STATUS") {
@@ -77,13 +101,7 @@ function BHClient(url) {
 				this.trigger("status", elementData);
 			}
 		},
-		
-		sessionID: null,
-		cells: {},
-		items: {},
-		mobiles: {},
-		buffs: {},
-		
+				
 		events: {}, // events are stored as "eventname": [], 
 		// the array elements are functions (or objects with invoke() methods)  
 		subscribe: function(eventName, invoke) {
@@ -142,16 +160,14 @@ function BHClient(url) {
 			}
 		},
 		
+		// == session mechanics ==
 		cellShifts: bhclient_cellShifts,
 		
 		getCell: function (x, y) { return getCell(this, x, y); },
 		getClosest: function(x, y)  { return getClosest(this, x, y); },
 		getMobiles: function (x, y) { return getMobiles(this, x, y); },
 		
-		log: function(message, messageLevel) {
-			if (typeof(this.logger) == "function") this.logger(message, messageLevel);
-		},
-		
+		// start/stop client polling
 		cycle: function(flag) {
 			if (flag && this.runLoop) {
 				return;
@@ -167,31 +183,102 @@ function BHClient(url) {
 			}
 		},
 		
+		// == start/stop server looping, if you own the session 
 		bhcycle: function(flag) {
-			getJSON(this, "cycleMode", {run : flag? (flag == "O" ? "O" : "Y") : "N"}, function(res) {
-				//alert("my apiUrl is " + this.url + ", join res=" + res);
-				this.log("cycleMode returns timecode=" + res, "INFO");
-			}.bind(this));
+			if (this.sessionID && this.sessionKey) {
+				getJSON(this, "cycle", {
+					id: this.sessionID,
+					key: this.sessionKey,
+					run : flag? (flag == "O" ? "O" : "Y") : "N"
+				}, function(res) {
+					//alert("my apiUrl is " + this.url + ", join res=" + res);
+					this.log("cycleMode returns timecode=" + res, "INFO");
+				}.bind(this));
+			} else {
+				this.log("No session owned");
+			}
 		},
 		
-		joinSession: function(sid, callback) {
+		joinSession: function(sid, atomID, callback) {
 			//joinSession(this, sid);
-			getJSON(this, "joinSession", {id : sid}, function(res) {
+			getJSON(this, "joinSession", {
+				id : sid,
+				atom: atomID
+			}, function(res) {
 				//alert("my apiUrl is " + this.url + ", join res=" + res);
-				this.sessionID = res;
+				this.clientKey = res;
 				this.trigger("joinSession");
 				if (typeof(callback) == "function") {
-					callback();
+					callback(res);
 				}
 			}.bind(this));
 		},
 		
+		leaveSession: function(callback) {
+			//joinSession(this, sid);
+			getJSON(this, "leaveSession", {
+				id : this.sessionID,
+				key: this.clientKey
+			}, function(res) {
+				//alert("my apiUrl is " + this.url + ", join res=" + res);
+				this.clientKey = "";
+				this.trigger("leaveSession");
+				if (typeof(callback) == "function") {
+					callback(res);
+				}
+			}.bind(this));
+		},
+		
+		getViewbagValue: function(bag, name, callback) {
+			getJSON(this, "getval", {
+				bag : bag,
+				name: name
+			}, function(res) {
+				if (typeof(callback) == "function") {
+					callback(res);
+				}
+			}.bind(this));
+		},
+		
+		setViewbagValue: function(bag, name, value, callback) {
+			getJSON(this, "putval", {
+				bag : bag,
+				name: name,
+				value: value
+			}, function(res) {
+				if (typeof(callback) == "function") {
+					callback(res);
+				}
+			}.bind(this));
+		},
+		
+		action: function(action, args, callback) {
+			if (!args) {
+				args = [];
+			}
+			else if (args && typeof(args) != "object") {
+				args = [args];
+			}
+				
+			getJSON(this, "action", {
+				id : this.sessionID,
+				key: this.clientKey,
+				action: action,
+				args: args
+			}, function(res) {
+				if (typeof(callback) == "function") {
+					callback(res);
+				}
+			}.bind(this));
+		},
+		/*
 		joinMobile: function(name) {
 			getJSON(this, "joinMobile", {name: name}, function(res) {
 				//alert("my apiUrl is " + this.url + ", join res=" + res);
 				//this.sessionID = res;
 			}.bind(this));
 		}
+		*/
 		/*
 		, reportUrl: function() {
 			return this.url;
@@ -241,24 +328,47 @@ function mainLoop(bhclient) {
 	});
 }
 
+
+/**
+ * Takes a promise from fetch and returns a promise with json.
+ * Similar to the standard fetch/response.json() but handles empty response correctly
+ * @param response
+ * @returns
+ */
+function fetchJson(response) {
+	return response
+	.text()
+	.then(function(respText) {
+		//console.log("fetchJson text: ");
+		//console.dir(respText);
+		var retObj;
+		if (!respText) 
+			retObj = "";
+		else 
+			retObj = JSON.parse(respText);
+		return new Promise((resolve, reject) => { resolve(retObj); });
+	});
+}
+
 function getJSON(bhclient, action, args, callback) {
 	var url = bhclient.url + action;
-	console.log("getJSON called for action=" + action + ", args=" + JSON.stringify(args));
+	//console.log("getJSON called for action=" + action + ", args=" + JSON.stringify(args));
 	if (args)
 	{
 		var oUrl = new URL(url);
 		for (var k in args) {
 			oUrl.searchParams.append(k, args[k] || "");
 		}
-		console.dir(oUrl);
+		//console.dir(oUrl);
 		url = oUrl.href;				
 	}
 	bhclient.log("getJSON: " + url, "INFO");
 	
 	fetch(url
 	).then(function(response) {
-		if (response) return response.json();
-		else {
+		if (response) { 
+			return fetchJson(response);
+		} else {
 			bhclient.log(action + " failed", "ERROR");
 			callback(null);
 		}
@@ -281,7 +391,10 @@ function getUpdate(bhclient, callback)
 	bhclient.log("url: " + bhclient.url + "getUpdate", "INFO");
 	//var url = new URL(bhclient.url + "getUpdate");
 	//url.searchParams.append("sessionID", bhclient.sessionID);
-	var url = bhclient.url + "getUpdate";
+	var url = buildQuery(bhclient.url + "getUpdate", {
+		id: bhclient.sessionID,
+		pwd: bhclient.clientKey
+	});
 	var pingTS = new Date().getTime();
 	fetch(url
 	).then(function(response) {
@@ -350,6 +463,10 @@ function getUpdate(bhclient, callback)
 			bhclient.onUpdate("BUFF", buff);
 		}
 		
+		if (resp.status) {
+			bhclient.serverLoopMsec = resp.status.cycleMsec || 0;
+			bhclient.controlledMobileID = resp.status.controlledMobileID || null;
+		}
 		bhclient.onUpdate("STATUS", resp.status || {});	
 		bhclient.log("getUpdate complete", "INFO");
 		if (typeof(callback) == "function") {
@@ -464,4 +581,62 @@ function formatDateTime(dt) {
     ("0" + m.getSeconds()).slice(-2)
     ;
     return dateString;
+}
+
+
+function buildQuery(url, args) {
+	if (!args) return url;
+	if (typeof(args) != "object") return url + "?" + args;
+	var isFirst = true;
+	var res = url;
+	for (var k in args) {
+		res += isFirst? "?" : "&";
+		isFirst = false;
+		res += encodeURIComponent(k) + "=" + encodeURIComponent(args[k]);
+	}
+	return res;
+}
+
+function setCookie(name, value) {
+	document.cookie = name + "="+ value + ";";
+}
+function getCookie(name) {
+    var b = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return b ? b.pop() : '';
+}
+
+function bagSummary(bhclient, bag) {
+	if (!bag) {
+		bag = getCookie("viewbag");
+	}
+	if (!bag) {
+		console.log("No bag token");
+	} else {
+		fetch(bhclient.url + "bagsummary?bag=" + bag
+		).then(function(response) {
+			if (response) {
+				var fetchVal =  fetchJson(response);
+				//console.log("bagsummary then fetchVal: ");
+				//console.dir(fetchVal);
+				return fetchVal;
+			}
+			else {
+				bhclient.log("viewbag failed", "ERROR");
+			}
+		}).then(function (resp) {
+			console.log("viewbag " + bag);
+			console.dir(resp);
+			
+		}).catch(function(error) {
+		    bhclient.log("getJSON failed for viewbag: " + error, "ERROR");
+		    callback(null);
+		});
+	}
+}
+
+function getQueryParam(name, searchString) {
+	var match = (new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(searchString || location.search)
+	   if(match)
+	      return decodeURIComponent(match[1]);
+	return null;
 }

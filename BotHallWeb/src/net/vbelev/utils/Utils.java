@@ -170,6 +170,7 @@ public class Utils
 	    }
 	    return out.toString();
 	}
+	
 	public static String encodeHTMLAttr(String src)
 	{
 		if (src == null || src.length() == 0) return "";
@@ -199,6 +200,26 @@ public class Utils
 	    return out.toString();
 	}
 	
+	public static String encodeJSON(String src)
+	{
+		if (src == null || src.length() == 0) return "\"\"";
+		StringBuilder out = new StringBuilder();
+		char[] chars = src.toCharArray();
+		out.append("\"");
+	    for (int i = 0; i < chars.length; i++) {
+	        char c = chars[i];
+	        switch (c)
+	        {
+	        	case '\"': out.append("\\\""); break;
+	        	case '\n': out.append("\\n"); break;
+	        	default: out.append(c); break;
+	        }	       
+	    }
+	    out.append("\"");
+	    
+	    return out.toString();
+	}
+	
 	public static String formatDate(Date d)
 	{
 		if (d == null) return "";
@@ -209,6 +230,15 @@ public class Utils
 	{
 		if (d == null) return "";
 		return String.format("%td/%tm/%tY %tH:%tM:%tS", d, d, d, d, d, d);		
+	}
+	
+	private final static char[] randomStringLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();	
+	public static String randomString(int length)
+	{
+		char[] res = new char[length];
+		for (int i = 0; i < length; i++) 
+			res[i] = randomStringLetters[random.nextInt(randomStringLetters.length)];
+		return new String(res);
 	}
 	
 	public static <T extends Comparable<T>>T Max(Enumeration<T> vals)

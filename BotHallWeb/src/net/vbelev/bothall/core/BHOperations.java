@@ -114,7 +114,7 @@ public class BHOperations
 		}
 		else if (action.actionType == ACTION_JUMP)
 		{
-			processActionJump(engine, me, action);
+			actionJump(engine, me, action);
 		}
 		else if (action.actionType == ACTION_STOPCYCLING)
 		{
@@ -122,7 +122,7 @@ public class BHOperations
 		}
 	}
 	
-	public static void doStop(BHEngine engine, BHCollection.Atom me)
+	public static void doStop(BHEngine engine, BHCollection.Atom me, boolean hardStop)
 	{
 		//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, 0);
 		//me.setIntProp(BHCollection.Atom.INT_PROPS.DY, 0);
@@ -130,6 +130,10 @@ public class BHOperations
 		//me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + 1);
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, 0);
+		if (hardStop)
+		{
+			me.setCoords(me);
+		}
 	}
 	
 	/** 
@@ -143,6 +147,8 @@ public class BHOperations
 		int repeatFlag = action.intProps[2];
 		int delay = action.intProps[3];
 		int baseTimecode = me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC);
+		int baseDirection = me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
+		
 		//if (actionTimecode > 0 && baseTimecode > 0 && actionTimecode != baseTimecode)
 		//{
 		//	return; // quietly ignore it end return
@@ -150,25 +156,25 @@ public class BHOperations
 		
 		if (direction == 0) // the special case of "move nowhere", it means stop
 		{
-			doStop(engine, me);
+			doStop(engine, me, false);
 			return;
 		}
 		
-		if (me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == direction) // we are already moving there 
+		if (baseDirection == direction) // we are already moving there 
 		{
 			return; 
 		}
 			
 		int[] shift = BHLandscape.cellShifts[direction];
-		
-			
 		BHLandscape.Cell targetCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
+		
 		//System.out.println("doMove: id=" + me.getID() + ", dir=" + direction + ", targetCell=" + targetCell);
 		if (targetCell.getTerrain() != BHLandscape.TerrainEnum.LAND) 
 		{
-			if (baseTimecode == 0) // we are not moving, so there is no point starting a buff 
+			if (baseDirection == 0) // we are not moving, so there is no point starting a buff 
 			{
 				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM!");
+				doStop(engine, me, false);
 				System.out.println("BOMM");
 			}
 			else
@@ -193,16 +199,17 @@ public class BHOperations
 		//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
 		//me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
 		//me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
+		me.setCoords(me);
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
 		
 		engine.postAction(jump, delay - 1); // 1 tick is already spent on doMove
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "I am moving to " + targetCell + " (" + direction + ")");
-		System.out.println("Posted jump action for id=" + jump.actorID + ", dir=" + direction + ", delay=" + delay + ", timecode=" + engine.timecode);
+		System.out.println("Posted jump action-1 for id=" + jump.actorID + ", dir=" + direction + ", delay=" + delay + ", timecode=" + engine.timecode);
 		
 	}
 
-	public static void processActionJump(BHEngine engine, BHCollection.Atom me, BHAction action)
+	public static void actionJump(BHEngine engine, BHCollection.Atom me, BHAction action)
 	{
 		//[basetimecode, direction, repeatflag, delay]
 		int actionTimecode = action.intProps[0];
@@ -226,37 +233,36 @@ public class BHOperations
 		if (targetCell.getTerrain() != BHLandscape.TerrainEnum.LAND) 
 		{
 			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM-M!");
-			doStop(engine, me);
+			doStop(engine, me, false);
 			//System.out.println("Hit the wall, escape, target=" + targetCell);
 			return;
 		}
+		/*
 		// don't let monsters move into each other
 		if (me.getGrade() == BHCollection.Atom.GRADE.MONSTER)
 		{
-		for (BHCollection.Atom a : engine.getCollection().atCoords(newPos, false))
-		{
-			if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER) // don't move into another monster... hero is okay
+			for (BHCollection.Atom a : engine.getCollection().atCoords(newPos, false))
 			{
-				doStop(engine, me);
-				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM-M-M!");
-				System.out.println("Hit a monster, escaping, target=" + targetCell);
-				return;
-				
+				if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER) // don't move into another monster... hero is okay
+				{
+					doStop(engine, me);
+					engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "BOMM-M-M!");
+					System.out.println("Hit a monster, escaping, target=" + targetCell);
+					return;
+					
+				}
 			}
 		}
-		}
-		me.setCoords(newPos);
-		/*
-		me.setX(me.getX() + shift[0]);
-		me.setY(me.getY() + shift[1]);
-		me.setZ(me.getZ() + shift[2]);
 		*/
+		//System.out.println("actionJump, id=" + me.getID() + ", dir=" + direction + ", new pos=" + newPos.toString());
+		me.setCoords(newPos);
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "I moved to " + direction);
 		
 		boolean shallRepeat = false;
 		if (repeatFlag > 0)
 		{
-			BHLandscape.Cell nextCell = engine.getLandscape().closestCells(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2])[direction];
+			//BHLandscape.Cell nextCell = engine.getLandscape().closestCells(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2])[direction];
+			BHLandscape.Cell nextCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2], direction);
 			if (nextCell.getTerrain() == BHLandscape.TerrainEnum.LAND)
 			{
 				shallRepeat = true;
@@ -285,11 +291,12 @@ public class BHOperations
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
 			
+			//System.out.println("actionJump shall repeat to dir=" + direction + ", delay=" + delay);
 			engine.postAction(jump, delay);
 		}
 		else
 		{
-			doStop(engine, me);
+			doStop(engine, me, false);
 			/*
 			me.setIntProp(BHCollection.Atom.INT_PROPS.DX, 0);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.DY, 0);
@@ -346,7 +353,7 @@ public class BHOperations
 		int[] shift = BHLandscape.cellShifts[direction];		
 		BHLandscape.Cell targetCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2]);
 		
-		System.out.println("buffMove: testing cell " + targetCell);
+		//System.out.println("buffMove: testing cell " + targetCell);
 		// if it's land, lodge a jump and stop the buff
 		if (targetCell.getTerrain() == BHLandscape.TerrainEnum.LAND) 
 		{
@@ -359,7 +366,9 @@ public class BHOperations
 			//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
 			//me.setIntProp(BHCollection.Atom.INT_PROPS.DY, delay * shift[1]);
 			//me.setIntProp(BHCollection.Atom.INT_PROPS.DZ, delay * shift[2]);
+			me.setCoords(me);
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
+			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
 			//System.out.println("buffMove: posted action " + jump + ", stopping");
 			engine.postAction(jump, delay - 1);
 			return false;

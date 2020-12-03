@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+	<script src="js/jquery-3.5.1.js"></script>
+	<script src="js/bhclient.js"></script>
+	
+	<script type="text/javascript">
+	var apiURL = "/BotHallWeb/api/";
+	var viewbagKey = getQueryParam("bag");
+	var fullApiURL = new URL(apiURL, window.location.href);
+	
+	var mybh = BHClient(fullApiURL.href);
+	console.log("client API url=" + fullApiURL.href);
+	</script>
+</head>
+<body>
+<div style="width: 60%; display: inline-block;">
+<h3>Sessions</h3>
+<table id="sessionList">
+<tr id="session_template" style="display: none;">
+	<td class="session_desc" colspan="1"></td>
+	<td class="session_status"></td>
+	<td class="session_date"></td>
+	<td class="client_desc">View-only</td>
+	<td><input type="radio" name="session_join" class="session_join" value="" bh_session_id="" bh_atom_id=""/></td>
+<tr>
+<tr id="atom_template" style="display: none;">
+	<td class="session_desc" colspan="3"></td>
+	<td class="atom_desc"></td>
+	<td><input type="radio" name="session_join" class="session_join" value="" bh_session_id="" bh_atom_id="" bh_client_key=""/>
+		<span class="client_desc"></span>
+	</td>
+</table>
+<button id="btnJoin">Join</button><br/>
+<a href="field.html">To Field</a>
+</div>
+<div style="width: 30%; display: inline-block;">
+<button id="btnRefresh">Refresh</button><br/>
+<button id="btnCreate">Create Session</button><br/>
+</div>
+<script type="text/javascript">
+$(document).ready(function() {
+	refreshList();
+	/*
+	viewbagKey = getCookie("viewbag");
+	getViewbagValue("", function(key) {
+		viewbagKey = key[0];
+		setCookie("viewbag", key[0]);
+	});
+	*/
+	if (!viewbagKey) {
+		mybh.getViewbagValue("", "", function(key) {
+			window.location.href="?bag=" + key;
+		});
+		return;
+	}
+	
+	$("#btnRefresh").click(function() {
+		refreshList();
+	});
+	
+	$("#btnCreate").click(function() {
+		createSession();
+	});
+	
+	$("#btnJoin").click(function() {
+		var sel = $("input[name=session_join]:checked");
+		if (sel.length == 0 || !sel.attr("session_id")) {
+			console.log("Join without a selected session");
+			return;
+		}
+		joinSession(sel.attr("session_id"), sel.attr("atom_id"));
+	});
+});
+/*
+item.sessionID = s.getID();
+			item.status = s.getEngine().isRunning? "Running" : "Idle";
+			item.createdDate = Utils.formatDateTime(s.createdDate);
+			item.description = "Session #" + s.getID();
+*/
+
+function refreshList() {
+	fetch(apiURL + "list",
+	).then(function(response) {
+		if (response) return response.json();
+		else {
+			alert("list failed");
+			return false;
+		}
+	}).then(function (resp) {
+		//bhclient.log(action + " complete", "INFO");
+		//callback(resp);
+		//alert("got list: " + JSON.stringify(resp));
+		var sessionTable = $("#sessionList");
+		sessionTable.find("tr:visible").remove();
+		
+		for (var k in resp) {
+			var item = resp[k];
+			var row = sessionTable.find("#session_template").clone();
+			row.attr("id", "session_" + item.sessionID);
+			row.find("td.session_desc").text(item.description);
+			row.find("td.session_status").text(item.status);
+			row.find("td.session_date").text(item.createdDate);
+			row.find("input.session_join").attr("session_id", item.sessionID);
+			row.find("input.session_join").attr("atom_id", "");
+			sessionTable.append(row);
+			row.show();
+			
+			for (var c in item.clients) {
+				/*
+				ci.atomID = a.getID();
+					ci.atomType = a.getType();
+					ci.controlledBy = null;
+					*/
+				var citem = item.clients[c];
+				var crow = sessionTable.find("#atom_template").clone();
+				crow.attr("id", "client_" + item.sessionID + "_" + citem.atomID);
+				crow.find(".atom_desc").text(citem.atomType + " #" + citem.atomID);
+				crow.find(".client_desc").text(citem.controlledBy || "(Available)");
+				
+				var sessionInput = crow.find("input.session_join");
+				sessionInput.attr("session_id", item.sessionID);
+				sessionInput.attr("atom_id",citem.atomID);
+				if (citem.controlledBy) {
+					sessionInput.prop("disabled", true);
+					sessionInput.prop("selected", false);
+				}
+				
+				sessionTable.append(crow);
+				crow.show();
+			}
+		}
+		updateClientKeys();
+	}).catch(function(error) {
+	    alert("list failed with error " + error);
+	});
+}
+
+function updateClientKeys() {
+	var sessionTable = $("#sessionList");
+	var atomList = [];
+	var atomMap = {};
+	
+	
+	sessionTable.find("input.session_join").each(function() {
+		var inp = $(this);
+		if (inp.attr("session_id") && inp.attr("atom_id")) {
+			var bagKey = "clientkey_" + inp.attr("session_id") + "_" + inp.attr("atom_id");
+			atomList.push(bagKey);
+			atomMap[bagKey] = atomList.length - 1;
+		}
+	});
+	
+	if (atomList.length > 0) {
+		mybh.getViewbagValue(viewbagKey, atomList.join(","), function(res) {
+			sessionTable.find("input.session_join").each(function() {
+				var inp = $(this);
+				
+				if (inp.attr("session_id") && inp.attr("atom_id")) {
+					var bagKey = "clientkey_" + inp.attr("session_id") + "_" + inp.attr("atom_id");
+					var key =  res[atomMap[bagKey]];
+					inp.attr("bh_client_key", key); 
+					console.log("for inp=" + bagKey + " set key=" + key);
+				}
+			});
+		});
+	}
+	
+}
+
+/*
+function getViewbagValue(name, callback) {
+	fetch(buildQuery(apiURL + "getval", {
+		bag: viewbagKey,
+		name: name
+	})).then(function(response) {
+		if (response) return response.json();
+		else {
+			alert("getval failed");
+			return false;
+		}
+	}).then(function(resp) {
+		callback(resp);
+	}).catch(function(error) {
+	    alert("getViewbagValue failed with error " + error);
+	});
+}
+
+function setViewbagValue(name, value, callback) {
+	fetch(buildQuery(apiURL + "putval", {
+		bag: viewbagKey,
+		name: name,
+		value: value
+	})).then(function(response) {
+		//console.log("setviewbag response");
+		//console.dir(response);
+	
+		var retObj = "";
+		if (response) {
+			//return response.text().length == 0? "" : response.json();
+			return fetchJson(response);
+		}
+		else {
+			alert("putval failed");
+			return false;
+		}
+
+	}).then(function(resp) {
+		if (typeof (callback) == "function") { 
+			callback(resp);
+		}
+	}).catch(function(error) {
+	    alert("setViewbagValue failed with error " + error);
+	});
+}
+*/
+
+function createSession() {
+	fetch(apiURL + "create", 
+	).then(function(response) {
+		if (response) return fetchJson(response);
+		else {
+			alert("create failed");
+			return false;
+		}
+	}).then(function(resp) {
+		alert("create succesful: " + JSON.stringify(resp));
+		mybh.setViewbagValue(viewbagKey, "sessionkey_" + resp.sessionID, resp.sessionKey, function(oldKey) {
+			refreshList();
+		});
+	}).catch(function(error) {
+	    alert("create failed with error " + error);
+	});
+}
+
+function joinSession(sessionId, atomId) {
+	fetch(buildQuery(apiURL + "join", {
+		id: sessionId,
+		atom: atomId
+	})).then(function(response) {
+		if (response) return fetchJson(response);
+		else {
+			alert("joinSession failed");
+			return false;
+		}
+	}).then(function(resp) {
+		/*
+		setViewbagValue("sessionid", sessionId, function (oldKey) {
+			setViewbagValue("atomid", atomId, function(oldKey) {
+				setViewbagValue("clientkey", resp, function(oldKey) {
+					refreshList();
+					//alert("joined!");
+				});
+			});
+		});
+		*/
+		mybh.setViewbagValue(viewbagKey, "clientkey_" + sessionId + "_" + atomId, resp, function(oldKey) {
+		refreshList();
+		//alert("joined!");
+	});
+	}).catch(function(error) {
+	    alert("create failed with error " + error);
+	});
+}
+
+</script>
+</body>
+</html>

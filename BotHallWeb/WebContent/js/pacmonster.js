@@ -2,6 +2,10 @@
  * Put the monster logic here: some client data and the onUpdate handler.
  * The bhclient will need an event provider, and it will probably be called onTick
  */
+/*
+ * function moveIt() {}
+ * this script will rely on the moveIt() function from the main page body
+ */
 
 
 var pacmanValidDirs = [1,2,3,6];
@@ -219,22 +223,3 @@ function houndMonsterMove(mybh, statusData) {
 	}
 }
 
-function moveIt(dir, id) {
-	/*
-	$.ajax({
-		method: "GET",
-		url: apiURL + "moveit",
-		data: {direction: dir},
-		dataType: "text"
-	}).done(function(data, textStatus, jqXHR) {
-		//alert("moveit: " + data);
-		console.log("moveit: " + data + " at " + new Date());
-	}).fail(function(jqXHR, textStatus, errorThrown ) {
-		alert("error: " + JSON.stringify(errorThrown));
-	}).always(function() {
-	});
-	*/
-	getJSON(mybh, "moveit", {direction: dir, id: id || ""}, function() {
-		console.log("posted moveit, dir=" + dir + ", id=" + id);
-	});
-}

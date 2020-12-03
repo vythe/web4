@@ -63,14 +63,16 @@ public class PacmanSession
 
 	public static final int PACMAN_DURATION = 1000;
 	
+	public static final Object lock = new Object();
 	private static int sessionInstanceSeq = 0;
 	private static final ArrayList<PacmanSession> sessionList = new ArrayList<PacmanSession>();
 	
 	private int sessionID = 0;
+	private String sessionKey = "";
 	private BHEngine engine;
 
 	public int engineTimecode = 0;
-
+	public final Date createdDate = new Date();
 	public final BHStorage storage = new BHStorage();
 	
 	public final Map<Integer, BHLandscape.Coords> startingPoints = new java.util.Hashtable<Integer, BHLandscape.Coords>();
@@ -78,7 +80,7 @@ public class PacmanSession
 	public static PacmanSession createSession()
 	{
 		BHEngine e = PacmanSession.loadFile("/../data/pacman.txt");
-		e.CYCLE_MSEC = 200;
+		e.CYCLE_MSEC = 150;
 		PacmanSession s =  PacmanSession.createSession(e);
 		
 		return s;
@@ -92,8 +94,9 @@ public class PacmanSession
 		e.clientCallback = s.new EngineCallback();
 		
 		s.sessionID = ++sessionInstanceSeq;
-		synchronized(sessionList)
+		synchronized(lock)
 		{
+			s.sessionKey = PacmanSession.generatePassword(8);
 			sessionList.add(s);
 		}
 		e.publish();
@@ -111,7 +114,7 @@ public class PacmanSession
 
 	public static PacmanSession getSession(int id)
 	{
-		synchronized(sessionList)
+		synchronized(lock)
 		{
 			for (PacmanSession s : sessionList)
 			{
@@ -121,8 +124,54 @@ public class PacmanSession
 		return null;
 	}	
 	
+	public static PacmanSession getSession(String key)
+	{
+		synchronized(lock)
+		{
+			for (PacmanSession s : sessionList)
+			{
+				if (key.equals(s.sessionKey)) return s;
+			}
+		}
+		return null;
+		
+	}
+	
+	public static String generatePassword(int length) 
+	{
+		int cnt = 0;
+		if (length <= 0) return "";
+		
+		do
+		{
+			String res = Utils.randomString(length);			
+			PacmanSession s = getSession(res);
+			if (s == null)
+			{
+				return res;
+			}
+		} while (cnt < 10);
+		throw new Error("Failed to create a unique password of length " + length);
+	}
+	
+	public static List<PacmanSession> sessionList()
+	{
+		ArrayList<PacmanSession> res = new ArrayList<PacmanSession>();
+		
+		synchronized(sessionList)
+		{
+			res.addAll(sessionList);
+			//for (PacmanSession s : sessionList)
+			//{
+			//	res.add(s);
+			//}
+		}
+		return res;
+	}
+	
 	public int getID() { return sessionID; }
 	
+	public String getSessionKey() { return sessionKey; }
 	public BHEngine getEngine() { return engine; }
 
 	private static BHCollection.Atom addAtom(BHCollection coll, String type, int grade)
@@ -264,12 +313,12 @@ public class PacmanSession
 		public void processAction(BHAction action)
 		{
 			BHCollection.Atom me = engine.getCollection().getItem(action.actorID);
-			if (me == null || me.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE)
-			{
-				return; //"No atom id" + session.myID;
-			}
 			if (action.actionType == PacmanSession.ACTION_DIE)
 			{
+				if (me == null || me.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE)
+				{
+					return; //"No atom id" + session.myID;
+				}
 				PacmanSession.this.actionDie(action.actorID);
 			}
 			else
@@ -390,6 +439,9 @@ public class PacmanSession
 							else
 							{
 								actionDie(it.getID());
+								BHLandscape.Coords c = startingPoints.get(a.getID());
+								a.setCoords(c);
+								engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  a.getID(), "M-M-M-CHOMP!");
 							}
 						}
 						else if (it.getGrade() == BHCollection.Atom.GRADE.MONSTER
@@ -399,7 +451,7 @@ public class PacmanSession
 								)
 						{
 							engine.getMessages().addMessage(BHCollection.EntityTypeEnum.GLOBAL,  0, "Jam! id1=" + a.getID() + ", id2=" + it.getID());
-							BHOperations.doStop(engine, it);
+							BHOperations.doStop(engine, it, true);
 						}
 					}
 				}
@@ -440,7 +492,7 @@ public class PacmanSession
 				{
 					if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER 
 						&& (a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == 0
-								|| a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == BHLandscape.cellShifts[direction][3]
+						|| a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == BHLandscape.cellShifts[direction][3]
 						)
 					)
 					{
@@ -452,11 +504,16 @@ public class PacmanSession
 			if (canMove)
 			{
 				BHOperations.BHAction action = new BHOperations.BHAction();
-				action.actionType = BHOperations.ACTION_MOVE;
 				action.actorID = me.getID();
 				action.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
 				
-				s.engine.postAction(action, 0);
+				//action.actionType = BHOperations.ACTION_MOVE;
+				//s.engine.postAction(action, 0);
+				me.setCoords(me);
+				me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
+				me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
+				action.actionType = BHOperations.ACTION_JUMP;
+				s.engine.postAction(action, BHOperations.MOVE_SPEED);
 				return action.ID; //"action ID=" + action.ID;
 			}			
 		}
@@ -631,6 +688,7 @@ public class PacmanSession
 			return 0; //"No atom id" + session.myID;
 		}		
 		me.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
+		BHOperations.doStop(engine, me, true);
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  mobileID, "You got died!");
 		
 		for (BHOperations.BHBuff b : engine.getBuffs(BHCollection.EntityTypeEnum.ITEM, mobileID, null))
@@ -739,7 +797,7 @@ public class PacmanSession
 			
 			engine.postAction(action, BHOperations.MOVE_SPEED);
 			me.setIntProp(INT_PROPS.MOVE_TC, engine.timecode);
-			me.setIntProp(INT_PROPS.MOVE_DIR, engine.timecode);
+			me.setIntProp(INT_PROPS.MOVE_DIR, direction);
 			
 			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Beamed! " + me.toString());			
 		}

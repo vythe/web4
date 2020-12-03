@@ -177,9 +177,9 @@ public class BotHallAPIOld
 			return dummy;
 		}
 		
-		BHSession.UpdateBin res = s.getUpdate(agent.timecode, agent.subscriptionID, agent.controlledMobileID);
+		BHSession.UpdateBin res = s.getUpdate(agent.timecode, agent.subscriptionID, agent.atomID);
 		agent.timecode = s.getEngine().timecode;
-		res.status.controlledMobileID = agent.controlledMobileID;
+		res.status.controlledMobileID = agent.atomID;
 		
 		return res;
 }
@@ -237,7 +237,7 @@ public class BotHallAPIOld
 		if (id != null) 
 			mobileId = id;
 		else
-			mobileId = agent.controlledMobileID;
+			mobileId = agent.atomID;
 		
 		if (mobileId <= 0)
 		{
@@ -491,13 +491,13 @@ public class BotHallAPIOld
 		}
 		else if (Utils.IsEmpty(name))
 		{
-			 if (agent.controlledMobileID == 0) 
+			 if (agent.atomID == 0) 
 			 {
 				 return "";
 			 }
 			 else
 			 {				 
-				agent.controlledMobileID = 0;
+				agent.atomID = 0;
 				return "0";
 			 }
 		}
@@ -512,7 +512,7 @@ public class BotHallAPIOld
 				{
 					int hID = a.getID();
 					BHClientAgent heroAgent = BHClientAgent.getAgents()
-					.filter((q) -> q.controlledMobileID == hID)
+					.filter((q) -> q.atomID == hID)
 					.findFirst()
 					.orElse(null)
 					;
@@ -525,7 +525,7 @@ public class BotHallAPIOld
 			}
 			if (hero != null)
 			{
-				agent.controlledMobileID = hero.getID();
+				agent.atomID = hero.getID();
 				return "" + hero.getID();
 			}
 			else return "0";
