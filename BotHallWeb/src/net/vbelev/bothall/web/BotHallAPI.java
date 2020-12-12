@@ -163,7 +163,8 @@ public class BotHallAPI
 	}
 	
 	/**
-	 * This should return the agent password...
+	 * This creates an agent object and returns its clientKey.
+	 * 
 	 * @param sessionID
 	 * @param atomID
 	 * @return
@@ -216,7 +217,7 @@ public class BotHallAPI
 	{
 		Integer sID = Utils.tryParseInt(sessionID);
 		BHClientAgent agent = BHClientAgent.getClient(sID, clientKey);
-		if (sID == null || agent == null)
+		if (agent == null)
 		{
 			return "";
 		}
@@ -225,18 +226,25 @@ public class BotHallAPI
 		
 		return Utils.encodeJSON("" + agent.sessionID);				
 	}	
+	
+	private static long lastUpdateTS = 0;
 	@Path("/getUpdate")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public BHStorage.UpdateBin getUpdate(
 			@QueryParam("id") String sessionID, 
-			@QueryParam("pwd") String clientKey, 
+			@QueryParam("key") String clientKey, 
 			@QueryParam("full") String full) 
 	{
+		long updateTS = new Date().getTime();
 		Integer sID = Utils.tryParseInt(sessionID);
-		if (sID == null || sID <= 0)
+		//if (sID == null || sID <= 0)
+		//{
+		//	throw new IllegalArgumentException("sessionID=" + sessionID);
+		//}
+		if (sID == null)
 		{
-			throw new IllegalArgumentException("sessionID=" + sessionID);
+			sID = 0;
 		}
 		BHClientAgent agent = BHClientAgent.getClient(sID, clientKey);
 		if (agent == null)
@@ -266,7 +274,9 @@ public class BotHallAPI
 		BHStorage.UpdateBin res = s.storage.getUpdate(s.getEngine(), timecode, agent.subscriptionID, agent.atomID);
 		agent.timecode = s.getEngine().timecode;
 		res.status.controlledMobileID = agent.atomID;
-		
+		long updateEndTS = new Date().getTime();
+		System.out.println("update " + clientKey + " proc=" + (updateEndTS - updateTS) + ", cycle=" + (updateTS - lastUpdateTS));
+		lastUpdateTS = updateTS;
 		return res;
 	}
 	
@@ -283,10 +293,10 @@ public class BotHallAPI
 		try
 		{
 		Integer sID = Utils.tryParseInt(sessionID);
-		if (sID == null || sID <= 0)
-		{
-			throw new IllegalArgumentException("sessionID=" + sessionID);
-		}
+		//if (sID == null || sID <= 0)
+		//{
+		//	throw new IllegalArgumentException("sessionID=" + sessionID);
+		//}
 		BHClientAgent agent = BHClientAgent.getClient(sID, clientKey);
 		if (agent == null)
 		{
@@ -322,6 +332,14 @@ public class BotHallAPI
 		}
 	}
 	
+	@Path("/getbag")
+	@GET
+	@Produces(MediaType.APPLICATION_JSON)	
+	public Map<String, String> getViewBag(@QueryParam("bag") String bag)
+	{
+		Map<String, String> res = ViewBag.all(bag);
+		return res;
+	}
 	
 	/**
 	 * A temporary (?) way to have session storage for stateless clients.
@@ -337,7 +355,7 @@ public class BotHallAPI
 	@Path("/getval")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)	
-	public List<String> getViewBag(@QueryParam("bag") String bag, @QueryParam("name") String name)
+	public List<String> getViewBagValue(@QueryParam("bag") String bag, @QueryParam("name") String name)
 	{
 		ArrayList<String> res = new ArrayList<String>();
 		if (Utils.IsEmpty(name))
@@ -369,7 +387,7 @@ public class BotHallAPI
 	@Path("/putval")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)	
-	public String putViewBag(@QueryParam("bag") String bag, @QueryParam("name") String name, @QueryParam("value") String value)
+	public String putViewBagValue(@QueryParam("bag") String bag, @QueryParam("name") String name, @QueryParam("value") String value)
 	{
 		String ret = "";
 		if (Utils.IsEmpty(bag) || Utils.IsEmpty(name))

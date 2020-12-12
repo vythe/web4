@@ -80,7 +80,7 @@ public class PacmanSession
 	public static PacmanSession createSession()
 	{
 		BHEngine e = PacmanSession.loadFile("/../data/pacman.txt");
-		e.CYCLE_MSEC = 150;
+		e.CYCLE_MSEC = 200;
 		PacmanSession s =  PacmanSession.createSession(e);
 		
 		return s;

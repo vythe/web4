@@ -106,6 +106,7 @@ button.movebutton {
 	<td>Load%::</td><td id="serverLoad"></td>
 	<td>Client Load%:</td><td id="clientLoad"></td>
 	<td>Tick msec:</td><td id="serverTick"></td>
+	<td>Pos X:</td><td id="position_x"></td>
 </tr>
 <tr>
 	<td>Timecode:</td><td id="serverTimecode"></td>
@@ -113,6 +114,7 @@ button.movebutton {
 	<td>Server Tick:</td><td id="serverMsec"></td>
 	<td>Client Tick:</td><td id="clientMsec"></td>
 	<td>Key pressed:</td><td id="keyPressSpan"></td>	
+	<td>Pos Y:</td><td id="position_y"></td>
 </tr>
 <tr><td>Info:</td><td id="infoString" colspan="10"></td></tr>
 </table>
@@ -135,27 +137,39 @@ mybh.subscribe("update",  onBHUpdate);
 //var viewbagKey = getCookie("viewbag");
 var viewbagKey = getQueryParam("bag");
 
-if (!viewbagKey) {
-	getViewbagValue("", function(key) {
-		window.location.href="?bag=" + key;
-	});		
-}
+//if (!viewbagKey) {
+//	getViewbagValue("", function(key) {
+//		window.location.href="?bag=" + key;
+//	});		
+//}
 	
 
 function initField() {
-	mybh.getViewbagValue(viewbagKey, "clientkey,sessionid", function(key) {
-		if (!key || key.length < 2) {
-			mybh.log("No active session", "ERROR");
-		} else {
-			mybh.clientKey = key[0];
-			mybh.sessionID = key[1];
-			//mybh.sessionKey = key[2];
-			if (mybh.sessionID && mybh.clientKey) {
-				//mybh.cycle(true);
-				getSessionKey();			
+	var urlKey = getQueryParam("key");
+	var urlSid = getQueryParam("sessionid");
+	var urlSkey = getQueryParam("sessionkey");
+	
+	if (urlKey) {
+		mybh.clientKey = urlKey;
+		mybh.sessionID = urlSid || "";
+		mybh.sessionKey = urlSkey || "";
+		
+	} else if (viewbagKey) {
+
+		mybh.getViewbagValue(viewbagKey, "clientkey,sessionid", function(key) {
+			if (!key || key.length < 2) {
+				mybh.log("No active session", "ERROR");
+			} else {
+				mybh.clientKey = key[0];
+				mybh.sessionID = key[1];
+				//mybh.sessionKey = key[2];
+				if (mybh.sessionID && mybh.clientKey) {
+					//mybh.cycle(true);
+					getSessionKey();			
+				}
 			}
-		}
-	});	
+		});	
+	}
 }
 	
 function getSessionKey() {
@@ -175,6 +189,7 @@ function onBHUpdate(obj, elementType, elementData) {
 	if (elementType == "STATUS") {
 		//addMessage("BH: update status: " + JSON.stringify(elementData));
 		// BH: update status: {"controlledMobileID":167,"cycleLoad":0,"cycleMsec":2000,"sessionID":1,"sessionStatus":"ACTIVE","timecode":60,"updateTS":0}
+		mybh.controlledMobileID = elementData.controlledMobileID;
 		var lastLoadTime = new Date().getTime();
 		$("#lastPollTime").text(formatDateTime(new Date(lastLoadTime)));
 		$("#serverTimecode").text(elementData.timecode);
@@ -236,11 +251,12 @@ $(document).ready(function() {
 	
 	$("#btnRefresh").click(function(evt) {
 		evt.preventDefault();
-		if (mybh.sessionID && mybh.clientKey) {
+		//if (mybh.sessionID && mybh.clientKey) {
+		if (mybh.clientKey) {
 			mybh.action("refresh");
 			addMessage("field refresh");
 		} else {
-			addMessage("cannot refresh the field: no active session");
+			addMessage("cannot refresh the field: no client key");
 		}
 	});
 	
@@ -262,21 +278,21 @@ $(document).ready(function() {
 	
 	$("#btnStartCycling").click(function(evt) {
 		evt.preventDefault();
-		if (mybh.sessionID) {
+		if (mybh.clientKey) {
 			mybh.cycle(true);
 			addMessage("start cycling");
 		} else {
-			addMessage("cannot start cycling: no active session");
+			addMessage("cannot start cycling: no client key");
 		}
 	});
 	
 	$("#btnStopCycling").click(function(evt) {
 		evt.preventDefault();
-		if (mybh.sessionID) {
+		if (mybh.clientKey) {
 			mybh.cycle(false);
 			addMessage("stop cycling");
 		} else {
-			addMessage("cannot stop cycling: no active session");
+			addMessage("cannot stop cycling: no client key");
 		}
 		
 	});
@@ -284,11 +300,11 @@ $(document).ready(function() {
 	$("#btnCycleOnce").click(function(evt) {
 		evt.preventDefault();
 		//console.log("btnCycleOnce clicked");
-		if (mybh.sessionID) {
+		if (mybh.clientKey) {
 			mybh.cycle("O");
 			addMessage("cycle once");
 		} else {
-			addMessage("cannot start cycling: no active session");
+			addMessage("cannot start cycling: no client key");
 		}
 		
 	});
@@ -297,7 +313,7 @@ $(document).ready(function() {
 	
 	$("#btnStartBHCycling").click(function(evt) {
 		evt.preventDefault();
-		if (mybh.sessionID) {
+		if (mybh.clientKey) {
 			mybh.bhcycle(true);
 			addMessage("start server cycling");
 		} else {
@@ -410,6 +426,10 @@ bhItemStatusDelete = 1;
 function updateItem(dataItem) {
 	//console.log("updateItem: " + JSON.stringify(dataItem) + ", tile=" +  spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
 	//console.log("updateItem, ID=" + dataItem.id + ", svg=" + JSON.stringify(itemTiles[dataItem.id]));
+	if (dataItem.id == mybh.controlledMobileID) {
+		$("#position_x").text(dataItem.x);
+		$("#position_y").text(dataItem.y);
+	}
 	var svgItem = itemTiles[dataItem.id];
 	if (dataItem.status == bhItemStatusDelete) {
 		delete itemTiles[dataItem.id];
@@ -497,12 +517,12 @@ function moveIt(dir, id) {
 		"move",
 		[dir],
 		function() {
-			console.log("posted moveit, dir=" + dir + ", id=" + id);
+			//console.log("posted moveit, dir=" + dir + ", id=" + id);
 		}
 	);
 }
 
-glideLoopDelay = 30;
+glideLoopDelay = 32;
 glideLoopFlex = 10;
 function glideItem(id, currentX, currentY, targetX, targetY, targetTS) {
 	//console.log("glide id=" + id + " from x=" + currentX + ", y=" + currentY + " to newX=" + targetX + ", newY=" + targetY);
@@ -511,7 +531,7 @@ function glideItem(id, currentX, currentY, targetX, targetY, targetTS) {
 	
 	var elem = svgItem.svg;
 	var currentTS = new Date().getTime();
-	if (elem.attr("x") != currentX || elem.attr("y") != currentY) return;
+	//if (elem.attr("x") != currentX || elem.attr("y") != currentY) return;
 	
 	if (currentTS >= targetTS - glideLoopFlex) {
 		elem.attr("x", targetX);
@@ -526,8 +546,8 @@ function glideItem(id, currentX, currentY, targetX, targetY, targetTS) {
 	var newY = currentY + Math.floor((targetY - currentY) / steps);
 	elem.attr("x", newX);
 	elem.attr("y", newY);
-	$("#mainSVG").remove(elem);				
-	$("#mainSVG").append(elem);				
+	//$("#mainSVG").remove(elem);				
+	//$("#mainSVG").append(elem);				
 	setTimeout(function() {
 		glideItem(id, newX, newY, targetX, targetY, targetTS);
 	}, glideLoopDelay);

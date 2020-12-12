@@ -58,7 +58,7 @@ function BHClient(url) {
 	return {
 		// == config, status ==
 		url: url,
-		loopMilliseconds: 100,
+		loopMilliseconds: 50,
 		runLoop: false,
 		
 		// == statistics and misc ==
@@ -79,6 +79,8 @@ function BHClient(url) {
 		items: {},
 		mobiles: {},
 		buffs: {},
+		// "events" are not updated from the server; they are handled with subscribe() and unsubscribe() 
+		events: {}, // events are stored as "eventname": [], 
 		
 		
 		// == utility, events ==
@@ -90,11 +92,9 @@ function BHClient(url) {
 			if (typeof(this.logger) == "function") this.logger(message, messageLevel);
 		},
 		
-		
+		// onUpdate is called from the update loop; you do not need to call it directly
 		onUpdate: function(elementType, elementData) {
-			//if (elementType == "STATUS") {
-			//	this.log("update status: " + JSON.stringify(elementData));
-			//}
+
 			this.trigger("update", elementType, elementData);
 			
 			if (elementType == "STATUS") {
@@ -102,7 +102,6 @@ function BHClient(url) {
 			}
 		},
 				
-		events: {}, // events are stored as "eventname": [], 
 		// the array elements are functions (or objects with invoke() methods)  
 		subscribe: function(eventName, invoke) {
 			if (!invoke || !eventName) 
@@ -140,22 +139,18 @@ function BHClient(url) {
 		},
 		
 		trigger: function(eventName) {
-			//console.log("trigger arguments: " + JSON.stringify(arguments));
+
 			var evt = this.events[eventName];
 			if (!evt || !evt.length) return;
-			//console.log("bhclient trigger " + eventName + ", sub count=" + evt.length);
+			
 			for (var e in evt) {
 				var ef = (typeof(evt[e]) == "function") ? evt[e] : evt[e].invoke; 
-				//console.log("subscriber " + e + ": " + ef);
 				var args = [this];
-				//if (arguments) args = args.concat(arguments);
 				if (arguments && arguments.length > 1) {
 					for (var a = 1; a < arguments.length; a++) {
 						args.push(arguments[a]);
 					}
 				}
-				//console.log("call ef for " + JSON.stringify(args));
-				//console.log("call ef for count=" + args.length);
 				ef.apply(null, args);
 			}
 		},
@@ -300,13 +295,15 @@ function BHClient(url) {
 	}
 }
 
-function mainLoop(bhclient) {
+function mainLoopOld(bhclient, overtime) {
 	
 	if (!bhclient || !bhclient.runLoop)
 	{
 		return;
 	}
-	var ts1 = new Date().getTime() + bhclient.loopMilliseconds;
+	var ts0 = new Date().getTime();
+	var ts1 = ts0 + bhclient.loopMilliseconds - (overtime || 0);
+	//var ts1 = new Date().getTime() + bhclient.loopMilliseconds;
 	bhclient.loopTimecode++;
 	
 	getUpdate(bhclient, function() {
@@ -320,14 +317,98 @@ function mainLoop(bhclient) {
 		} 
 		else if (bhclient.runLoop)
 		{
-			bhclient.log("sleep for " + sleepTime, "INFO");
+			//bhclient.log("sleep for " + sleepTime, "INFO");
+			console.log("loop proc=" + (ts2 - ts0) + ", sleep=" + sleepTime);
+			/*
 			setTimeout(function() {
-				mainLoop(bhclient);
+				var ts3 = new Date().getTime();
+				var ot = 0;
+				if (ts3 > ts1 + 1) {
+					console.log("overtime " + (ts3 - ts1));
+					ot = ts3 - ts1;
+				}
+				mainLoop(bhclient, ot);
 			}, sleepTime);
+			*/
+			setTimeout(mainLoop, sleepTime, bhclient);
 		}
 	});
 }
 
+function mainLoop(bhclient) {
+	
+	if (!bhclient || !bhclient.runLoop)
+	{
+		return;
+	}
+	var ts0 = new Date().getTime();
+	var ts1 = ts0 + bhclient.loopMilliseconds;
+	//var ts1 = new Date().getTime() + bhclient.loopMilliseconds;
+	bhclient.loopTimecode++;
+	
+	var mainLoopTimer = setInterval(function() {
+		ts0 = new Date().getTime();
+		getUpdate(bhclient, function() {
+			var ts2 = new Date().getTime();
+			//var sleepTime = ts1 > ts2? ts1 - ts2: 1;
+			bhclient.loopLoad = Math.round((ts2 - ts0) * 100 / bhclient.loopMilliseconds);
+			//ts0 = ts2;
+			
+			if (bhclient.runLoop == "once") {
+				bhclient.log("cycled once and stopped", "INFO");
+				bhclient.runLoop = false;
+			} 
+			if (!bhclient.runLoop) {
+				clearInterval(mainLoopTimer);
+			} else {
+				bhclient.loopTimecode++;
+			}
+		});
+	}, bhclient.loopMilliseconds);
+}
+
+function innerLoop(bhclient, ts1) {
+	var ts2 = new Date().getTime();
+	var sleepTime = ts1 > ts2? ts1 - ts2: 1;
+	bhclient.loopLoad = Math.round((ts2 - ts1 + bhclient.loopMilliseconds) * 100 / bhclient.loopMilliseconds);
+	
+	if (bhclient.runLoop == "once") {
+		bhclient.log("cycled once and stopped", "INFO");
+		bhclient.runLoop = false;
+	} 
+	else if (bhclient.runLoop)
+	{
+		//bhclient.log("sleep for " + sleepTime, "INFO");
+		console.log("sleep for " + sleepTime, "INFO");
+		//console.log("loop proc=" + (ts2 - ts0) + ", sleep=" + sleepTime);
+		/*
+		setTimeout(function() {
+			var ts3 = new Date().getTime();
+			var ot = 0;
+			if (ts3 > ts1 + 1) {
+				console.log("overtime " + (ts3 - ts1));
+				ot = ts3 - ts1;
+			}
+			mainLoop(bhclient, ot);
+		}, sleepTime);
+		*/
+		setTimeout(mainLoop, sleepTime, bhclient);
+	}
+}
+
+function mainLoop2(bhclient, overtime) {
+	
+	if (!bhclient || !bhclient.runLoop)
+	{
+		return;
+	}
+	var ts0 = new Date().getTime();
+	var ts1 = ts0 + bhclient.loopMilliseconds - (overtime || 0);
+	//var ts1 = new Date().getTime() + bhclient.loopMilliseconds;
+	bhclient.loopTimecode++;
+	
+	getUpdate(bhclient, innerLoop, bhclient, ts1);
+}
 
 /**
  * Takes a promise from fetch and returns a promise with json.
@@ -385,7 +466,7 @@ function getJSON(bhclient, action, args, callback) {
 /** getUpdate is different in the way that it invokes callback(elementType, elementData) 
  * for each received element separately
  */
-function getUpdate(bhclient, callback)
+function getUpdate(bhclient, callback, arg1, arg2, arg3)
 {
 	bhclient.log("getUpdate start " + new Date(), "INFO");
 	bhclient.log("url: " + bhclient.url + "getUpdate", "INFO");
@@ -393,7 +474,7 @@ function getUpdate(bhclient, callback)
 	//url.searchParams.append("sessionID", bhclient.sessionID);
 	var url = buildQuery(bhclient.url + "getUpdate", {
 		id: bhclient.sessionID,
-		pwd: bhclient.clientKey
+		key: bhclient.clientKey
 	});
 	var pingTS = new Date().getTime();
 	fetch(url
@@ -470,7 +551,7 @@ function getUpdate(bhclient, callback)
 		bhclient.onUpdate("STATUS", resp.status || {});	
 		bhclient.log("getUpdate complete", "INFO");
 		if (typeof(callback) == "function") {
-			callback();
+			callback(arg1, arg2, arg3);
 		}
 		
 	}).catch(function(error) {

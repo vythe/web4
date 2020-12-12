@@ -143,4 +143,14 @@ public class ViewBag
 		}
 		return res;
 	}
+	
+	public static Hashtable<String, String> all(String bag)
+	{
+		Hashtable<String, String> res = new Hashtable<String, String>();
+		if (bag == null) return res;
+		ViewBag b = getByKey(bag);
+		if (b == null) return res;
+		res.putAll(b.vals);
+		return res;
+	}
 }

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<!--  This is like base.html, optimized for connection through a cookie -->
+<meta charset="UTF-8">
+<title>Insert title here</title>
+<!-- 
+<script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+ -->
+<script src="js/jquery-3.5.1.js"></script>
+<script src="js/bhclient.js"></script>
+<script src="js/pacmonster.js"></script>
+
+<script type="text/javascript">
+var apiURL = "/BotHallWeb/api/";
+
+var fullApiURL = new URL(apiURL, window.location.href);
+var viewbagKey = getQueryParam("bag");
+
+var mybh = BHClient(fullApiURL.href);
+var monster = null;
+mybh.logger = function(message, messageLevel){ // the logger function, it will be called as logger(message, messageLevel);
+	if (messageLevel != "INFO") {
+		console.log("Robot BH: " + (messageLevel || "(Info)") + ": " + message);
+		if (messageLevel == "ERROR") {
+			throw message;
+		}
+	}
+};
+
+initField();
+
+mybh.subscribe("update",  onBHUpdate);
+
+
+function initField() {
+	var urlKey = getQueryParam("key");
+	var urlSid = getQueryParam("sessionid");
+	//var urlSkey = getQueryParam("sessionkey");
+	var urlKind = getQueryParam("kind");
+	
+	if (urlKind == "hound") {
+		monster = houndMonster();
+		//monster.itemId = item.id;
+		//console.log("subscribe hound to id=" + item.id);
+		mybh.subscribe("status", monster);		
+	} else {
+		monster = shamblerMonster();
+		//monster.itemId = item.id;
+		//console.log("subscribe hound to id=" + item.id);
+		mybh.subscribe("status", monster);		
+	}
+	if (urlKey) {
+		mybh.clientKey = urlKey;
+		mybh.sessionID = urlSid || "";
+		//mybh.sessionKey = urlSkey || "";
+		
+	} else if (viewbagKey) {
+
+		mybh.getViewbagValue(viewbagKey, "clientkey,sessionid", function(key) {
+			if (!key || key.length < 2) {
+				mybh.log("No active session", "ERROR");
+			} else {
+				mybh.clientKey = key[0];
+				mybh.sessionID = key[1];
+				//mybh.sessionKey = key[2];
+				if (mybh.sessionID && mybh.clientKey) {
+					//mybh.cycle(true);
+					getSessionKey();			
+				}
+			}
+		});	
+	}
+}
+
+
+function getSessionKey() {
+	if (!mybh.sessionID) return;
+	
+	mybh.getViewbagValue(viewbagKey, "sessionkey_" + mybh.sessionID, function(key) {
+		if (!key || key.length < 1) {
+			return;
+		} else {
+			mybh.sessionKey = key[0];
+		}
+	});	
+}
+
+function onBHUpdate(obj, elementType, elementData) {
+	//console.log("subscribed update called, elementType=" + elementType);
+	if (elementType == "STATUS") {
+		//addMessage("BH: update status: " + JSON.stringify(elementData));
+		// BH: update status: {"controlledMobileID":167,"cycleLoad":0,"cycleMsec":2000,"sessionID":1,"sessionStatus":"ACTIVE","timecode":60,"updateTS":0}
+		var lastLoadTime = new Date().getTime();
+		$("#lastPollTime").text(formatDateTime(new Date(lastLoadTime)));
+		$("#serverTimecode").text(elementData.timecode);
+		$("#sessionID").text(elementData.sessionID);
+		$("#controlledID").text(elementData.controlledMobileID);
+		$("#serverLoad").text(elementData.cycleLoad);
+		$("#clientLoad").text(mybh.loopLoad);
+		$("#serverMsec").text(elementData.cycleMsec);
+		$("#clientMsec").text(mybh.loopMilliseconds);
+	}
+	else if (elementType == "CELL") {
+		//setTerrain(elementData.x, elementData.y, elementData.terrain);
+	}
+	else if (elementType == "ITEM") {
+		//updateItem(elementData);
+	}
+	else if (elementType == "MOBILE") {
+		//console.log("update mobile: " + JSON.stringify(elementData));
+		updateItem(elementData);
+	}
+	else if (elementType == "MESSAGE") {
+		addMessage(elementData);
+	} 
+	else if (elementType == "BUFF") {
+		//addMessage(elementData);
+		//console.log("BUFF: " + JSON.stringify(elementData));
+		var buffElem = $("#meBuffsList li#buff_" + elementData.id);
+		if (elementData.isCancelled) {
+			buffElem.remove();
+		} else {
+			if (buffElem.length == 0) {
+				buffElem = $("<li/>");
+				buffElem.attr("id", "buff_" + elementData.id);
+				$("#meBuffsList").append(buffElem);
+			}
+			buffElem.text(elementData.actorID + ": " + elementData.ticks + " " + elementData.type);
+		}
+	} 
+}
+
+
+function updateItem(dataItem) {
+
+	var row = $("#tblMobiles tbody tr#item_" + dataItem.id);
+	if (row.length == 0) {
+		row = $("#tblMobiles #mobileTemplate").clone();
+		row.attr("id", "item_" + dataItem.id);
+		row.find(".mobile_id").text(dataItem.id);
+		$("#tblMobiles tbody").append(row);
+		row.show();
+	}
+	row.find(".mobile_type").text(dataItem.mobiletype);
+	row.find(".mobile_x").text(dataItem.x);
+	row.find(".mobile_y").text(dataItem.y);
+	row.find(".mobile_status").text(dataItem.status);
+}
+
+function addMessage(msg) {
+	mybh.log("INFO", msg);
+}
+
+function moveIt(dir, id) {
+	/*
+		getJSON(mybh, "moveit", {direction: dir, id: id || ""}, function() {
+			console.log("posted moveit, dir=" + dir + ", id=" + id);
+		});
+	*/
+		mybh.action(
+			"move",
+			[dir],
+			function() {
+				//console.log("posted moveit, dir=" + dir + ", id=" + id);
+			}
+		);
+	}
+</script>
+</head>
+
+<body>
+	<h1>Session <span id="sessionid"></span></h1>
+	
+	<table id="tblMobiles" style="white-space: nowrap;">
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Type</th>
+			<th>X</th>
+			<th>Y</th>
+			<th>Status</th>
+			<th>Buffs</th>
+		</tr>
+	</thead>
+	<tbody>
+		<tr id="mobileTemplate" style="display: none;">
+			<td class="mobile_id"></td>
+			<td class="mobile_type"></td>
+			<td class="mobile_x"></td>
+			<td class="mobile_y"></td>
+			<td class="mobile_status"></td>
+			<td class="mobile_buffs"></td>
+		</tr>
+	</tbody>
+	</table>
+	<br/>
+	<fieldset>
+	<legend>Debug</legend>
+		<button id="btnStartCycling">Start Cycling</button> 
+		<button id="btnCycleOnce">Cycle Once</button> 
+		<button id="btnStopCycling">Stop Cycling</button><br/>
+		<button id="btnRefresh">Refresh</button>
+	</fieldset>
+	
+	<table>
+		<tr>
+			<td>Last Poll:</td><td id="lastPollTime"></td>
+			<td>Session ID:</td><td id="sessionID"></td>
+			<td>Load%::</td><td id="serverLoad"></td>
+			<td>Client Load%:</td><td id="clientLoad"></td>
+			<td>Tick msec:</td><td id="serverTick"></td>
+		</tr>
+		<tr>
+			<td>Timecode:</td><td id="serverTimecode"></td>
+			<td>controlled ID:</td><td id="controlledID"></td>
+			<td>Server Tick:</td><td id="serverMsec"></td>
+			<td>Client Tick:</td><td id="clientMsec"></td>
+			<td>Key pressed:</td><td id="keyPressSpan"></td>	
+		</tr>
+		<tr><td>Info:</td><td id="infoString" colspan="10"></td></tr>
+	</table>
+
+<script type="text/javascript">
+$(document).ready(function() {
+	$("#btnStartCycling").click(function(evt) {
+		evt.preventDefault();
+		if (mybh.clientKey) {
+			mybh.cycle(true);
+			addMessage("start cycling");
+		} else {
+			addMessage("cannot start cycling: no client key");
+		}
+	});
+	
+	$("#btnStopCycling").click(function(evt) {
+		evt.preventDefault();
+		if (mybh.clientKey) {
+			mybh.cycle(false);
+			addMessage("stop cycling");
+		} else {
+			addMessage("cannot stop cycling: no client key");
+		}
+		
+	});
+		
+	$("#btnCycleOnce").click(function(evt) {
+		evt.preventDefault();
+		//console.log("btnCycleOnce clicked");
+		if (mybh.clientKey) {
+			mybh.cycle("O");
+			addMessage("cycle once");
+		} else {
+			addMessage("cannot start cycling: no client key");
+		}
+	});
+	
+	$("#btnRefresh").click(function(evt) {
+		evt.preventDefault();
+		//if (mybh.sessionID && mybh.clientKey) {
+		if (mybh.clientKey) {
+			mybh.action("refresh");
+			addMessage("field refresh");
+		} else {
+			addMessage("cannot refresh the field: no client key");
+		}
+	});
+	
+	
+});
+</script>	
+</body>

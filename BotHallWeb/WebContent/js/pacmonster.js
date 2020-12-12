@@ -161,6 +161,10 @@ function houndMonsterMove(mybh, statusData) {
 	//if (elementType != "STATUS") return;
 	//console.log("hound invoked, itemId=" + this.itemId + ", tick=" + mybh.loopTimecode);
 	var ind;
+	if (statusData.controlledMobileID) {
+		this.itemId = statusData.controlledMobileID;
+	}
+	
 	var mobileId = this.itemId; // || elementData.controlledMobileID;
 	if (!mobileId) {
 		//mybh.log("cowInvoke: no controlled Id, returning");

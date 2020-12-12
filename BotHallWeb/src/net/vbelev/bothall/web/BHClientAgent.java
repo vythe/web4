@@ -30,6 +30,7 @@ public class BHClientAgent
 	
 	/** this is for pacman: which atom (mobile) this client controls */
 	public int atomID = 0;
+	public String controlledBy;
 	
 	private static final ArrayList<BHClientAgent> agentList = new ArrayList<BHClientAgent>();
 	
@@ -53,7 +54,7 @@ public class BHClientAgent
 		return null;		
 	}
 	
-	public static BHClientAgent getClient(int sessionID, String password)
+	public static BHClientAgent getClient(Integer sessionID, String password)
 	{
 		if (password == null) return null;
 		
@@ -61,7 +62,7 @@ public class BHClientAgent
 		{
 			for (BHClientAgent a : agentList)
 			{
-				if ((sessionID <= 0 || sessionID == a.sessionID) && password.equals(a.password)) return a;
+				if ((sessionID == null || sessionID <= 0 || sessionID == a.sessionID) && password.equals(a.password)) return a;
 			}
 		}
 		return null;
