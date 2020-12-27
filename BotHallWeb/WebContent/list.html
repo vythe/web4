@@ -9,6 +9,7 @@
 	<script type="text/javascript">
 	var apiURL = "/BotHallWeb/api/";
 	var viewbagKey = getQueryParam("bag");
+	var userKey = getQueryParam("user");
 	var fullApiURL = new URL(apiURL, window.location.href);
 	
 	var mybh = BHClient(fullApiURL.href);
@@ -30,8 +31,9 @@
 <tr id="atom_template" style="display: none;">
 	<td class="session_desc" colspan="3"></td>
 	<td class="atom_desc"></td>
-	<td><input type="radio" name="session_join" class="session_join" value="" bh_session_id="" bh_atom_id="" bh_client_key=""/>
-		<span class="client_desc"></span>
+	<td><label><input type="radio" name="session_join" class="session_join" value="" bh_session_id="" bh_atom_id="" bh_client_key=""/>
+		<span class="client_key"></span>
+		<span class="client_desc"></span></label>
 	</td>
 </table>
 </div>
@@ -59,24 +61,39 @@ $(document).ready(function() {
 		setCookie("viewbag", key[0]);
 	});
 	*/
-	if (true || !viewbagKey) {
-		mybh.getViewbagValue(viewbagKey || "", "", function(key) {
-			if (viewbagKey != key) {
-				window.location.href="?bag=" + key;
+	if (true || !userKey) {
+		mybh.getuserkey(function(key) {
+			if (key && key != userKey) {				
+				window.location.href="?user=" + key + "&bag=" + viewbagKey;
 				return;
-			} else {
-				// get session keys
-				getJSON(mybh, "getbag", {bag: viewbagKey}, function(res) {
-					sessionKeys = {};
-					for (var k in res) {
-						if (k.startsWith("sessionkey_")) {
-							sessionKeys[k] = res[k];
-						}
-					}
-				});
+			} else if (!key) {
+				alert("could not get user key!");
 			}
 		});
 	}
+	mybh.userKey = userKey;
+	
+	mybh.createBag(viewbagKey || "", function(key) {
+		if (!key) {
+			viewbagKey = "";
+			alert("could not get the viewbag key");
+			return;
+		}
+		else if (viewbagKey != key) {
+			window.location.href="?user=" + mybh.userKey + "&bag=" + key;
+			return;
+		} else {
+			// get session keys
+			mybh.bag(viewbagKey, function(res) {
+				sessionKeys = {};
+				for (var k in res) {
+					if (k.startsWith("sessionkey_")) {
+						sessionKeys[k] = res[k];
+					}
+				}
+			});
+		}
+	});
 	
 	$("#btnRefresh").click(function() {
 		refreshList();
@@ -87,6 +104,7 @@ $(document).ready(function() {
 	});
 	
 	$("#btnJoin").click(function() {
+		console.log("btnJoin clicked");
 		var sel = $("input[name=session_join]:checked");
 		if (sel.length == 0 || !sel.attr("bh_session_id")) {
 			console.log("Join without a selected session");
@@ -108,14 +126,25 @@ $(document).ready(function() {
 	});
 	
 	$("#btnSummary").click(function() {
-		getJSON(mybh, "bagsummary", {bag: viewbagKey}, function(res) {
-			try
-			{
-				//$("#bagsummary").html(JSON.stringify(res, null, " "));
-				$("#bagsummary").html(res);
-			} catch (x) {
-				$("#bagsummary").html(x);
+		/*
+		getJSON(mybh.url + "bagsummary", 
+			{bag: viewbagKey}, 
+			function(res) {
+				try
+				{
+					//$("#bagsummary").html(JSON.stringify(res, null, " "));
+					$("#bagsummary").html(res);
+				} catch (x) {
+					$("#bagsummary").html(x);
+				}
+			},
+			function (err) {
+				mybh.log("bagsummary: " + err, "ERROR");
 			}
+		);
+		*/
+		mybh.bagSummary(viewbagKey, function(res) {
+			$("#bagsummary").html(res);
 		});
 	});
 });
@@ -127,14 +156,7 @@ item.sessionID = s.getID();
 */
 
 function refreshList() {
-	fetch(apiURL + "list",
-	).then(function(response) {
-		if (response) return response.json();
-		else {
-			alert("list failed");
-			return false;
-		}
-	}).then(function (resp) {
+	mybh.list(function (resp) {
 		//bhclient.log(action + " complete", "INFO");
 		//callback(resp);
 		//alert("got list: " + JSON.stringify(resp));
@@ -144,11 +166,11 @@ function refreshList() {
 		for (var k in resp) {
 			var item = resp[k];
 			var row = sessionTable.find("#session_template").clone();
-			row.attr("id", "session_" + item.sessionID);
+			row.attr("id", "session_" + item.sessionId);
 			row.find("td.session_desc").text(item.description);
 			row.find("td.session_status").text(item.status);
 			row.find("td.session_date").text(item.createdDate);
-			row.find("input.session_join").attr("bh_session_id", item.sessionID);
+			row.find("input.session_join").attr("bh_session_id", item.sessionId);
 			row.find("input.session_join").attr("bh_atom_id", "");
 			sessionTable.append(row);
 			row.show();
@@ -161,12 +183,12 @@ function refreshList() {
 					*/
 				var citem = item.clients[c];
 				var crow = sessionTable.find("#atom_template").clone();
-				crow.attr("id", "client_" + item.sessionID + "_" + citem.atomID);
+				crow.attr("id", "client_" + item.sessionId + "_" + citem.atomID);
 				crow.find(".atom_desc").text(citem.atomType + " #" + citem.atomID);
 				crow.find(".client_desc").text(citem.controlledBy || "(Available)");
 				
 				var sessionInput = crow.find("input.session_join");
-				sessionInput.attr("bh_session_id", item.sessionID);
+				sessionInput.attr("bh_session_id", item.sessionId);
 				sessionInput.attr("bh_atom_id",citem.atomID);
 				//if (citem.controlledBy) {
 				//	sessionInput.prop("disabled", true);
@@ -178,8 +200,6 @@ function refreshList() {
 			}
 		}
 		updateClientKeys();
-	}).catch(function(error) {
-	    alert("list failed with error " + error);
 	});
 }
 
@@ -199,35 +219,36 @@ function updateClientKeys() {
 	});
 	
 	if (atomList.length > 0) {
-		mybh.getViewbagValue(viewbagKey, atomList.join(","), function(res) {
+		mybh.getBagValue(viewbagKey, atomList.join(","), function(res) {
 			sessionTable.find("input.session_join").each(function() {
 				var inp = $(this);
 				
 				if (inp.attr("bh_session_id") && inp.attr("bh_atom_id")) {
 					var bagKey = "clientkey_" + inp.attr("bh_session_id") + "_" + inp.attr("bh_atom_id");
 					var key =  res[atomMap[bagKey]];
-					inp.attr("bh_client_key", key); 
-					console.log("for inp=" + bagKey + " set key=" + key);
+					inp.attr("bh_client_key", key);
+					inp.parent().find(".client_key").text(key);
+					//console.log("for inp=" + bagKey + " set key=" + key);
 				}
 			});
 		});
 	}	
 }
 
-function openClient(sessionID, clientKey, clientkind, sessionkey) {
+function openClient(sessionId, clientKey, clientkind, sessionkey) {
 	if (!clientKey) {
 		alert("no client key - cannot open the client");
 		return;
 	}
 	var url = "";
 	if (clientkind == "manual" || !clientkind) {
-		url = "field.html?key=" + clientKey + "&sessionid=" + sessionID;
+		url = "field.html?client=" + clientKey + "&sid=" + sessionId;
 		if (sessionkey) {
-			url = url + "&sessionkey=" + sessionkey;
+			url = url + "&session=" + sessionkey;
 		}
 		
 	} else if (clientkind == "hound" || clientkind == "shambler") {
-		window.open("robot.html?key=" + clientKey + "&sessionid=" + sessionID + "&kind=" + clientkind, "_blank");
+		window.open("robot.html?client=" + clientKey + "&sid=" + sessionId + "&kind=" + clientkind, "_blank");
 	}
 	if (url) {
 		window.open(url, "_blank");
@@ -235,54 +256,16 @@ function openClient(sessionID, clientKey, clientkind, sessionkey) {
 			
 }
 
-/*
-function getViewbagValue(name, callback) {
-	fetch(buildQuery(apiURL + "getval", {
-		bag: viewbagKey,
-		name: name
-	})).then(function(response) {
-		if (response) return response.json();
-		else {
-			alert("getval failed");
-			return false;
-		}
-	}).then(function(resp) {
-		callback(resp);
-	}).catch(function(error) {
-	    alert("getViewbagValue failed with error " + error);
-	});
-}
-
-function setViewbagValue(name, value, callback) {
-	fetch(buildQuery(apiURL + "putval", {
-		bag: viewbagKey,
-		name: name,
-		value: value
-	})).then(function(response) {
-		//console.log("setviewbag response");
-		//console.dir(response);
-	
-		var retObj = "";
-		if (response) {
-			//return response.text().length == 0? "" : response.json();
-			return fetchJson(response);
-		}
-		else {
-			alert("putval failed");
-			return false;
-		}
-
-	}).then(function(resp) {
-		if (typeof (callback) == "function") { 
-			callback(resp);
-		}
-	}).catch(function(error) {
-	    alert("setViewbagValue failed with error " + error);
-	});
-}
-*/
 
 function createSession() {
+	mybh.create("N", function(resp) {
+		alert("create succesful: " + JSON.stringify(resp));
+		sessionKeys["sessionkey_" + resp.sessionId] = resp.sessionKey;
+		mybh.putBagValue(viewbagKey, "sessionkey_" + resp.sessionId, resp.sessionKey, function(oldKey) {
+			refreshList();
+		});
+	});
+	/*
 	fetch(apiURL + "create", 
 	).then(function(response) {
 		if (response) return fetchJson(response);
@@ -299,9 +282,11 @@ function createSession() {
 	}).catch(function(error) {
 	    alert("create failed with error " + error);
 	});
+	*/
 }
 
 function joinSession(sessionId, atomId) {
+	/*
 	fetch(buildQuery(apiURL + "join", {
 		id: sessionId,
 		atom: atomId
@@ -312,22 +297,22 @@ function joinSession(sessionId, atomId) {
 			return false;
 		}
 	}).then(function(resp) {
-		/*
-		setViewbagValue("sessionid", sessionId, function (oldKey) {
-			setViewbagValue("atomid", atomId, function(oldKey) {
-				setViewbagValue("clientkey", resp, function(oldKey) {
-					refreshList();
-					//alert("joined!");
-				});
-			});
-		});
-		*/
 		mybh.setViewbagValue(viewbagKey, "clientkey_" + sessionId + "_" + atomId, resp, function(oldKey) {
 		refreshList();
-		//alert("joined!");
 	});
 	}).catch(function(error) {
 	    alert("create failed with error " + error);
+	});
+	*/
+	console.log("joinSession called for sid=" + sessionId + ", atom=" + atomId);
+	mybh.join(sessionId, atomId, sessionKeys["sessionkey_" + sessionId], function(key) {
+		if (!key) {
+			alert("Could not join sessionId=" + sessionId + ", atomId=" + atomId);
+		} else {
+			mybh.putBagValue(viewbagKey, "clientkey_" + sessionId + "_" + atomId, key, function(oldKey) {
+				refreshList();
+			});
+		}
 	});
 }
 

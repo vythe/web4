@@ -34,6 +34,12 @@ public class PacmanSession
 		private INT_PROPS() {}
 	}
 	
+	public static class STRING_PROPS
+	{		
+		private static final int COUNT = 1;
+		public static final int NAME = 0;
+	}
+		
 	public static class ATOM
 	{
 		public static final String GOLD = "GOLD".intern(); 
@@ -41,14 +47,20 @@ public class PacmanSession
 		public static final String HERO = "HERO".intern(); 
 		public static final String PAC = "PAC".intern(); 
 		public static final String PORTAL = "PORTAL".intern(); 
+		
+		private ATOM() {}
 	}
 	
-	public static class STRING_PROPS
-	{		
-		private static final int COUNT = 1;
-		public static final int NAME = 0;
-	}
+	public static class COMMAND
+	{
+		public static final String REFRESH = "refresh".intern();
+		public static final String MOVE = "move".intern();
+		public static final String PACMAN = "pacman".intern();
+		public static final String DIE = "die".intern();
 		
+		private COMMAND() {}
+	}
+	
 	public static final String ACTION_DIE = "DIE".intern();
 	public static final String BUFF_RESURRECT = "RESURRECT".intern();
 	public static final String BUFF_PACMONSTER = "PACMONSTER".intern();
@@ -72,6 +84,7 @@ public class PacmanSession
 	private BHEngine engine;
 
 	public int engineTimecode = 0;
+	public boolean isProtected = false;
 	public final Date createdDate = new Date();
 	public final BHStorage storage = new BHStorage();
 	
@@ -86,6 +99,10 @@ public class PacmanSession
 		return s;
 	}
 	
+	public static int getSessionCount()
+	{
+		return sessionList.size();
+	}
 	
 	public static PacmanSession createSession(BHEngine e)
 	{
@@ -96,7 +113,7 @@ public class PacmanSession
 		s.sessionID = ++sessionInstanceSeq;
 		synchronized(lock)
 		{
-			s.sessionKey = PacmanSession.generatePassword(8);
+			s.sessionKey = PacmanSession.generateKey(8);
 			sessionList.add(s);
 		}
 		e.publish();
@@ -112,8 +129,9 @@ public class PacmanSession
 		return s;
 	}	
 
-	public static PacmanSession getSession(int id)
+	public static PacmanSession getSession(Integer id)
 	{
+		if (id == null || id <= 0) return null;
 		synchronized(lock)
 		{
 			for (PacmanSession s : sessionList)
@@ -126,6 +144,7 @@ public class PacmanSession
 	
 	public static PacmanSession getSession(String key)
 	{
+		if (Utils.IsEmpty(key)) return null;
 		synchronized(lock)
 		{
 			for (PacmanSession s : sessionList)
@@ -137,7 +156,20 @@ public class PacmanSession
 		
 	}
 	
-	public static String generatePassword(int length) 
+	public static boolean destroySession(PacmanSession s)
+	{
+		synchronized(lock)
+		{
+			if (!sessionList.remove(s))
+				return false;			
+		}
+		s.getEngine().stopCycling();
+		s.getEngine().getMessages().clear();
+		return true;
+		
+	}
+	
+	public static String generateKey(int length) 
 	{
 		int cnt = 0;
 		if (length <= 0) return "";
@@ -181,8 +213,7 @@ public class PacmanSession
 		res.setGrade(grade);
 		res = coll.addAtom(res);
 		
-		return res;
-		
+		return res;		
 	}
 	
 	public static BHEngine loadFile(String fileName)
@@ -457,6 +488,39 @@ public class PacmanSession
 				}
 			}
 		}
+	}
+	
+	/**
+	 * Process a game command as issued by atomID; return "" if successful.
+	 * Return an error message if there is a problem.
+	 */
+	public String command(String cmd, int atomID, List<String> args)
+	{
+		if (Utils.IsEmpty(cmd)) return "Invalid command";
+		
+		if (COMMAND.MOVE.equals(cmd)) 
+		{
+			Integer direction = Utils.tryParseInt(args.get(0));			
+			Integer actionID = commandMove(atomID, direction);
+			if (actionID == null)
+			{
+				return "move to dir " + direction + " failed";
+			}
+		}
+		else if (COMMAND.PACMAN.equals(cmd))
+		{
+			triggerPacman();
+		}
+		else if (COMMAND.DIE.equals(cmd))
+		{
+			actionDie(atomID);
+		}
+		else if (COMMAND.REFRESH.equals(cmd))
+		{
+			//agent.timecode = 0;
+			// refresh doesn't do anything on the session, it's a client thing
+		}
+		return "";
 	}
 	
 	/** 

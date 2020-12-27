@@ -91,8 +91,8 @@ button.movebutton {
 	<button id="btnPacman">Pacman</button><br/>
 	<a href="list.html">To List</a>
 	<hr/>
-	<div id="meMessages" style="height: 100px; width: 40%; display: inline-block; overflow: auto; white-space: nowrap; border: 1px;"></div>
-	<div id="meBuffs" style="width: 40%; display: inline-block;">
+	<div id="meMessages" style="height: 100px; width: 90%; display: block; overflow: auto; white-space: nowrap; border: 1px;"></div>
+	<div id="meBuffs" style="width: 90%; display: block;">
 		<ul id="meBuffsList">
 		</ul>
 	</div>
@@ -102,7 +102,7 @@ button.movebutton {
 <table>
 <tr>
 	<td>Last Poll:</td><td id="lastPollTime"></td>
-	<td>Session ID:</td><td id="sessionID"></td>
+	<td>Session ID:</td><td id="sessionId"></td>
 	<td>Load%::</td><td id="serverLoad"></td>
 	<td>Client Load%:</td><td id="clientLoad"></td>
 	<td>Tick msec:</td><td id="serverTick"></td>
@@ -145,25 +145,25 @@ var viewbagKey = getQueryParam("bag");
 	
 
 function initField() {
-	var urlKey = getQueryParam("key");
-	var urlSid = getQueryParam("sessionid");
-	var urlSkey = getQueryParam("sessionkey");
+	var urlClient = getQueryParam("client");
+	var urlSid = getQueryParam("sid");
+	var urlSession = getQueryParam("session");
 	
-	if (urlKey) {
-		mybh.clientKey = urlKey;
-		mybh.sessionID = urlSid || "";
-		mybh.sessionKey = urlSkey || "";
+	if (urlClient) {
+		mybh.clientKey = urlClient;
+		mybh.sessionId = urlSid || "";
+		mybh.sessionKey = urlSession || "";
 		
 	} else if (viewbagKey) {
 
-		mybh.getViewbagValue(viewbagKey, "clientkey,sessionid", function(key) {
+		mybh.getBagValue(viewbagKey, "clientkey,sessionid", function(key) {
 			if (!key || key.length < 2) {
 				mybh.log("No active session", "ERROR");
 			} else {
 				mybh.clientKey = key[0];
-				mybh.sessionID = key[1];
+				mybh.sessionId = key[1];
 				//mybh.sessionKey = key[2];
-				if (mybh.sessionID && mybh.clientKey) {
+				if (mybh.sessionId && mybh.clientKey) {
 					//mybh.cycle(true);
 					getSessionKey();			
 				}
@@ -173,9 +173,9 @@ function initField() {
 }
 	
 function getSessionKey() {
-	if (!mybh.sessionID) return;
+	if (!mybh.sessionId) return;
 	
-	mybh.getViewbagValue(viewbagKey, "sessionkey_" + mybh.sessionID, function(key) {
+	mybh.getBagValue(viewbagKey, "sessionkey_" + mybh.sessionId, function(key) {
 		if (!key || key.length < 1) {
 			return;
 		} else {
@@ -193,7 +193,7 @@ function onBHUpdate(obj, elementType, elementData) {
 		var lastLoadTime = new Date().getTime();
 		$("#lastPollTime").text(formatDateTime(new Date(lastLoadTime)));
 		$("#serverTimecode").text(elementData.timecode);
-		$("#sessionID").text(elementData.sessionID);
+		$("#sessionId").text(elementData.sessionId);
 		$("#controlledID").text(elementData.controlledMobileID);
 		$("#serverLoad").text(elementData.cycleLoad);
 		$("#clientLoad").text(mybh.loopLoad);
@@ -253,7 +253,7 @@ $(document).ready(function() {
 		evt.preventDefault();
 		//if (mybh.sessionID && mybh.clientKey) {
 		if (mybh.clientKey) {
-			mybh.action("refresh");
+			mybh.command("refresh");
 			addMessage("field refresh");
 		} else {
 			addMessage("cannot refresh the field: no client key");
@@ -314,7 +314,7 @@ $(document).ready(function() {
 	$("#btnStartBHCycling").click(function(evt) {
 		evt.preventDefault();
 		if (mybh.clientKey) {
-			mybh.bhcycle(true);
+			mybh.sessionCycle(true);
 			addMessage("start server cycling");
 		} else {
 			addMessage("cannot start server cycling: no active session");
@@ -323,8 +323,8 @@ $(document).ready(function() {
 	
 	$("#btnStopBHCycling").click(function(evt) {
 		evt.preventDefault();
-		if (mybh.sessionID) {
-			mybh.bhcycle(false);
+		if (mybh.sessionId) {
+			mybh.sessionCycle(false);
 			addMessage("stop server cycling");
 		} else {
 			addMessage("cannot stop server cycling: no active session");
@@ -336,8 +336,8 @@ $(document).ready(function() {
 	$("#btnBHCycleOnce").click(function(evt) {
 		evt.preventDefault();
 		console.log("btnBHCycleOnce clicked");
-		if (mybh.sessionID) {
-			mybh.bhcycle("O");
+		if (mybh.sessionId) {
+			mybh.sessionCycle("O");
 			addMessage("server cycle once");
 		} else {
 			addMessage("cannot start server cycling: no active session");
@@ -350,7 +350,7 @@ $(document).ready(function() {
 		evt.preventDefault();
 		console.log("btnDie clicked");
 		
-		mybh.action("die", function(res) {
+		mybh.command("die", function(res) {
 			//alert("my apiUrl is " + this.url + ", join res=" + res);
 			if (res) {
 				console.log("die error: " + res, "INFO");
@@ -365,7 +365,7 @@ $(document).ready(function() {
 		evt.preventDefault();
 		console.log("btnPacman clicked");
 		
-		mybh.action("pacman", function(res) {
+		mybh.command("pacman", function(res) {
 			//alert("my apiUrl is " + this.url + ", join res=" + res);
 			if (res) {
 				console.log("pacman error: " + res, "INFO");
@@ -424,6 +424,7 @@ function setTerrain(x, y, terrain) {
 
 bhItemStatusDelete = 1;
 function updateItem(dataItem) {
+	//console.log("updateItem: " + JSON.stringify(dataItem));
 	//console.log("updateItem: " + JSON.stringify(dataItem) + ", tile=" +  spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
 	//console.log("updateItem, ID=" + dataItem.id + ", svg=" + JSON.stringify(itemTiles[dataItem.id]));
 	if (dataItem.id == mybh.controlledMobileID) {
@@ -448,13 +449,17 @@ function updateItem(dataItem) {
 		elem.attr("x", dataItem.x * cellWidth);
 		elem.attr("y", dataItem.y * cellHeight);
 		elem.attr("xlink:href", spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
+		//console.log("append item id=" + dataItem.id + ", x=" + (dataItem.x * cellWidth) + ", y=" + (dataItem.y * cellHeight));
 		$("#mainSVG").append(elem);
 		
 	} else {
 		var elem = svgItem.svg;
+		var elemD = elem[0];
 		//svgItem.atom = dataItem;
 		var currX = +(elem.attr("x"));
 		var currY = +(elem.attr("y"));
+		//var currX = +(elemD.x.baseVal.value);
+		//var currY = +(elemD.y.baseVal.value);
 		
 		var newX = dataItem.x * cellWidth;
 		var newY = dataItem.y * cellHeight;
@@ -466,30 +471,43 @@ function updateItem(dataItem) {
 			currX = newX;
 			currY = newY;
 		}
-
+		
 		// if we are moving - do some forward gliding
 		if (dataItem.dir > 0) {
 			var closest = mybh.getClosest(dataItem.x, dataItem.y);
 			if (!closest[dataItem.dir]) {
 				alert("err! dir=" + dataItem.dir + ", dataItem=" + JSON.stringify(dataItem));
 			} else {
-				newX = +(closest[dataItem.dir].x) * cellWidth;
-				newY = +(closest[dataItem.dir].y) * cellHeight;
+				var forwardX = +(closest[dataItem.dir].x) * cellWidth;
+				var forwardY = +(closest[dataItem.dir].y) * cellHeight;
+				glideItem(dataItem.id, 
+						forwardX, forwardY,
+						new Date().getTime() + mybh.serverLoopMsec * 4
+				);			
 			}
+		} 		
+		//console.log("update item id=" + dataItem.id + ", currX=" + currX + ", newX=" + newX + ", currY=" + currY + ", newY=" + newY);
+		//if (newX >= currX - cellWidth && newX <= currX + cellWidth && newY >= currY - cellHeight && newY <= currY + cellHeight) {
+		else {
+			glideItem(dataItem.id, 
+					newX, newY,
+					new Date().getTime() + mybh.serverLoopMsec //* 4
+			);			
 		} 
 		
-		if (newX >= currX - cellWidth && newX <= currX + cellWidth && newY >= currY - cellHeight && newY <= currY + cellHeight) {
-			glideItem(dataItem.id, 
-					currX, currY,
-					newX, newY,
-					new Date().getTime() + mybh.serverLoopMsec * 4
-			);			
-		} else if (dataItem.dir == 0) {
+		/*else { //if (dataItem.dir == 0) {
+			
 			elem.attr("x", dataItem.x * cellWidth);
 			elem.attr("y", dataItem.y * cellHeight);
 			//$("#mainSVG").remove(elem);				
 			//$("#mainSVG").append(elem);
-		}				
+			
+			//elemD.x.baseVal.newValueSpecifiedUnits(1, dataItem.x * cellWidth);
+			//elemD.y.baseVal.newValueSpecifiedUnits(1, dataItem.y * cellHeight);
+			//elemD.setAttribute("x", dataItem.x * cellWidth);
+			//elemD.setAttribute("y", dataItem.y * cellHeight);			
+			//console.log("updateItem, set pos for id=" + dataItem.id + ", x=" + (dataItem.x * cellWidth) + ", y=" + (dataItem.y * cellHeight)); 
+		}*/				
 	}
 }
 
@@ -508,12 +526,23 @@ function addMessage(msg) {
 }
 
 function moveIt(dir, id) {
-/*
-	getJSON(mybh, "moveit", {direction: dir, id: id || ""}, function() {
-		console.log("posted moveit, dir=" + dir + ", id=" + id);
-	});
-*/
-	mybh.action(
+
+	if (dir > 0 && mybh.controlledMobileId > 0 ) {
+	
+		var me = mybh.mobiles[mybh.controlledMobileId];
+		var closest = mybh.getClosest(me.x, me.y);
+		
+		if (closest[dir]) {
+			var forwardX = +(closest[dataItem.dir].x) * cellWidth;
+			var forwardY = +(closest[dataItem.dir].y) * cellHeight;
+			glideItem(me.id, 
+					forwardX, forwardY,
+					new Date().getTime() + mybh.serverLoopMsec * 4
+			);			
+		}
+	} 		
+
+	mybh.command(
 		"move",
 		[dir],
 		function() {
@@ -524,32 +553,132 @@ function moveIt(dir, id) {
 
 glideLoopDelay = 32;
 glideLoopFlex = 10;
-function glideItem(id, currentX, currentY, targetX, targetY, targetTS) {
+
+var glidePool = {};
+var glideTimer = null;
+var glideLatestTS = 0;
+
+function glideItem(id, targetX, targetY, targetTS) {
+	//console.log("glideItem id=" + id + " to x=" + targetX + ", y=" + targetY);
+	var elem = itemTiles[id];
+	if (!elem) return;
+	elem = elem.svg;
+	if (!elem) return;
+	
+	var glideRecord = {
+			id: id,
+			targetX: targetX,
+			targetY: targetY,
+			targetTS: targetTS,
+			currentX: +elem.attr("x"),
+			currentY: +elem.attr("y")			
+	};
+	glidePool[id] = glideRecord; // it will quietly replace the old glide record if there is any
+	if (targetTS > glideLatestTS) {
+		glideLatestTS = targetTS;
+	}
+	
+	if (!glideTimer) {
+		glideTimer = setInterval(glideLoop, glideLoopDelay);
+		glideLoop();
+	}
+}
+
+function glideLoop() {
+	var ts = new Date().getTime();
+	var ts0 = ts - glideLoopFlex;
+	var hasRecords = false;
+	for (var id in glidePool) {
+		//console.log("glide check id=" + id);
+		var glideRecord = glidePool[id];
+	//	console.dir(glideRecord);
+		var elem = itemTiles[id];
+		if (!elem || !elem.svg) {
+			delete glidePool[id];
+			continue;
+		}
+		elem = elem.svg;
+		
+		if (elem.attr("x") != glideRecord.currentX || elem.attr("y") != glideRecord.currentY || id != glideRecord.id) {
+			delete glidePool[id];
+			elem.attr("x", glideRecord.targetX);
+			elem.attr("y", glideRecord.targetY);
+			console.log("glide delete id=" + id + " because x, y"); 
+			continue;
+		}
+		
+		if (glideRecord.targetTS <= ts0) {
+			elem.attr("x", glideRecord.targetX);
+			elem.attr("y", glideRecord.targetY);
+			console.log("glide delete id=" + id + " because ts"); 
+			delete glidePool[id];
+			continue;
+		}
+		
+		var steps = Math.ceil((glideRecord.targetTS - ts) / glideLoopDelay);
+		var newX = +glideRecord.currentX + Math.floor((glideRecord.targetX - glideRecord.currentX) / steps);
+		var newY = +glideRecord.currentY + Math.floor((glideRecord.targetY - glideRecord.currentY) / steps);
+		//console.log("steps=" + steps + ", newX=" + newX + ", newY=" + newY);
+		if (isNaN(newX) || isNaN(newY)) {
+			delete glidePool[id];
+			continue;			
+		}
+		elem.attr("x", newX);
+		elem.attr("y", newY);
+		glideRecord.currentX = newX;
+		glideRecord.currentY = newY;
+		
+		hasRecords = true;		
+	}
+	//console.log("glide loop, hasRecords=" + hasRecords);
+	if (!hasRecords || ts > glideLatestTS + glideLoopFlex) {
+		clearInterval(glideTimer);
+		glideTimer = null;		
+	}
+}
+
+function glideItemOld(id, currentX, currentY, targetX, targetY, targetTS) {
 	//console.log("glide id=" + id + " from x=" + currentX + ", y=" + currentY + " to newX=" + targetX + ", newY=" + targetY);
 	var svgItem = itemTiles[id];
 	if (!svgItem || !svgItem.svg) return;
 	
 	var elem = svgItem.svg;
+	var elemD = elem[0];
 	var currentTS = new Date().getTime();
 	//if (elem.attr("x") != currentX || elem.attr("y") != currentY) return;
 	
 	if (currentTS >= targetTS - glideLoopFlex) {
+		
 		elem.attr("x", targetX);
 		elem.attr("y", targetY);
-		$("#mainSVG").remove(elem);				
-		$("#mainSVG").append(elem);				
+		//$("#mainSVG").remove(elem);				
+		//$("#mainSVG").append(elem);
+		
+		//elemD.x.baseVal.newValueSpecifiedUnits(1, targetX);
+		//elemD.y.baseVal.newValueSpecifiedUnits(1, targetY);
+		//console.log("glide1, for id=" + id + " set x=" + targetX + ", y=" + targetY + ", html=" + elemD.outerHTML);
+		//elemD.setAttribute("x", targetX);
+		//elemD.setAttribute("y", targetY);
 		return;	
 	}
 	
 	var steps = Math.ceil((targetTS - currentTS - glideLoopFlex) / glideLoopDelay);
 	var newX = currentX + Math.floor((targetX - currentX) / steps);
 	var newY = currentY + Math.floor((targetY - currentY) / steps);
+	
 	elem.attr("x", newX);
 	elem.attr("y", newY);
 	//$("#mainSVG").remove(elem);				
-	//$("#mainSVG").append(elem);				
+	//$("#mainSVG").append(elem);
+	
+	//elemD.x.baseVal.newValueSpecifiedUnits(1, newX);
+	//elemD.y.baseVal.newValueSpecifiedUnits(1, newY);
+	//console.log("glide2, for id=" + id + " set x=" + newX + ", y=" + newY + ", html=" + elemD.outerHTML);
+	//elemD.setAttribute("x", newX);
+	//elemD.setAttribute("y", newY);
+	
 	setTimeout(function() {
-		glideItem(id, newX, newY, targetX, targetY, targetTS);
+		glideItemOld(id, newX, newY, targetX, targetY, targetTS);
 	}, glideLoopDelay);
 }
 

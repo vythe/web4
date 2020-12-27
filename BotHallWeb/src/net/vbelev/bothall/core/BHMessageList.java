@@ -147,6 +147,13 @@ public class BHMessageList
 		messages.removeIf(q -> {return q.ID <= deleteID; });
 	}
 	
+	public void clear()
+	{
+		subscriptions.clear();
+		this.messages.clear();
+		this.newMessages.clear();
+	}
+	
 	/** If this method returns null, your subscription is loat and you need a new subscription.
 	 * If there are no messages, it will return an empty list.
 	 * The result list is unfiltered; the main loop will decide which messages to send out.

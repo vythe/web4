@@ -15,7 +15,8 @@
 var apiURL = "/BotHallWeb/api/";
 
 var fullApiURL = new URL(apiURL, window.location.href);
-var viewbagKey = getQueryParam("bag");
+//var viewbagKey = getQueryParam("bag");
+
 
 var mybh = BHClient(fullApiURL.href);
 var monster = null;
@@ -34,57 +35,21 @@ mybh.subscribe("update",  onBHUpdate);
 
 
 function initField() {
-	var urlKey = getQueryParam("key");
-	var urlSid = getQueryParam("sessionid");
-	//var urlSkey = getQueryParam("sessionkey");
-	var urlKind = getQueryParam("kind");
 	
+	mybh.clientKey = getQueryParam("client");
+	mybh.sessionId = getQueryParam("sid");
+	mybh.sessionKey = getQueryParam("session");
+	var urlKind = getQueryParam("kind");
+
 	if (urlKind == "hound") {
 		monster = houndMonster();
-		//monster.itemId = item.id;
-		//console.log("subscribe hound to id=" + item.id);
 		mybh.subscribe("status", monster);		
 	} else {
 		monster = shamblerMonster();
-		//monster.itemId = item.id;
-		//console.log("subscribe hound to id=" + item.id);
 		mybh.subscribe("status", monster);		
 	}
-	if (urlKey) {
-		mybh.clientKey = urlKey;
-		mybh.sessionID = urlSid || "";
-		//mybh.sessionKey = urlSkey || "";
-		
-	} else if (viewbagKey) {
-
-		mybh.getViewbagValue(viewbagKey, "clientkey,sessionid", function(key) {
-			if (!key || key.length < 2) {
-				mybh.log("No active session", "ERROR");
-			} else {
-				mybh.clientKey = key[0];
-				mybh.sessionID = key[1];
-				//mybh.sessionKey = key[2];
-				if (mybh.sessionID && mybh.clientKey) {
-					//mybh.cycle(true);
-					getSessionKey();			
-				}
-			}
-		});	
-	}
 }
 
-
-function getSessionKey() {
-	if (!mybh.sessionID) return;
-	
-	mybh.getViewbagValue(viewbagKey, "sessionkey_" + mybh.sessionID, function(key) {
-		if (!key || key.length < 1) {
-			return;
-		} else {
-			mybh.sessionKey = key[0];
-		}
-	});	
-}
 
 function onBHUpdate(obj, elementType, elementData) {
 	//console.log("subscribed update called, elementType=" + elementType);
@@ -94,7 +59,7 @@ function onBHUpdate(obj, elementType, elementData) {
 		var lastLoadTime = new Date().getTime();
 		$("#lastPollTime").text(formatDateTime(new Date(lastLoadTime)));
 		$("#serverTimecode").text(elementData.timecode);
-		$("#sessionID").text(elementData.sessionID);
+		$("#sessionId").text(elementData.sessionId);
 		$("#controlledID").text(elementData.controlledMobileID);
 		$("#serverLoad").text(elementData.cycleLoad);
 		$("#clientLoad").text(mybh.loopLoad);
@@ -158,7 +123,7 @@ function moveIt(dir, id) {
 			console.log("posted moveit, dir=" + dir + ", id=" + id);
 		});
 	*/
-		mybh.action(
+		mybh.command(
 			"move",
 			[dir],
 			function() {
@@ -170,7 +135,7 @@ function moveIt(dir, id) {
 </head>
 
 <body>
-	<h1>Session <span id="sessionid"></span></h1>
+	<h1>Session <span id="titleSessionId"></span></h1>
 	
 	<table id="tblMobiles" style="white-space: nowrap;">
 	<thead>
@@ -206,7 +171,7 @@ function moveIt(dir, id) {
 	<table>
 		<tr>
 			<td>Last Poll:</td><td id="lastPollTime"></td>
-			<td>Session ID:</td><td id="sessionID"></td>
+			<td>Session ID:</td><td id="sessionId"></td>
 			<td>Load%::</td><td id="serverLoad"></td>
 			<td>Client Load%:</td><td id="clientLoad"></td>
 			<td>Tick msec:</td><td id="serverTick"></td>
@@ -259,7 +224,7 @@ $(document).ready(function() {
 		evt.preventDefault();
 		//if (mybh.sessionID && mybh.clientKey) {
 		if (mybh.clientKey) {
-			mybh.action("refresh");
+			mybh.command("refresh");
 			addMessage("field refresh");
 		} else {
 			addMessage("cannot refresh the field: no client key");

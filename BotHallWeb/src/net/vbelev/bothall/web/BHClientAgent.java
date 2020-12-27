@@ -23,7 +23,7 @@ public class BHClientAgent
 	public int sessionID;
 	/** A little security: external calls to the client should present this password.
 	 * I am not sure about TCP-connected clients... but there should be a way to reconnect a client.*/
-	public String password;
+	public String clientKey;
 	
 	/** If it's a push client, this stream will receive updates */
 	public OutputStream pushStream = null;
@@ -54,15 +54,15 @@ public class BHClientAgent
 		return null;		
 	}
 	
-	public static BHClientAgent getClient(Integer sessionID, String password)
+	public static BHClientAgent getClient(Integer sessionID, String clientKey)
 	{
-		if (password == null) return null;
+		if (clientKey == null) return null;
 		
 		synchronized(lock)
 		{
 			for (BHClientAgent a : agentList)
 			{
-				if ((sessionID == null || sessionID <= 0 || sessionID == a.sessionID) && password.equals(a.password)) return a;
+				if ((sessionID == null || sessionID <= 0 || sessionID == a.sessionID) && clientKey.equals(a.clientKey)) return a;
 			}
 		}
 		return null;
@@ -110,7 +110,7 @@ public class BHClientAgent
 		agent.agentID = ++agentInstanceSeq;
 		synchronized(lock)
 		{
-			agent.password = generatePassword(6);
+			agent.clientKey = generatePassword(6);
 			agentList.add(agent);
 		}
 		return agent;
@@ -141,7 +141,7 @@ public class BHClientAgent
 		}
 		this.sessionID = 0;
 		this.agentID = 0;
-		this.password = "";
+		this.clientKey = "";
 		//BHSession s = BHSession.getSession(this.sessionID);
 		//if (s != null && this.subscriptionID > 0)
 		//{

@@ -39,8 +39,7 @@ public class BHStorage
 	}
 	
 	
-	/** This works over the published atom */
-	public BHClient.Item atomToItemCache(BHCollection.Atom atom)
+	public static BHClient.Item bhAtomToItem(BHCollection.Atom atom)
 	{
 		BHClient.Item item = new BHClient.Item();
 		item.id = atom.getID();
@@ -49,6 +48,59 @@ public class BHStorage
 		item.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
 		item.itemtype = atom.getType();
 		item.status = atom.getStatus();
+		
+		return item;
+	}
+	
+	public static BHClient.Mobile bhAtomToMobile(BHCollection.Atom atom)
+	{
+		BHClient.Mobile mobile = new BHClient.Mobile();
+		mobile.id = atom.getID();
+		mobile.x = atom.getIntProp(BHCollection.Atom.INT_PROPS.X);
+		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
+		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
+		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
+		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
+		mobile.status = atom.getStatus();
+		mobile.mobiletype = atom.getType();
+		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
+		
+		return mobile;
+	}	
+	
+	public static BHClient.Mobile bhAtomToHero(BHCollection.Atom atom)
+	{
+		BHClient.Mobile mobile = new BHClient.Mobile();
+		mobile.id = atom.getID();
+		mobile.x = atom.getIntProp(BHCollection.Atom.INT_PROPS.X);
+		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
+		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
+		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
+		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
+		mobile.status = atom.getStatus();
+		mobile.mobiletype = atom.getType();
+		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
+		
+		return mobile;
+	}
+	
+	public static BHClient.Cell bhCellToClient(BHLandscape.Cell c)
+	{
+		BHClient.Cell cell = new BHClient.Cell();
+		cell.id = c.getID();
+		cell.terrain = c.getTerrain().name();
+		cell.x = c.getX();
+		cell.y = c.getY();
+		cell.z = c.getZ();
+		
+		return cell;
+	}
+	
+	
+	/** This works over the published atom */
+	public BHClient.Item atomToItemCache(BHCollection.Atom atom)
+	{
+		BHClient.Item item = bhAtomToItem(atom);
 		
 		try
 		{
@@ -59,14 +111,6 @@ public class BHStorage
 			itemCereals.put(item.id, cereal);
 			
 			return item;
-			/*
-			dryer.addInt(atom.id);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.X]);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.Y]);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.Z]);
-			dryer.addString(atom.type);
-			return dryer.pull();
-			*/
 		}
 		catch (IOException x)
 		{
@@ -79,16 +123,7 @@ public class BHStorage
 	 *  */
 	public BHClient.Mobile atomToMobileCache(BHCollection.Atom atom)
 	{
-		BHClient.Mobile mobile = new BHClient.Mobile();
-		mobile.id = atom.getID();
-		mobile.x = atom.getIntProp(BHCollection.Atom.INT_PROPS.X);
-		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
-		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
-		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
-		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
-		mobile.status = atom.getStatus();
-		mobile.mobiletype = atom.getType();
-		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
+		BHClient.Mobile mobile = bhAtomToMobile(atom);
 		
 		try
 		{
@@ -98,14 +133,6 @@ public class BHStorage
 			mobileCereals.put(mobile.id, cereal);
 			
 			return mobile;
-			/*
-			dryer.addInt(atom.id);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.X]);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.Y]);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.Z]);
-			dryer.addString(atom.type);
-			return dryer.pull();
-			*/
 		}
 		catch (IOException x)
 		{
@@ -116,16 +143,7 @@ public class BHStorage
 	
 	public BHClient.Mobile atomToHeroCache(BHCollection.Atom atom)
 	{
-		BHClient.Mobile mobile = new BHClient.Mobile();
-		mobile.id = atom.getID();
-		mobile.x = atom.getIntProp(BHCollection.Atom.INT_PROPS.X);
-		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
-		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
-		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
-		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
-		mobile.status = atom.getStatus();
-		mobile.mobiletype = atom.getType();
-		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
+		BHClient.Mobile mobile = bhAtomToHero(atom);
 		
 		try
 		{
@@ -135,14 +153,6 @@ public class BHStorage
 			mobileCereals.put(mobile.id, cereal);
 			
 			return mobile;
-			/*
-			dryer.addInt(atom.id);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.X]);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.Y]);
-			dryer.addInt(atom.intProps[Atom.INT_PROPS.Z]);
-			dryer.addString(atom.type);
-			return dryer.pull();
-			*/
 		}
 		catch (IOException x)
 		{
@@ -150,6 +160,7 @@ public class BHStorage
 			
 		}
 	}	
+	
 	
 	/** returns an update set from the given timecode until now */
 	public UpdateBin getUpdate(BHEngine engine, int timecode, int subscriptionID, int mobileID)
@@ -189,13 +200,7 @@ public class BHStorage
 		{
 			if (c.getTimecode() > timecode)
 			{
-				BHClient.Cell cell = new BHClient.Cell();
-				cell.id = c.getID();
-				cell.terrain = c.getTerrain().name();
-				cell.x = c.getX();
-				cell.y = c.getY();
-				cell.z = c.getZ();
-				
+				BHClient.Cell cell = bhCellToClient(c);
 				res.cells.add(cell);
 			}
 		}

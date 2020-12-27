@@ -5,16 +5,16 @@ import net.vbelev.utils.*;
 /**
  * Our own little session storage
  */
-public class ViewBag
+public class SessionBag
 {
-	private static Map<String, ViewBag> bagList = new Hashtable<String, ViewBag>();
+	private static Map<String, SessionBag> bagList = new Hashtable<String, SessionBag>();
 	
 	private static Object lock = new Object();
 	
 	private static String createKey()
 	{
 		String res = null;
-		ViewBag test = null;
+		SessionBag test = null;
 		synchronized(lock)
 		{
 			int count = 0;
@@ -33,11 +33,11 @@ public class ViewBag
 		return res;
 	}
 	
-	private static ViewBag getByKey(String key)
+	private static SessionBag getByKey(String key)
 	{
 		synchronized(lock)
 		{
-			ViewBag res = bagList.get(key);
+			SessionBag res = bagList.get(key);
 			return res;
 		}
 	}
@@ -47,10 +47,11 @@ public class ViewBag
 		synchronized (lock)
 		{
 			List<String> toDelete = new ArrayList<String>();
-			long flushTS = new Date().getTime() - 30 * 60 * 1000;
-			for (Map.Entry<String, ViewBag> entry : bagList.entrySet())
+			//long flushTS = new Date().getTime() - 30 * 60 * 1000;
+			for (Map.Entry<String, SessionBag> entry : bagList.entrySet())
 			{
-				if (entry.getValue().touchTS < flushTS) toDelete.add(entry.getKey());
+				if (entry.getValue().isValid(false)) toDelete.add(entry.getKey());
+				//if (entry.getValue().touchTS < flushTS) toDelete.add(entry.getKey());
 			}
 			for (String key : toDelete)
 			{
@@ -71,46 +72,58 @@ public class ViewBag
 		{
 			flush();
 			key = createKey();
-			bagList.put(key, new ViewBag());
+			bagList.put(key, new SessionBag());
 		}
 		return key;
 	}
 	
 	private long touchTS = 0;
+	private long expireTS = 0;
 	private Hashtable<String, String> vals = new Hashtable<String, String>();
 	
-	private ViewBag()
+	private SessionBag()
 	{
+		expireTS = new Date().getTime() + 60 * 60 * 1000;
 		touch();
+	}
+	
+	public boolean isValid(boolean touch)
+	{
+		long ts = new Date().getTime();
+		long flushTS = ts - 30 * 60 * 1000;
+		if (this.expireTS < ts || this.touchTS < flushTS) return false;
+		if (touch)
+		{
+			this.touch();
+		}
+		return true;
+
 	}
 	
 	public static boolean isValid(String bag)
 	{
 		if (Utils.IsEmpty(bag)) return false;
-		ViewBag b = getByKey(bag);
-		if (b != null)
-		{
-			b.touch();
-			return true;
-		}
-		return false;
+		SessionBag b = getByKey(bag);
+		if (b == null) return false;
+
+		return b.isValid(false);
 	}
 	
 	public static String get(String bag, String name)
 	{
 		if (bag == null || name == null) return null;
-		ViewBag b = getByKey(bag);
-		if (b == null) return null;
+		SessionBag b = getByKey(bag);
 		
-		b.touch();
+		if (b == null || !b.isValid(true)) return null;
+		
 		return b.vals.get(name);
 	}
 	
 	public static String put(String bag, String name, String val)
 	{
 		if (bag == null || name == null) return null;
-		ViewBag b = getByKey(bag);
-		if (b == null) return null;
+		SessionBag b = getByKey(bag);
+		if (b == null || !b.isValid(true)) return null;
 
 		synchronized(b)
 		{
@@ -131,8 +144,8 @@ public class ViewBag
 	public static String summary(String bag)
 	{
 		if (bag == null) return "";
-		ViewBag b = getByKey(bag);
-		if (b == null) return "";
+		SessionBag b = getByKey(bag);
+		if (b == null || !b.isValid(true)) return "";
 		String res = "";
 		synchronized(b)
 		{
@@ -148,8 +161,9 @@ public class ViewBag
 	{
 		Hashtable<String, String> res = new Hashtable<String, String>();
 		if (bag == null) return res;
-		ViewBag b = getByKey(bag);
-		if (b == null) return res;
+		SessionBag b = getByKey(bag);
+		if (b == null || !b.isValid(true)) return res;
+		
 		res.putAll(b.vals);
 		return res;
 	}

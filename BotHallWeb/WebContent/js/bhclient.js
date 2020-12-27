@@ -1,4 +1,31 @@
 /*
+ * API:
+ /#/create?protected=Y
+  * 	create a new session (optionally, protected)
+  * 	returns SessionInfo with sessionKey
+ /#/destroy?sessionkey=something
+  * 	destroys the session
+  * 	returns the same session key, or empty if the session could not be destroyed
+ /#/list
+  * 	returns [SessionInfo] of all existing sessions, their mobiles and clients
+ /#/cycle?sessionkey=something&run=Y
+  * 	starts/stops the session; Y = start, N = stop, O = one cycle
+  * 	returns the engine timecode as string 
+ /#/join?session=something&atom=something&sessionkey=something
+  * 	create a client
+  * 	session: the public session ID
+  * 	atom: the mobile to control; without a controlled mobile, the client will be an observer
+  * 	sessionkey: protected sessions require the session key to create a client
+  * 	returns the client key (or empty if it could not be created)
+ /#/leave?key=something
+  * 	destroy the client and release the controlled mobile
+ /#/update?key=something&full=Y
+  * 	get the update bin - changes since the previous update request
+  * 	if full=Y, get the update since the session start (the full data, including the map)
+ /#/map?session=something&key=something
+  * 	get the full map for this session, using either a public session ID or a client key
+  * 	maps can be retrieved without 
+ 
  * Status:
  		public int timecode;
 		public long updateTS;
@@ -70,7 +97,8 @@ function BHClient(url) {
 		},
 		
 		// == session props ==
-		sessionID: null,
+		userKey: null,
+		sessionId: null,
 		sessionKey: null,
 		clientKey: null, 
 		controlledMobileID: null, 
@@ -79,10 +107,10 @@ function BHClient(url) {
 		items: {},
 		mobiles: {},
 		buffs: {},
+		
 		// "events" are not updated from the server; they are handled with subscribe() and unsubscribe() 
 		events: {}, // events are stored as "eventname": [], 
-		
-		
+				
 		// == utility, events ==
 		logger: function(message, messageLevel){ // the logger function, it will be called as logger(message, messageLevel);
 			console.log("bhclient " + messageLevel + ": " + message);
@@ -178,123 +206,78 @@ function BHClient(url) {
 			}
 		},
 		
+		// === API ===
+		getuserkey: function(callback) {
+			return getuserkey(this, callback);
+		},
+
+		create: function(isProtected, callback) {
+			return create(this, isProtected, callback);
+		},
+		
+		destroy: function(sessionKey, callback) {
+			return destroy(this, sessionKey, callback);
+		},
+		
+		list: function(callback) {
+			return list(this, callback);
+		},
+		
+		join: function(sid, atomID, sKey, callback) { 
+			return join(this, sid, atomID, sKey, callback); 
+		},			
+		
+		leave: function(callback) {
+			return leave(this, callback);
+		},
+		
+		command: function(cmd, args, callback) {
+			return command(this, cmd, args, callback);
+		},
+		
 		// == start/stop server looping, if you own the session 
-		bhcycle: function(flag) {
-			if (this.sessionID && this.sessionKey) {
-				getJSON(this, "cycle", {
-					id: this.sessionID,
-					key: this.sessionKey,
-					run : flag? (flag == "O" ? "O" : "Y") : "N"
-				}, function(res) {
-					//alert("my apiUrl is " + this.url + ", join res=" + res);
-					this.log("cycleMode returns timecode=" + res, "INFO");
-				}.bind(this));
-			} else {
-				this.log("No session owned");
-			}
-		},
+		sessionCycle: function (flag) { 
+			return sessionCycle(this, flag); 
+		}, 
 		
-		joinSession: function(sid, atomID, callback) {
-			//joinSession(this, sid);
-			getJSON(this, "joinSession", {
-				id : sid,
-				atom: atomID
-			}, function(res) {
-				//alert("my apiUrl is " + this.url + ", join res=" + res);
-				this.clientKey = res;
-				this.trigger("joinSession");
-				if (typeof(callback) == "function") {
-					callback(res);
-				}
-			}.bind(this));
+		// === bag API ===
+		/**
+		 * If the provided bag key is valid, returns the same bag key;
+		 * if the bag key is absent or expired, returns a new bag key;
+		 * if the user key is not valid, returns ""
+		 */
+		createBag: function(bag, callback) {
+			return createBag(this, bag, callback);
 		},
-		
-		leaveSession: function(callback) {
-			//joinSession(this, sid);
-			getJSON(this, "leaveSession", {
-				id : this.sessionID,
-				key: this.clientKey
-			}, function(res) {
-				//alert("my apiUrl is " + this.url + ", join res=" + res);
-				this.clientKey = "";
-				this.trigger("leaveSession");
-				if (typeof(callback) == "function") {
-					callback(res);
-				}
-			}.bind(this));
-		},
-		
-		getViewbagValue: function(bag, name, callback) {
-			getJSON(this, "getval", {
-				bag : bag,
-				name: name
-			}, function(res) {
-				if (typeof(callback) == "function") {
-					callback(res);
-				}
-			}.bind(this));
-		},
-		
-		setViewbagValue: function(bag, name, value, callback) {
-			getJSON(this, "putval", {
-				bag : bag,
-				name: name,
-				value: value
-			}, function(res) {
-				if (typeof(callback) == "function") {
-					callback(res);
-				}
-			}.bind(this));
-		},
-		
-		action: function(action, args, callback) {
-			if (!args) {
-				args = [];
-			}
-			else if (args && typeof(args) != "object") {
-				args = [args];
-			}
 				
-			getJSON(this, "action", {
-				id : this.sessionID,
-				key: this.clientKey,
-				action: action,
-				args: args
-			}, function(res) {
-				if (typeof(callback) == "function") {
-					callback(res);
-				}
-			}.bind(this));
+		/**
+		 * Note that name can be a comma-separated list of names
+		 */
+		getBagValue: function(bagKey, name, callback) {
+			return getBagValue(this, bagKey, name, callback);
 		},
-		/*
-		joinMobile: function(name) {
-			getJSON(this, "joinMobile", {name: name}, function(res) {
-				//alert("my apiUrl is " + this.url + ", join res=" + res);
-				//this.sessionID = res;
-			}.bind(this));
-		}
-		*/
-		/*
-		, reportUrl: function() {
-			return this.url;
+		
+		putBagValue: function(bagKey, name, value, callback) {
+			return putBagValue(this, bagKey, name, value, callback);
 		},
-		useCallback: function(callback) {
-			callback();
-		},
-		reportUrl2: function() {
-			setTimeout(function() {
-				alert("self-report: " + url);
-			}, 10);
-		},
-		reportUrl3: function() {
-			this.useCallback(function() {
-				alert("async3: " + this.url + ", func: " + this.reportUrl());
-			}.bind(this));
-		}
-		*/
+		
+		/**
+		 * returns a {name: value} object with all bag values
+		 */
+		bag: function(bagKey, callback) {
+			return getBag(this, bagKey, callback);
+		},		
+
+		/**
+		 * returns the bag content as a string (for debugging purposes)
+		 */
+		bagSummary: function(bagKey, callback) {
+			return bagSummary(this, bagKey, callback);
+		}		
 	}
 }
 
+//  main loop using setTimeout()
 function mainLoopOld(bhclient, overtime) {
 	
 	if (!bhclient || !bhclient.runLoop)
@@ -330,11 +313,12 @@ function mainLoopOld(bhclient, overtime) {
 				mainLoop(bhclient, ot);
 			}, sleepTime);
 			*/
-			setTimeout(mainLoop, sleepTime, bhclient);
+			setTimeout(mainLoopOld, sleepTime, bhclient);
 		}
 	});
 }
 
+// main loop using setInterval()
 function mainLoop(bhclient) {
 	
 	if (!bhclient || !bhclient.runLoop)
@@ -367,56 +351,16 @@ function mainLoop(bhclient) {
 	}, bhclient.loopMilliseconds);
 }
 
-function innerLoop(bhclient, ts1) {
-	var ts2 = new Date().getTime();
-	var sleepTime = ts1 > ts2? ts1 - ts2: 1;
-	bhclient.loopLoad = Math.round((ts2 - ts1 + bhclient.loopMilliseconds) * 100 / bhclient.loopMilliseconds);
-	
-	if (bhclient.runLoop == "once") {
-		bhclient.log("cycled once and stopped", "INFO");
-		bhclient.runLoop = false;
-	} 
-	else if (bhclient.runLoop)
-	{
-		//bhclient.log("sleep for " + sleepTime, "INFO");
-		console.log("sleep for " + sleepTime, "INFO");
-		//console.log("loop proc=" + (ts2 - ts0) + ", sleep=" + sleepTime);
-		/*
-		setTimeout(function() {
-			var ts3 = new Date().getTime();
-			var ot = 0;
-			if (ts3 > ts1 + 1) {
-				console.log("overtime " + (ts3 - ts1));
-				ot = ts3 - ts1;
-			}
-			mainLoop(bhclient, ot);
-		}, sleepTime);
-		*/
-		setTimeout(mainLoop, sleepTime, bhclient);
-	}
-}
-
-function mainLoop2(bhclient, overtime) {
-	
-	if (!bhclient || !bhclient.runLoop)
-	{
-		return;
-	}
-	var ts0 = new Date().getTime();
-	var ts1 = ts0 + bhclient.loopMilliseconds - (overtime || 0);
-	//var ts1 = new Date().getTime() + bhclient.loopMilliseconds;
-	bhclient.loopTimecode++;
-	
-	getUpdate(bhclient, innerLoop, bhclient, ts1);
-}
 
 /**
  * Takes a promise from fetch and returns a promise with json.
- * Similar to the standard fetch/response.json() but handles empty response correctly
- * @param response
- * @returns
+ * Similar to the standard fetch/response.json() but handles an empty response correctly
  */
 function fetchJson(response) {
+	if (!response) {
+		return new Promise((resolve, reject) => { resolve(""); });
+	}
+	
 	return response
 	.text()
 	.then(function(respText) {
@@ -431,7 +375,39 @@ function fetchJson(response) {
 	});
 }
 
-function getJSON(bhclient, action, args, callback) {
+/**
+ * A simple wrapper over fetch()
+ */
+function getJSON(url, args, onSuccess, onError) {
+
+	if (args)
+	{
+		var oUrl = new URL(url);
+		for (var k in args) {
+			oUrl.searchParams.append(k, args[k] || "");
+		}
+		//console.dir(oUrl);
+		url = oUrl.href;				
+	}
+	
+	fetch(url
+	).then(function(response) {
+		if (response) { 
+			return fetchJson(response);
+		} else {
+			if (typeof (onError) == "function") onError("call failed");
+			//return null;
+		}
+	}).then(function (resp) {
+		if (typeof(onSuccess) == "function") onSuccess(resp);
+		
+	}).catch(function(error) {
+		if (typeof (onError) == "function") onError("call failed: " + error);
+		//return null;
+	});
+}
+
+function getJSONOld(bhclient, action, args, callback) {
 	var url = bhclient.url + action;
 	//console.log("getJSON called for action=" + action + ", args=" + JSON.stringify(args));
 	if (args)
@@ -469,13 +445,13 @@ function getJSON(bhclient, action, args, callback) {
 function getUpdate(bhclient, callback, arg1, arg2, arg3)
 {
 	bhclient.log("getUpdate start " + new Date(), "INFO");
-	bhclient.log("url: " + bhclient.url + "getUpdate", "INFO");
-	//var url = new URL(bhclient.url + "getUpdate");
-	//url.searchParams.append("sessionID", bhclient.sessionID);
-	var url = buildQuery(bhclient.url + "getUpdate", {
-		id: bhclient.sessionID,
-		key: bhclient.clientKey
+	bhclient.log("url: " + bhclient.url + "update", "INFO");
+
+	var url = buildQuery(bhclient.url + "update", {
+		id: bhclient.sessionId,
+		client: bhclient.clientKey
 	});
+	
 	var pingTS = new Date().getTime();
 	fetch(url
 	).then(function(response) {
@@ -651,6 +627,235 @@ function getMobiles(bh, x, y) {
 	return res;
 }
 
+//======= API functions =========
+
+/** 
+ * get user key (aka login)
+ */
+function getuserkey(bhclient, callback) {
+	getJSON(bhclient.url + "getuserkey", {
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("getuserkey: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+/** 
+ * create session
+ */
+function create(bhclient, isProtected, callback) {
+	getJSON(bhclient.url + "create", {
+		user: bhclient.userKey,
+		protected: isProtected
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("create: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+/** 
+ * destroy session
+ */
+function destroy(bhclient, sessionKey, callback) {
+	getJSON(bhclient.url + "destroy", {
+		session: sessionKey
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("destroy: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+/** 
+ * list sessions
+ */
+function list(bhclient, callback) {
+	getJSON(bhclient.url + "list", {
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("list: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+
+function sessionCycle(bhclient, flag) {
+	if (bhclient.sessionId && bhclient.sessionKey) {
+		getJSON(bhclient.url + "cycle", {
+			session: bhclient.sessionKey,
+			run : flag? (flag == "O" ? "O" : "Y") : "N"
+		}, 
+			function(res) {
+			//alert("my apiUrl is " + this.url + ", join res=" + res);
+			bhclient.log("cycleMode returns timecode=" + res, "INFO");
+		}, 
+		function(err) {
+			bhclient.log("cycle: " + err, "ERROR");
+		});
+	} else {
+		bhclient.log("No session owned");
+	}
+}
+
+function join(bhclient, sid, mobileID, sKey, callback) {
+	//joinSession(this, sid);
+	getJSON(bhclient.url + "join", {
+		sid : sid,
+		atom: mobileID,
+		session: sKey
+	}, 
+	function(res) {
+		//alert("my apiUrl is " + this.url + ", join res=" + res);
+		bhclient.clientKey = res;
+		bhclient.trigger("joinSession");
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	}, 
+	function(err) {
+		bhclient.log("join: " + err, "ERROR");
+	});
+}
+
+function leave(bhclient, callback) {
+	//joinSession(this, sid);
+	getJSON(bhclient.url + "leave", {
+		client: bhclient.clientKey
+	}, function(res) {
+		//alert("my apiUrl is " + this.url + ", join res=" + res);
+		bhclient.clientKey = "";
+		bhclient.trigger("leaveSession");
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("leave: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+function command(bhclient, cmd, args, callback) {
+	if (!args) {
+		args = [];
+	}
+	else if (args && typeof(args) != "object") {
+		args = [args];
+	}
+		
+	getJSON(bhclient.url + "command", {
+		client: bhclient.clientKey,
+		cmd: cmd,
+		args: args
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("command: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+// === bag API ===
+function createBag(bhclient, bag, callback) {
+	//joinSession(this, sid);
+	getJSON(bhclient.url + "bag/create", {
+		user: bhclient.userKey,
+		bag: bag
+	}, function(res) {
+		//alert("my apiUrl is " + this.url + ", join res=" + res);
+		//console.log("bag/create result: " + res + ", callback=" + callback);
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("bag/create: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+function getBagValue(bhclient, bag, name, callback) {
+	getJSON(bhclient.url + "bag/get", {
+		bag : bag,
+		name: name
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("bag/get: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+function putBagValue(bhclient, bag, name, value, callback) {
+	getJSON(bhclient.url +"bag/put", {
+		bag : bag,
+		name: name,
+		value: value
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("bag/put: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+function bagSummary(bhclient, bag, callback) {
+	getJSON(bhclient.url +"bag/summary", {
+		bag : bag
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("bag/summary: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+function getBag(bhclient, bag, callback) {
+	getJSON(bhclient.url +"bag", {
+		bag : bag
+	}, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("bag: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+// == general purpose javascript helpers ==
+
 function formatDateTime(dt) {
     var m = dt || new Date();
     var dateString =
@@ -667,8 +872,9 @@ function formatDateTime(dt) {
 
 function buildQuery(url, args) {
 	if (!args) return url;
-	if (typeof(args) != "object") return url + "?" + args;
-	var isFirst = true;
+	var isFirst = (url || "").indexOf("?") < 0;
+	if (typeof(args) != "object") 
+		return url + (isFirst? "?" : "&") + args;
 	var res = url;
 	for (var k in args) {
 		res += isFirst? "?" : "&";
@@ -686,34 +892,6 @@ function getCookie(name) {
     return b ? b.pop() : '';
 }
 
-function bagSummary(bhclient, bag) {
-	if (!bag) {
-		bag = getCookie("viewbag");
-	}
-	if (!bag) {
-		console.log("No bag token");
-	} else {
-		fetch(bhclient.url + "bagsummary?bag=" + bag
-		).then(function(response) {
-			if (response) {
-				var fetchVal =  fetchJson(response);
-				//console.log("bagsummary then fetchVal: ");
-				//console.dir(fetchVal);
-				return fetchVal;
-			}
-			else {
-				bhclient.log("viewbag failed", "ERROR");
-			}
-		}).then(function (resp) {
-			console.log("viewbag " + bag);
-			console.dir(resp);
-			
-		}).catch(function(error) {
-		    bhclient.log("getJSON failed for viewbag: " + error, "ERROR");
-		    callback(null);
-		});
-	}
-}
 
 function getQueryParam(name, searchString) {
 	var match = (new RegExp('[?&]'+encodeURIComponent(name)+'=([^&]*)')).exec(searchString || location.search)
@@ -721,3 +899,4 @@ function getQueryParam(name, searchString) {
 	      return decodeURIComponent(match[1]);
 	return null;
 }
+
