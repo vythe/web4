@@ -10,11 +10,27 @@ import net.vbelev.bothall.core.BHOperations.BHBuff;
 
 /** 
  * A set of objects to run a session over an engine.
- * Session is shared across threats (multiple clients).
+ * Session is shared across threads (multiple clients).
  */
 public class BHSession
 {
-	
+	/**
+	 * These commands are processed by BHSession itself, not by the subclasses 
+	 */
+	public static class COMMAND
+	{
+		/**
+		 * JOINCLIENT is processed by the listener (StreamServer)
+		 * and not passed to BHSession for processing at all
+		 */
+		public static final String JOINCLIENT = "JOINCLIENT".intern();
+		public static final String JOIN = "JOIN".intern(); //inrArgs: [direction]
+		public static final String CREATE = "CREATE".intern();
+		//public static final String DIE = "die".intern();
+		//public static final String ROBOT = "robot".intern(); // stringArgs: [clientKey, robotType], where clientKey may be null
+		
+		private COMMAND() {}
+	}
 	/** Note that the update bin is not serialized, so as to support json clients.
 	 *  */
 	public static class UpdateBin
@@ -27,19 +43,39 @@ public class BHSession
 		public BHClient.Status status;
 	}
 	
+	/** Event handler for the engine.publishEvent */
+	public static class PublishEventArgs extends EventBox.EventArgs
+	{
+		public int timecode;
+		
+		public PublishEventArgs(int timestamp)
+		{
+			this.timecode = timestamp;
+		}
+	}
+	
+	
 	private static int sessionInstanceSeq = 0;
 	private static final ArrayList<BHSession> sessionList = new ArrayList<BHSession>();
+	public static final Object lock = new Object();
 	
-	private int sessionID = 0;
-	private BHEngine engine;
+	private int sessionID;
+	private String sessionKey;
+
+	protected BHEngine engine;
 
 	public int engineTimecode = 0;
+	public boolean isProtected = false;
 	public final Map<Integer, String> itemCereals;
 	public final Map<Integer, BHClient.Item> itemExports;
 	public final Map<Integer, String> mobileCereals;
 	public final Map<Integer, BHClient.Mobile> mobileExports;
 	public final DryCereal dryer = new DryCereal();
+	public final Date createdDate = new Date();
 
+	
+	public final EventBox.Event<PublishEventArgs> publishEvent = new EventBox.Event<PublishEventArgs>();
+	public final BHStorage storage = new BHStorage();
 	
 	public static BHSession createSession()
 	{
@@ -53,26 +89,78 @@ public class BHSession
 	public static BHSession createSession(BHEngine e)
 	{
 		BHSession s = new BHSession(e);
-		s.sessionID = ++sessionInstanceSeq;
-		synchronized(sessionList)
-		{
-			sessionList.add(s);
-		}
+		registerSession(s);
 		
 		return s;
 	}
+	
+	public static boolean destroySession(BHSession s)
+	{
+		synchronized(lock)
+		{
+			if (!sessionList.remove(s))
+				; // whatever
+				//return false;			
+		}
+		BHEngine engine = s.getEngine();
+		if (engine != null)
+		{
+			engine.stopCycling();
+			engine.getMessages().clear();
+		}
+		s.sessionID = 0;
+		s.sessionKey = null;
+		
+		return true;
+	}
+	
+	
+	public static int getSessionCount()
+	{
+		return sessionList.size();
+	}
+	
+	public static List<BHSession> getSessionList()
+	{
+		ArrayList<BHSession> res = new ArrayList<BHSession>();
+		
+		synchronized(lock)
+		{
+			res.addAll(sessionList);
+		}
+		return res;
+	}
+	
+	public static String generateSessionKey(int length) 
+	{
+		int cnt = 0;
+		if (length <= 0) return "";
+		
+		do
+		{
+			String res = Utils.randomString(length);			
+			BHSession s = getSession(res);
+			if (s == null)
+			{
+				return res;
+			}
+		} while (cnt < 10);
+		throw new Error("Failed to create a unique password of length " + length);
+	}	
 	
 	private static void registerSession(BHSession s)
 	{
 		s.sessionID = ++sessionInstanceSeq;
 		synchronized(sessionList)
 		{
+			s.sessionKey = generateSessionKey(8);
 			sessionList.add(s);
 		}
 	}
 	
-	public static BHSession getSession(int id)
+	public static BHSession getSession(Integer id)
 	{
+		if (id == null || id <= 0) return null;
 		synchronized(sessionList)
 		{
 			for (BHSession s : sessionList)
@@ -83,7 +171,48 @@ public class BHSession
 		return null;
 	}	
 	
-	private BHSession()
+	public static BHSession getSession(String key)
+	{
+		if (Utils.IsEmpty(key)) return null;
+		synchronized(lock)
+		{
+			for (BHSession s : sessionList)
+			{
+				if (key.equals(s.sessionKey)) return s;
+			}
+		}
+		return null;
+		
+	}
+	
+	public BHClientAgent createAgent()
+	{
+		BHClientAgent agent = BHClientAgent.createAgent();
+		agent.sessionID = this.getID();
+		agent.subscriptionID = this.getEngine().getMessages().addSubscription();
+		
+		return agent;
+	}
+
+	public void detachAgent(BHClientAgent agent)
+	{
+		if (agent == null  || agent.getID() == 0) return;
+		// we need to check the session and possibly stop it...
+		
+		BHSession s = this; //PacmanSession.getSession(agent.sessionID);	
+		if (s != null)
+		{
+			if (s.getID() != agent.sessionID)
+			{
+				throw new IllegalArgumentException("client session Id (" + agent.sessionID + ") does not match the session id (" + s.getID()  + ")");
+			}
+			s.getEngine().getMessages().removeSubscription(agent.subscriptionID);
+		}
+		agent.subscriptionID = 0;
+		agent.sessionID = 0;
+		agent.detach();
+	}		
+	protected BHSession()
 	{
 		itemCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
 		itemExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Item>());
@@ -95,28 +224,23 @@ public class BHSession
 	
 	private BHSession(BHEngine e)
 	{		
+		this();
+		
 		engine = e;
 		engine.clientCallback = new EngineCallback();
-
-		itemCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
-		itemExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Item>());
-		mobileCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
-		mobileExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Mobile>());
-		
-		registerSession(this);
 	}
 	
 	private BHSession(BHEngine e, BHEngine.IClientCallback callback)
 	{
+		this();
+		
 		engine = e;
 		engine.clientCallback = callback;
-
-		itemCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
-		itemExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Item>());
-		mobileCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
-		mobileExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Mobile>());
-		
-		registerSession(this);	
+	}
+	
+	public void finalize()
+	{
+		destroySession(this);
 	}
 	
 	public class EngineCallback implements BHEngine.IClientCallback
@@ -163,7 +287,130 @@ public class BHSession
 	
 	public int getID() { return sessionID; }
 	
+	public String getSessionKey() { return sessionKey; }
+	
 	public BHEngine getEngine() { return engine; }
+	
+	/**
+	 * Takes a client command wrapped in BHClient.Command and returns 
+	 * a commands' execution result, wrapped in BHClient.Command, or an Error
+	 * 
+	 * This method should be overridden in a subclass. 
+	 */
+	public BHClient.Element processCommand(BHClientAgent agent, BHClient.Command cmd)
+	{
+		return null;
+	}
+	
+	/**
+	 * A special case: commands like "login", "create session", "join session"
+	 * can be performed without a BHClientAgent
+	 */
+	public static BHClient.Element processCommand(String clientKey, BHClient.Command cmd)
+	{
+		BHClientAgent agent = null;
+		BHClient.Element res;
+		if (clientKey != null)
+		{
+			agent = BHClientAgent.getClient(null, clientKey);
+		}
+		
+		// server-level commands do not require an agent
+		if (cmd.command.equals(COMMAND.JOIN)) // intArgs: [sessionID, atom ID], stringArgs: [userKey, sessionKey] return clientKey
+		{
+			BHClient.Command resCommand = new BHClient.Command(0, 1);
+			res = resCommand;
+			resCommand.command = "AGENT";
+			int sessionID = cmd.intArgs[0];
+			int atomID = cmd.intArgs[1];
+			String userKey = cmd.stringArgs.length > 0? cmd.stringArgs[0] : "";
+			String sessionKey = cmd.stringArgs.length > 1? cmd.stringArgs[1] : "";
+			boolean success = true;
+			BHSession s = BHSession.getSession(sessionID);
+			
+			if (s.isProtected && (Utils.IsEmpty(sessionKey) || !sessionKey.equals(s.getSessionKey())))
+			{
+				//res.stringArgs[0] = "";
+				success = false;
+			}
+			else
+			{
+				synchronized(BHClientAgent.lock)
+				{
+					if (atomID > 0)
+					{
+						// check that the atom is available
+						List<BHClientAgent> agents = BHClientAgent.agentList(s.sessionID);
+						for (BHClientAgent a : agents)
+						{
+							if (a.atomID == atomID)
+								//res.stringArgs[0] = ""; // already used; do not create agent
+								success = false;
+						}
+					}
+					if (success)
+					{
+						agent = s.createAgent();
+						agent.atomID = atomID;
+						agent.controlledBy = "User " + userKey;
+						resCommand.stringArgs[0] = agent.clientKey;
+					}			
+				}				
+			}
+			if (!success)
+			{
+				resCommand.stringArgs[0] = "";
+			}
+			return res;
+		}
+		else if (COMMAND.CREATE.equals(cmd.command))  // [userKey, session type, is protected]
+		{
+			String userKey = cmd.stringArgs.length > 0? cmd.stringArgs[0] : "";
+			String sessionType = cmd.stringArgs.length > 1? cmd.stringArgs[1] : "";
+			String isProtected = cmd.stringArgs.length > 2? cmd.stringArgs[2] : "";
+			
+			boolean success = true;
+			
+			if (!BHUser.isValidUserKey(userKey))
+			{
+				success = false;
+				res = new BHClient.Error(0, "Invalid  user key");
+			}
+			else if (!Utils.IsEmpty(sessionType) && !"pacman".equals(sessionType))
+			{
+				success = false;
+				res = new BHClient.Error(0, "Invalid  session type");
+			}
+			if (success)
+			{
+				BHSession s = PacmanSession.createSession();
+				BHClient.Command resCommand = new BHClient.Command(1, 1);
+				res = resCommand;
+				resCommand.command = "SESSION";
+				resCommand.intArgs[0] = s.sessionID;
+				resCommand.stringArgs[0] = s.sessionKey;
+			}
+			else
+			{
+				res = null; // won't happen
+			}
+			return res;
+		}
+		else if (agent == null)
+		{
+			res = new BHClient.Error(0, "Invalid or missing client key");
+			return res;
+		}
+		
+			
+		BHSession session = BHSession.getSession(agent.sessionID);
+		if  (session == null)
+		{
+			res = new BHClient.Error(0, "Invalid or missing session ID: " + agent.sessionID);
+			return res;
+		}
+		return session.processCommand(agent, cmd);
+	}
 	/*
 	public final List<BHClientAgent> agents = new ArrayList<BHClientAgent>();	
 
@@ -188,6 +435,27 @@ public class BHSession
 		}
 	}
 	*/
+
+	public static boolean postMessage(String clientKey, BHCollection.EntityTypeEnum target, int targetID, String message)
+	{
+		BHClientAgent agent = null;
+		BHClient.Element res;
+		BHSession s = null;
+		if (clientKey != null)
+		{
+			agent = BHClientAgent.getClient(null, clientKey);
+		}
+		if (agent != null && agent.sessionID > 0)
+		{
+			s = BHSession.getSession(agent.sessionID);
+		}
+		if (s != null)
+		{
+			s.getEngine().getMessages().addMessage(new BHMessageList.Message(target, targetID, message));
+			return true;
+		}
+		return false;
+	}
 	
 	/** This works over the published atom */
 	public BHClient.Item atomToItemCache(BHCollection.Atom atom)
@@ -358,7 +626,7 @@ public class BHSession
 		{
 			return null; // already moving that way
 		}
-		BHLandscape.Cell tCell = s.engine.getLandscape().getCell(me.getX(), me.getY(), me.getZ(), direction);
+		BHLandscape.Cell tCell = s.engine.getLandscape().getNextCell(me, direction);
 		if (tCell.getTerrain() == BHLandscape.TerrainEnum.LAND)
 		{
 			// monsters won't move into each other

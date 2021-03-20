@@ -231,8 +231,12 @@ function BHClient(url) {
 			return leave(this, callback);
 		},
 		
-		command: function(cmd, args, callback) {
-			return command(this, cmd, args, callback);
+		command: function(cmd, intArgs, stringArgs, callback) {
+			return command(this, cmd, intArgs, stringArgs, callback);
+		},
+		
+		commandOld: function(cmd, args, callback) {
+			return commandOld(this, cmd, args, callback);
 		},
 		
 		// == start/stop server looping, if you own the session 
@@ -384,7 +388,14 @@ function getJSON(url, args, onSuccess, onError) {
 	{
 		var oUrl = new URL(url);
 		for (var k in args) {
-			oUrl.searchParams.append(k, args[k] || "");
+			var val = args[k] || "";
+			if (typeof(val) == "object") {
+				for (var k2 in val) {
+					oUrl.searchParams.append(k, val[k2] || "");
+				}
+			} else {
+				oUrl.searchParams.append(k, val);
+			}
 		}
 		//console.dir(oUrl);
 		url = oUrl.href;				
@@ -532,6 +543,7 @@ function getUpdate(bhclient, callback, arg1, arg2, arg3)
 		
 	}).catch(function(error) {
 	    bhclient.log(error,"ERROR");
+	    bhclient.runLoop = false;	    
 	});
 }
 /** Same as BHLandscape.cellShifts;
@@ -716,6 +728,17 @@ function sessionCycle(bhclient, flag) {
 }
 
 function join(bhclient, sid, mobileID, sKey, callback) {
+	//  // intArgs: [sessionID, atom ID], stringArgs: [userKey, sessionKey] return clientKey
+	command(bhclient, "JOIN", [sid, mobileID], [bhclient.userKey, sKey], function(res) {
+		//bhclient.clientKey = res;
+		bhclient.trigger("joinSession");
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	});
+}
+
+function joinOld(bhclient, sid, mobileID, sKey, callback) {
 	//joinSession(this, sid);
 	getJSON(bhclient.url + "join", {
 		sid : sid,
@@ -753,7 +776,46 @@ function leave(bhclient, callback) {
 	});
 }
 
-function command(bhclient, cmd, args, callback) {
+function command(bhclient, cmd, intArgs, stringArgs, callback) {
+	if (!intArgs) {
+		intArgs = [];
+	}
+	else if (intArgs && typeof(intArgs) != "object") {
+		intArgs = [intArgs];
+	}
+		
+	if (!stringArgs) {
+		stringArgs = [];
+	}
+	else if (stringArgs && typeof(stringArgs) != "object") {
+		stringArgs = [stringArgs];
+	}
+	
+	var callArgs = {
+		client: bhclient.clientKey,
+		cmd: cmd
+	};
+	if (intArgs.length > 0)
+	{
+		callArgs.intArgs = intArgs;
+	}
+	if (stringArgs.length > 0)
+	{
+		callArgs.stringArgs = stringArgs;
+	}
+	
+	getJSON(bhclient.url + "command", callArgs, function(res) {
+		if (typeof(callback) == "function") {
+			callback(res);
+		}
+	},
+	function (err) {
+		bhclient.log("command: " + err, "ERROR");
+		callback(null);
+	});
+}
+
+function commandOld(bhclient, cmd, args, callback) {
 	if (!args) {
 		args = [];
 	}
@@ -761,7 +823,7 @@ function command(bhclient, cmd, args, callback) {
 		args = [args];
 	}
 		
-	getJSON(bhclient.url + "command", {
+	getJSON(bhclient.url + "commandOld", {
 		client: bhclient.clientKey,
 		cmd: cmd,
 		args: args
@@ -771,7 +833,7 @@ function command(bhclient, cmd, args, callback) {
 		}
 	},
 	function (err) {
-		bhclient.log("command: " + err, "ERROR");
+		bhclient.log("commandOld: " + err, "ERROR");
 		callback(null);
 	});
 }

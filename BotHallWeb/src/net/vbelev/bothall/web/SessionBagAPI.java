@@ -3,9 +3,9 @@ package net.vbelev.bothall.web;
 import java.util.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
-import javax.xml.bind.annotation.XmlRootElement;
+//import javax.xml.bind.annotation.XmlRootElement;
 
-import net.vbelev.utils.Utils;
+import net.vbelev.utils.*;
 
 @Path("/")
 public class SessionBagAPI
@@ -27,7 +27,7 @@ public class SessionBagAPI
 			)
 	{
 		String res = "";
-		if (!BotHallAPI.isValidUserKey(userKey))
+		if (!BHUser.isValidUserKey(userKey))
 		{
 			res = "";
 		}

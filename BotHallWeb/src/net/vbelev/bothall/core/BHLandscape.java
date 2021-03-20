@@ -250,9 +250,20 @@ public class BHLandscape
 		;*/
 		Cell res = findCell(cells, x, y, z, true);
 		return res;
+	}	
+	
+	public Cell getNextCell(Coords c, int direction)
+	{
+		if (direction < 0 || direction >= cellShifts.length)
+		{
+			return new Cell(c.getX(), c.getY(), c.getZ(), TerrainEnum.VOID);
+		}
+		int[] shifts = cellShifts[direction];
+		Cell res = findCell(cells, c.getX() + shifts[0], c.getY() + shifts[1], c.getZ() + shifts[2], true);
+		return res;
 	}
 	
-	public Cell getCell(int x, int y, int z, int direction)
+	public Cell getNextCell(int x, int y, int z, int direction)
 	{
 		/*Cell res = cells.stream()
 				.filter(q -> q.m_x == x && q.m_y == y && q.m_z == z)
@@ -275,7 +286,7 @@ public class BHLandscape
 		Cell res = findCell(cells, x + shifts[0], y + shifts[1], z + shifts[2], true);
 		return res;
 	}
-	
+
 	public Cell getByID(int id)
 	{
 		Cell res = cells.stream()

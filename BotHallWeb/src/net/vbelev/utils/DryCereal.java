@@ -19,7 +19,7 @@ public class DryCereal
 		STRINGPART('P', 100), // longer strings somehow
 		REF('R', 4), // an int (up to 65535_; the serializer will know it's a reference to another object
 		START('J', 4), // object start with the obejct reference
-		END('E', 8); // object end with the obejct reference
+		END('E', 4); // object end with the obejct reference
 
 		public final char typeCode;
 		public final int length;
@@ -42,11 +42,72 @@ public class DryCereal
 	public static class Flake
 	{
 		public CerealType type;
-		public Object value;
+		private Object value;
 
+		protected Flake()
+		{
+		}
+		
+		public Flake (CerealType t, Object val)
+		{
+			type = t;
+			value = val;
+			//System.out.println("flake " + t.name() + ": " + (val == null? "(null)" : val.toString()));
+		}
+		
 		public String toString()
 		{
 			return type + ":" + value;
+		}
+		
+		public byte getByte()
+		{
+			if (type != CerealType.BYTE)
+			{
+				throw new IllegalArgumentException("Flake " + type.name() + " is not byte"); 
+			}
+			if (value == null) return 0;
+			return (byte)value;
+		}
+		
+		public short getShort()
+		{
+			if (type != CerealType.SHORT && type != CerealType.START && type != CerealType.END)
+			{
+				throw new IllegalArgumentException("Flake " + type.name() + " is not short"); 
+			}
+			if (value == null) return 0;
+			return (short)value;
+		}
+		
+		public int getInteger()
+		{
+			if (type != CerealType.INT)
+			{
+				throw new IllegalArgumentException("Flake " + type.name() + " is not integer"); 
+			}
+			if (value == null) return 0;
+			return (int)value;
+		}
+		
+		public long getLong()
+		{
+			if (type != CerealType.LONG)
+			{
+				throw new IllegalArgumentException("Flake " + type.name() + " is not long"); 
+			}
+			if (value == null) return 0;
+			return (long)value;
+		}
+		
+		public String getString()
+		{
+			if (type != CerealType.STRING && type != CerealType.MONIKER)
+			{
+				throw new IllegalArgumentException("Flake " + type.name() + " is not string"); 
+			}
+			if (value == null) return null;
+			return (String)value;
 		}
 	}
 
@@ -82,6 +143,7 @@ public class DryCereal
 				{
 					do
 					{
+						nextChar = -1;
 						nextChar = reader.read();
 					}
 					while (Character.isWhitespace((char)nextChar));
@@ -94,6 +156,59 @@ public class DryCereal
 			return (nextChar >= 0);
 		}
 
+		/** After en error, read everything from the input stream, return it as a string */
+		public synchronized String skipToEnd()
+		{
+			StringBuilder b = new StringBuilder();
+			if (nextChar >= 0)
+			{
+				b.append((char)nextChar);
+			}
+			nextChar = -1;
+			try
+			{
+				int c;
+				do
+				{
+					c = reader.read();
+					if (c < 0) break;
+					
+					b.append((char)c);
+				}
+				while (c >= 0);
+			}
+			catch (IOException x)
+			{
+			}
+			return b.toString();			
+		}
+		
+		public synchronized String skipLine()
+		{
+			StringBuilder b = new StringBuilder();
+			if (nextChar >= 0)
+			{
+				b.append((char)nextChar);
+			}
+			nextChar = -1;
+			try
+			{
+				int c;
+				do
+				{
+					c = reader.read();
+					if (c < 0 || c == '\n') break;
+					
+					b.append((char)c);
+				}
+				while (c >= 0 );
+			}
+			catch (IOException x)
+			{
+			}
+			return b.toString();			
+		}
+		
 		private String getStringFromReader()
 		{
 			nextChar = -1; 
@@ -124,10 +239,10 @@ public class DryCereal
 			}
 			if (!hasNext())
 			{
-				throw new NoSuchElementException();
+				throw new NoSuchElementException("DryCereal.next - no next byte");
 			}
 						
-			Flake res = new Flake();
+			Flake res = null; //new Flake();
 			CerealType type = CerealType.fromChar((char) nextChar);
 			if (type == CerealType.STRING || type == CerealType.STRINGPART)
 			{
@@ -150,12 +265,13 @@ public class DryCereal
 				resString += getStringFromReader();
 				//nextChar = getReaderChar(reader);
 
-				res.type = CerealType.STRING;
-				res.value = resString;
+				//res.type = CerealType.STRING;
+				//res.value = resString;
+				res = new Flake(CerealType.STRING, resString);
 			}
 			else
 			{
-				res.type = type;
+				//res.type = type;
 				int len = type.length;
 				long longValue;
 				char[] chars = getReaderChars(reader, len);
@@ -167,64 +283,75 @@ public class DryCereal
 						longValue = Decimal
 								.fromString2(new String(chars), null, 16)
 								.toLong();
-						res.value = (byte) longValue;
+						//res.value = (byte) longValue;
+						res = new Flake(CerealType.BYTE, (byte)longValue);
 						break;
 					case SHORT :
 						// longValue = Decimal.digitsToLong(chars, 16);
 						longValue = Decimal
 								.fromString2(new String(chars), null, 16)
 								.toLong();
-						res.value = (short) longValue;
+						//res.value = (short) longValue;
+						res = new Flake(CerealType.SHORT, (short)longValue);
 						break;
 					case INT :
 						// longValue = Decimal.digitsToLong(chars, 16);
 						longValue = Decimal
 								.fromString2(new String(chars), null, 16)
 								.toLong();
-						res.value = (int) longValue;
+						//res.value = (int) longValue;
+						res = new Flake(CerealType.INT, (int)longValue);
 						break;
 					case LONG :
 						// longValue = Decimal.digitsToLong(chars, 16);
 						longValue = Decimal
 								.fromString2(new String(chars), null, 16)
 								.toLong();
-						res.value = (long) longValue;
+						//res.value = (long) longValue;
+						res = new Flake(CerealType.LONG, (long)longValue);
 						break;
 					case TIME :
 						// longValue = Decimal.digitsToLong(chars, 16);
 						longValue = Decimal
 								.fromString2(new String(chars), null, 16)
 								.toLong();
-						res.value = new Date(longValue);
-						break;
+						//res.value = new Date(longValue);
+						res = new Flake(CerealType.TIME, (long)longValue);
+						throw new IllegalArgumentException("CerealType.TIME is not supported");
+						//break;
 					case FLOAT :
 						Decimal floatDecimal = Decimal.fromString2(
 								new String(chars, 0, 7),
 								new String(chars, 7, 4), 16);
-						res.value = (float) floatDecimal.toDouble();
+						//res.value = (float) floatDecimal.toDouble();
+						res = new Flake(CerealType.FLOAT, (float)floatDecimal.toDouble());
 						break;
 					case DOUBLE :
 						Decimal doubleDecimal = Decimal.fromString2(
 								new String(chars, 0, 17),
 								new String(chars, 17, 9), 16);
-						res.value = (float) doubleDecimal.toDouble();
+						//res.value = (float) doubleDecimal.toDouble();
+						res = new Flake(CerealType.DOUBLE, doubleDecimal.toDouble());
 						break;
 					case MONIKER :
-						res.value = new String(chars, 1, (int)(chars[0] - 'A'));
+						//res.value = new String(chars, 1, (int)(chars[0] - 'A'));
+						res = new Flake(CerealType.MONIKER, new String(chars, 1, (int)(chars[0] - 'A')));
 						break;
 					case START :
 						// longValue = Decimal.digitsToLong(chars, 16);
 						longValue = Decimal
 								.fromString2(new String(chars), null, 16)
 								.toLong();
-						res.value = (short) longValue;
+						//res.value = (short) longValue;
+						res = new Flake(CerealType.START, (short)longValue);
 						break;
 					case END :
 						// longValue = Decimal.digitsToLong(chars, 16);
 						longValue = Decimal
 								.fromString2(new String(chars), null, 16)
 								.toLong();
-						res.value = (short) longValue;
+						//res.value = (short) longValue;
+						res = new Flake(CerealType.END, (short)longValue);
 						break;
 					default :
 						throw new IllegalArgumentException(
@@ -233,6 +360,7 @@ public class DryCereal
 				}
 			}
 			nextChar = -1;
+			//System.out.println("DC:" + res.toString());
 			return res;
 		}
 	}
@@ -330,7 +458,7 @@ public class DryCereal
 	}
 
 	/** Ends the current output line and flushes the output stream */
-	public void flush() throws IOException
+	public synchronized void flush() throws IOException
 	{
 		flush(-1);
 	}
@@ -338,7 +466,7 @@ public class DryCereal
 	/** Checks if there is least extraLength chars left in the current line;
 	 * if there is not - ends the current line and flushes the output stream
 	 */
-	private void flush(int extraLength) throws IOException
+	private synchronized void flush(int extraLength) throws IOException
 	{
 		if (buff.length() == 0) return;
 		
@@ -348,6 +476,7 @@ public class DryCereal
 			char[] line = new char[buff.length()];
 			buff.getChars(0, line.length, line, 0);
 			buff.setLength(0);
+			//System.out.println("dry write [" + new String(line) + "]"); 
 			writer.write(line);
 			writer.flush();
 		}
@@ -367,14 +496,14 @@ public class DryCereal
 		}
 	}
 
-	public void addByte(int val) throws IOException
+	public synchronized void addByte(int val) throws IOException
 	{
 		flush(3);
 		buff.append(CerealType.BYTE.typeCode);
 		addDigits(val, 2);
 	}
 
-	public void addShort(int val) throws IOException
+	public synchronized void addShort(int val) throws IOException
 	{
 		flush(6);
 		buff.append(CerealType.SHORT.typeCode);
@@ -390,21 +519,21 @@ public class DryCereal
 		}
 	}
 
-	public void addInt(int val) throws IOException
+	public synchronized void addInt(int val) throws IOException
 	{
 		flush(10);
 		buff.append(CerealType.INT.typeCode);
 		buff.append(Decimal.longToString(val, 8, 16));
 	}
 
-	public void addLong(long val) throws IOException
+	public synchronized void addLong(long val) throws IOException
 	{
 		flush(18);
 		buff.append(CerealType.LONG.typeCode);
 		buff.append(Decimal.longToString(val, 16, 16));
 	}
 
-	public void addTime(Date d) throws IOException
+	public synchronized void addTime(Date d) throws IOException
 	{
 		long dt = d == null ? 0 : d.getTime();
 		flush(18);
@@ -412,7 +541,7 @@ public class DryCereal
 		buff.append(Decimal.longToString(dt, 16, 16));
 
 	}
-	public void addFloat(double val) throws IOException
+	public synchronized void addFloat(double val) throws IOException
 	{
 		/*
 		 * int maxprec = 6; int sign = (int)Math.signum(val); val =
@@ -437,7 +566,7 @@ public class DryCereal
 		buff.append(Decimal.longToString(d.getPower(), 3, 16));
 	}
 
-	public void addDouble(double val) throws IOException
+	public synchronized void addDouble(double val) throws IOException
 	{
 		flush(26);
 		Decimal d = new Decimal(val, 16);
@@ -446,7 +575,7 @@ public class DryCereal
 		buff.append(Decimal.longToString(d.getPower(), 8, 16));
 	}
 
-	public void addIntOld(int val)
+	public synchronized void addIntOld(int val)
 	{
 		int mask = 0xf000;
 		int shift = 12;
@@ -491,7 +620,7 @@ public class DryCereal
 		buff.append(chars);
 	}
 
-	public void addString(String s) throws IOException
+	public synchronized void addString(String s) throws IOException
 	{
 		if (s != null)
 		{
@@ -505,7 +634,7 @@ public class DryCereal
 		addSubstring(CerealType.STRING.typeCode, s);
 	}
 	
-	public void addMoniker(String s) throws IOException
+	public synchronized void addMoniker(String s) throws IOException
 	{
 		char[] chars = s == null? new char[0] : s.toCharArray();
 		if (chars.length >= CerealType.MONIKER.length)
@@ -529,45 +658,45 @@ public class DryCereal
 		}
 	}
 	
-	public short addObjectStart() throws IOException
+	public synchronized short addObjectStart() throws IOException
 	{
 		flush(CerealType.START.length + 1);
 		buff.append(CerealType.START.typeCode);
 		int id = ++objSequence;
 		objStack.add(id);
-		buff.append(Decimal.unsignedToString(id, 4, 16));
+		buff.append(Decimal.unsignedToString(id, CerealType.START.length, 16));
 		
 		return (short)id;
 	}
 	
-	public short addObjectStart(short key) throws IOException
+	public synchronized short addObjectStart(short key) throws IOException
 	{
 		flush(CerealType.START.length + 1);
 		buff.append(CerealType.START.typeCode);
-		buff.append(Decimal.unsignedToString(key, 4, 16));
+		buff.append(Decimal.unsignedToString(key, CerealType.START.length, 16));
 		
 		return key;
 	}
 	
-	public short addObjectEnd() throws IOException
+	public synchronized short addObjectEnd() throws IOException
 	{
 		if (objStack.size() == 0)
 		{
 			throw new IllegalArgumentException("Unmatched object end in DryCereal");
 		}
 		flush(CerealType.END.length + 1);
-		buff.append(CerealType.START.typeCode);
+		buff.append(CerealType.END.typeCode);
 		int id = objStack.remove(objStack.size() - 1);
-		buff.append(Decimal.unsignedToString(id, 4, 16));
+		buff.append(Decimal.unsignedToString(id, CerealType.END.length, 16));
 		
 		return (short)id;
 	}
 	
-	public short addObjectEnd(short key) throws IOException
+	public synchronized short addObjectEnd(short key) throws IOException
 	{
 		flush(CerealType.END.length + 1);
-		buff.append(CerealType.START.typeCode);
-		buff.append(Decimal.unsignedToString(key, 4, 16));
+		buff.append(CerealType.END.typeCode);
+		buff.append(Decimal.unsignedToString(key, CerealType.END.length, 16));
 		
 		return key;
 	}

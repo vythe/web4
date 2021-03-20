@@ -41,12 +41,15 @@
 <label><input type="radio" name="clientkind" value="manual" checked="checked">Manual</label><br/>
 <label><input type="radio" name="clientkind" value="hound" checked="checked">Hound</label><br/>
 <label><input type="radio" name="clientkind" value="shambler" checked="checked">Shambler</label><br/>
+<label><input type="radio" name="clientkind" value=robot checked="checked">Robot</label><br/>
 <button id="btnJoin">Join</button>
 <button id="btnOpenClient">Open Client</button>
 <br/>
 <a href="field.html">To Field</a>
 <button id="btnRefresh">Refresh</button><br/>
 <button id="btnCreate">Create Session</button><br/>
+<button id="btnStart">Start Session</button><br/>
+<button id="btnStop">Stop Session</button><br/>
 </div>
 <div style="border: 1px solid black;">
 <button id="btnSummary">Get Summary</button><br/>
@@ -103,11 +106,38 @@ $(document).ready(function() {
 		createSession();
 	});
 	
+	$("#btnStart").click(function() {
+		console.log("btnStart clicked");
+		var sel = $("input[name=session_join]:checked");
+		if (sel.length == 0 || !sel.attr("bh_session_id")) {
+			console.log("Start without a selected session/client");
+			alert("Start without a selected session");
+			return;
+		}
+		mybh.sessionId = sel.attr("bh_session_id");
+		mybh.sessionKey = sessionKeys["sessionkey_" + mybh.sessionId] || null;
+		mybh.sessionCycle(true);		
+	});
+	
+	$("#btnStop").click(function() {
+		console.log("btnStop clicked");
+		var sel = $("input[name=session_join]:checked");
+		if (sel.length == 0 || !sel.attr("bh_session_id")) {
+			console.log("Stop without a selected session/client");
+			alert("Stop without a selected session");
+			return;
+		}
+		mybh.sessionId = sel.attr("bh_session_id");
+		mybh.sessionKey = sessionKeys["sessionkey_" + mybh.sessionId] || null;
+		mybh.sessionCycle(false);		
+	});
+	
 	$("#btnJoin").click(function() {
 		console.log("btnJoin clicked");
 		var sel = $("input[name=session_join]:checked");
 		if (sel.length == 0 || !sel.attr("bh_session_id")) {
-			console.log("Join without a selected session");
+			console.log("Join without a selected session/client");
+			alert("Join without a selected session");
 			return;
 		}
 		joinSession(sel.attr("bh_session_id"), sel.attr("bh_atom_id"));
@@ -116,13 +146,18 @@ $(document).ready(function() {
 	$("#btnOpenClient").click(function() {
 		var sel = $("input[name=session_join]:checked");
 		if (sel.length == 0 || !sel.attr("bh_session_id")) {
+			alert("Open client without a selected session/client");
 			console.log("Open client without a selected session");
 			return;
 		}
 		var sID = sel.attr("bh_session_id");
 		var sKey = sessionKeys["sessionkey_" + sID] || null;
 		var sKind = $("input[name=clientkind]:checked").val();
-		openClient(sID, sel.attr("bh_client_key"), sKind, sKey);
+		if (sKind == "robot") {
+			startRobot(sID, sel.attr("bh_client_key"), sKind, sKey);
+		} else {
+			openClient(sID, sel.attr("bh_client_key"), sKind, sKey);
+		}
 	});
 	
 	$("#btnSummary").click(function() {
@@ -256,6 +291,12 @@ function openClient(sessionId, clientKey, clientkind, sessionkey) {
 			
 }
 
+function startRobot(sessionId, clientKey, clientkind, sessionKey) {
+	mybh.clientKey = clientKey;
+	mybh.command("robot", [], ["robot", sessionKey], function(res) {
+		console.log("command res: " + JSON.stringify(res));
+	});
+}
 
 function createSession() {
 	mybh.create("N", function(resp) {

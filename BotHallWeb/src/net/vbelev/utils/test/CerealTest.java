@@ -81,7 +81,7 @@ public class CerealTest
 			DryCereal.Reader dr = new DryCereal.Reader(cer);
 			BHClient.Cell cOut = new BHClient.Cell();
 			cOut.fromCereal(dr);
-			String strOur = (String)dr.next().value;
+			String strOur = (String)dr.next().getString();
 			
 		}
 		
@@ -98,5 +98,60 @@ public class CerealTest
 			cOut.fromCereal(dr);
 		}
 		*/
+	}
+
+	@Test
+	void commandTest() throws IOException
+	{
+		DryCereal d1 = new DryCereal();
+		BHClient.Command cmd = new BHClient.Command();
+		
+		cmd.command = "my test";
+		cmd.timecode = 17;
+		cmd.intArgs = new int[] {1,2,3,4,5};
+		cmd.stringArgs = new String[] {"arg A", "arg (B)", "ещё что-то"};
+		
+		System.out.println("original command: " + cmd.toString());
+		
+		cmd.toCereal(d1);
+		//d1.flush();
+		String cereal = d1.toString();
+	
+		System.out.println("cereal: " + cereal);
+		
+		InputStream is1 = new ByteArrayInputStream(cereal.getBytes());
+		DryCereal.Reader rd1 = new DryCereal.Reader(is1);
+		
+		BHClient.Command r1 = new BHClient.Command();
+		r1.fromCereal(rd1);
+
+		System.out.println("restored command: " + cmd.toString());
+	}
+	
+	@Test
+	void cellTest() throws IOException
+	{
+		 PipedOutputStream pipeOut = new PipedOutputStream();
+		 PipedInputStream pipeIn = new PipedInputStream(pipeOut);
+
+		DryCereal d1 = new DryCereal(pipeOut);
+		DryCereal.Reader r1 = new DryCereal.Reader(pipeIn);
+
+		
+		BHClient.Cell c = new BHClient.Cell();
+		c.x = 17;
+		c.y = 18;
+		c.z = 19;
+		c.terrain = "STONE";
+		c.buffs = new BHClient.Buff[0];
+		c.toCereal(d1);
+		d1.flush();
+		//String cer = d1.toString();
+		//DryCereal.Reader r1 = new DryCereal.Reader(pipeIn);
+		BHClient.Cell c2 = new BHClient.Cell();
+		c2.fromCereal(r1);
+		System.out.println(c2.toString());
+		
+		 
 	}
 }

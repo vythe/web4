@@ -22,7 +22,11 @@ public class BHCollection
 		@Utils.EnumElement(code=1)
 		ITEM,
 		@Utils.EnumElement(code=2)
-		LANDSCAPE
+		LANDSCAPE,
+		@Utils.EnumElement(code=3)
+		ERROR,
+		@Utils.EnumElement(code=4)
+		RECEIPT
 	}
 		
 	

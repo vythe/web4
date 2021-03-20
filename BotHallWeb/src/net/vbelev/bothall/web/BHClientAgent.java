@@ -26,7 +26,7 @@ public class BHClientAgent
 	public String clientKey;
 	
 	/** If it's a push client, this stream will receive updates */
-	public OutputStream pushStream = null;
+	//public OutputStream pushStream = null;
 	
 	/** this is for pacman: which atom (mobile) this client controls */
 	public int atomID = 0;

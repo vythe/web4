@@ -261,8 +261,8 @@ public class BHOperations
 		boolean shallRepeat = false;
 		if (repeatFlag > 0)
 		{
-			//BHLandscape.Cell nextCell = engine.getLandscape().closestCells(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2])[direction];
-			BHLandscape.Cell nextCell = engine.getLandscape().getCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2], direction);
+			//BHLandscape.Cell nextCell = engine.getLandscape().getNextCell(me.getX() + shift[0], me.getY() + shift[1], me.getZ() + shift[2], direction);
+			BHLandscape.Cell nextCell = engine.getLandscape().getNextCell(newPos, direction);
 			if (nextCell.getTerrain() == BHLandscape.TerrainEnum.LAND)
 			{
 				shallRepeat = true;

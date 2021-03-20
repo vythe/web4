@@ -1,4 +1,4 @@
-package net.vbelev.bothall.web;
+package net.vbelev.utils;
 
 import java.util.*;
 import net.vbelev.utils.*;

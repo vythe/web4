@@ -350,7 +350,7 @@ $(document).ready(function() {
 		evt.preventDefault();
 		console.log("btnDie clicked");
 		
-		mybh.command("die", function(res) {
+		mybh.command("die", [], [], function(res) {
 			//alert("my apiUrl is " + this.url + ", join res=" + res);
 			if (res) {
 				console.log("die error: " + res, "INFO");
@@ -365,7 +365,7 @@ $(document).ready(function() {
 		evt.preventDefault();
 		console.log("btnPacman clicked");
 		
-		mybh.command("pacman", function(res) {
+		mybh.command("pacman", [], [], function(res) {
 			//alert("my apiUrl is " + this.url + ", join res=" + res);
 			if (res) {
 				console.log("pacman error: " + res, "INFO");
@@ -545,6 +545,7 @@ function moveIt(dir, id) {
 	mybh.command(
 		"move",
 		[dir],
+		[],
 		function() {
 			//console.log("posted moveit, dir=" + dir + ", id=" + id);
 		}

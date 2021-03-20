@@ -1,5 +1,6 @@
 package net.vbelev.bothall.web;
 
+import java.net.Socket;
 import java.util.*;
 import javax.servlet.ServletContext;
 import javax.servlet.http.*;
@@ -38,6 +39,7 @@ public class BotHallAPI
 		public final List<SessionClientInfo> clients = new ArrayList<SessionClientInfo>();
 	}
 	
+
 	private static BHClientAgent createAgent(PacmanSession s)
 	{
 		BHClientAgent agent = BHClientAgent.createAgent();
@@ -46,7 +48,7 @@ public class BotHallAPI
 		return agent;
 	}
 
-	private void detachAgent(BHClientAgent agent)
+	private static void detachAgent(BHClientAgent agent)
 	{
 		if (agent == null  || agent.getID() == 0) return;
 		// we need to check the session and possibly stop it...
@@ -61,6 +63,15 @@ public class BotHallAPI
 		agent.detach();
 	}
 	
+	private static StreamClient createSocketAgent(PacmanSession s, int atomID)
+	{
+		BHClientAgent agent = createAgent(s);
+		//agent.
+		//StreamClient sAgent = new StreamClient();
+		//sAgent.
+		return null;
+	}
+	
 	/**
 	 * 
 	 * @return
@@ -70,12 +81,7 @@ public class BotHallAPI
 	@Produces(MediaType.APPLICATION_JSON)	
 	public String getUserKey()
 	{
-		if (userKeyTS + 3 * 60 * 60 * 1000 < new Date().getTime())
-		{
-			prevUserKey = userKey;
-			userKey = Utils.randomString(8);
-		}
-		return Utils.encodeJSON(userKey);
+		return Utils.encodeJSON(BHUser.getUserKey());
 	}
 	
 	/**
@@ -111,6 +117,31 @@ public class BotHallAPI
 		return item;
 	}
 	
+	public SessionInfo createSessionOld(
+			@QueryParam("user") String userKey,
+			@QueryParam("protected") String isProtected
+			)
+	{
+		if (PacmanSession.getSessionCount() > 10)
+		{
+			throw new IllegalArgumentException("Too many open sessions");
+		}
+		
+		PacmanSession s = PacmanSession.createSession();
+		if ("Y".equals(isProtected))
+		{			
+			s.isProtected = true;			
+		}
+
+		SessionInfo item = new SessionInfo();
+		item.sessionId = s.getID();
+		item.sessionKey = s.getSessionKey();
+		item.status = s.getEngine().isRunning? "Running" : "Idle";
+		item.createdDate = Utils.formatDateTime(s.createdDate);
+		item.description = "Session #" + s.getID();
+		item.isProtected = s.isProtected? "Y": "";
+		return item;
+	}	
 	@Path("/destroy")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
@@ -220,10 +251,10 @@ public class BotHallAPI
 	
 	/**
 	 * This creates an agent object and returns its clientKey.
-	 * Protected sessions will require the session key; if atomID is empty, it will create an observer client
-	 * @param sessionID
-	 * @param atomID
-	 * @return
+	 * Protected sessions will require the session key; 
+	 * if atomID is empty, it will create an observer client;
+	 * if the session key is provided and the mode is not empty, 
+	 * it will start a server-side client in the given mode 
 	 */
 	@Path("/join")
 	@GET
@@ -231,7 +262,9 @@ public class BotHallAPI
 	public String createClient(
 			@QueryParam("sid") String sessionID, 
 			@QueryParam("atom") String atomID,
-			@QueryParam("session") String sessionKey)
+			@QueryParam("session") String sessionKey,
+			@QueryParam("mode") String clientMode
+			)
 	{
 		Integer sID = Utils.NVL(Utils.tryParseInt(sessionID), null);
 		Integer aID = Utils.tryParseInt(atomID);
@@ -307,7 +340,16 @@ public class BotHallAPI
 		return Utils.encodeJSON("" + agent.sessionID);				
 	}	
 	
-	
+	protected static void startSocketClient(String clientKey) throws java.io.IOException
+	{
+		BHListener bhs = BHListener.getSocketServer(); // this will start the server if needed
+		Socket s = new Socket();
+		s.setSoTimeout(1000);
+		s.bind(new java.net.InetSocketAddress((String)null, bhs.getPort()));
+		// at this point we should already have the StreamServer on the other side
+		throw new RuntimeException("boo");
+		//new StreamClient(s);
+	}
 	//private static long lastUpdateTS = 0;
 	
 	@Path("/update")
@@ -408,6 +450,55 @@ public class BotHallAPI
 	public String command(
 			@QueryParam("client") String clientKey, 
 			@QueryParam("cmd") String cmd,
+			@QueryParam("intArgs") List<Integer> intArgs,
+			@QueryParam("stringArgs") List<String> stringArgs
+			)
+	{
+		try
+		{
+			if (intArgs == null) intArgs = new ArrayList<Integer>();
+			if (stringArgs == null) stringArgs = new ArrayList<String>();
+			
+			BHClient.Command bhcmd = new BHClient.Command(intArgs.size(), stringArgs.size());
+			bhcmd.command = cmd;
+			int i = 0;
+			for (int a : intArgs)
+			{
+				bhcmd.intArgs[i++] = Utils.NVL(a, 0);
+			}
+			i = 0;
+			for (String s : stringArgs)
+			{
+				bhcmd.stringArgs[i++] = s;
+			}
+			BHClient.Element bhres = BHSession.processCommand(clientKey, bhcmd);
+			 
+			if (bhres.getElementCode() == BHClient.ElementCode.ERROR)
+			{
+				return Utils.encodeJSON(bhres.toString());
+			}
+			else if (bhres.getElementCode() == BHClient.ElementCode.COMMAND)
+			{
+				BHClient.Command bhresCommand = (BHClient.Command)bhres;
+				if (bhresCommand.stringArgs.length > 0)
+				{
+					return Utils.encodeJSON(bhresCommand.stringArgs[0]);
+				}
+			}
+			return Utils.encodeJSON(bhres.toString()); // a fallback that shouldn't happen
+		}
+		catch (Exception x)
+		{
+			return Utils.encodeJSON(x.getMessage());
+		}
+	}
+
+	//@Path("/command")
+	//@GET
+	@Produces(MediaType.APPLICATION_JSON)	
+	public String commandOld(
+			@QueryParam("client") String clientKey, 
+			@QueryParam("cmd") String cmd,
 			@QueryParam("args") List<String> args
 			)
 	{
@@ -432,7 +523,7 @@ public class BotHallAPI
 		}
 		else
 		{
-			res = s.command(cmd, agent.atomID, args);
+			res = s.command(cmd, clientKey, args);
 		}
 		
 		//return "action called for action=" + action + ", args=" + String.join("/", args);
@@ -444,15 +535,4 @@ public class BotHallAPI
 		}
 	}
 
-	private static String userKey = Utils.randomString(8);
-	private static String prevUserKey = Utils.randomString(8);
-	private static long userKeyTS = new Date().getTime();
-
-	
-	/** for now, keep user validation here. It is for protections from robots only. 
-	 */
-	public static boolean isValidUserKey(String key)
-	{
-		return key != null && (key.equals(userKey) || key.equals(prevUserKey));
-	}
 }

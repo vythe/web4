@@ -306,5 +306,70 @@ public class Utils
 		}
 	}
 	
+	public static Integer[] box(int... args)
+	{
+		if (args == null) return new Integer[0];
+		Integer[] res = new Integer[args.length];
+		for (int pos = 0; pos < args.length; pos++) res[pos] = args[pos];
+		
+		return res;
+	}
 	
+	public static Double[] box(double... args)
+	{
+		if (args == null) return new Double[0];
+		Double[] res = new Double[args.length];
+		for (int pos = 0; pos < args.length; pos++) res[pos] = args[pos];
+		
+		return res;
+	}
+	
+	private static class StringIterator<T> implements Iterator<String>
+	{
+
+		Iterator<T> iter;
+		public StringIterator(Iterator<T> from)
+		{
+			iter = from;
+		}
+		
+		@Override
+		public boolean hasNext()
+		{
+			// TODO Auto-generated method stub
+			return iter == null? false : iter.hasNext();
+		}
+
+		@Override
+		public String next()
+		{
+			// TODO Auto-generated method stub
+			if (iter == null) return null;
+			
+			T n = iter.next();
+			return n == null? "" : n.toString();
+		}		
+	}
+	
+	public static class StringIterable<T> implements Iterable<String>
+	{
+		private Iterable<T> from;
+		public StringIterable(Iterable<T> from)
+		{
+			this.from = from;
+		}
+		
+		public StringIterable(T[] from)
+		{
+			this.from = from == null? null : Arrays.asList(from);
+		}
+		
+		@Override
+		public Iterator<String> iterator()
+		{
+			Iterator<T> fromIterator = from == null? null : from.iterator();
+			
+			return new StringIterator<T>(fromIterator); 
+		}
+	}
 }
