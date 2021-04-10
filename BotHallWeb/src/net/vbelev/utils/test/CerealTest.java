@@ -52,7 +52,7 @@ public class CerealTest
 	{
 		BHClient.Cell testCell = new BHClient.Cell();
 		testCell.id = 17;
-		testCell.terrain = "TERRA";
+		testCell.terrain = "TERRA".intern();
 		testCell.x = 1;
 		testCell.y = 2;
 		testCell.z = 3;
@@ -142,7 +142,7 @@ public class CerealTest
 		c.x = 17;
 		c.y = 18;
 		c.z = 19;
-		c.terrain = "STONE";
+		c.terrain = "STONE".intern();
 		c.buffs = new BHClient.Buff[0];
 		c.toCereal(d1);
 		d1.flush();

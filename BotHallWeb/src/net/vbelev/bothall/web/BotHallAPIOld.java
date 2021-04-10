@@ -166,7 +166,7 @@ public class BotHallAPIOld
 	@Produces(MediaType.APPLICATION_JSON)
 	public BHSession.UpdateBin getUpdate() 
 	{
-		BHClientAgent agent = getAgent();
+		BHClientRegistration agent = getAgent();
 		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 
 		if (s == null)
@@ -227,7 +227,7 @@ public class BotHallAPIOld
 	@Produces(MediaType.APPLICATION_JSON)
 	public String moveit(@QueryParam("direction") int direction, @QueryParam("id")Integer id)
 	{
-		BHClientAgent agent = getAgent();
+		BHClientRegistration agent = getAgent();
 		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 
 		if (s == null)
@@ -338,12 +338,12 @@ public class BotHallAPIOld
 	public static final String BOTHALL_SESSION_ID_ATTR = "botHall";
 	public static final String BOTHALL_AGENT_ID_ATTR = "botHallAgent";
 
-	private BHClientAgent getAgent()
+	private BHClientRegistration getAgent()
 	{
 		Object agentID = request.getSession().getAttribute(BOTHALL_AGENT_ID_ATTR);
 		if (agentID instanceof Integer)
 		{
-			return BHClientAgent.getClient((int)agentID);
+			return BHClientRegistration.getClient((int)agentID);
 		}
 		return null;
 	}
@@ -354,7 +354,7 @@ public class BotHallAPIOld
 	public String createSessionOld()
 	{
 		// if there is an old client - disconnect
-		BHClientAgent oldAgent = getAgent();
+		BHClientRegistration oldAgent = getAgent();
 		if (oldAgent != null)
 		{
 			oldAgent.detach();
@@ -374,7 +374,7 @@ public class BotHallAPIOld
 		*/
 		BHEngine e = BHEngine.loadFileEngine("/../data/pacman.txt");
 		BHSession s = BHSession.createSession(e);
-		BHClientAgent agent = createAgent(s);
+		BHClientRegistration agent = createAgent(s);
 		
 		//agent.attachTo(s);
 		// it's a pull client, we don't need to do anything with it
@@ -386,9 +386,9 @@ public class BotHallAPIOld
 		return s.getID() + "";
 	}
 	
-	private BHClientAgent createAgent(BHSession s)
+	private BHClientRegistration createAgent(BHSession s)
 	{
-		BHClientAgent agent = BHClientAgent.createAgent();
+		BHClientRegistration agent = BHClientRegistration.createAgent();
 		agent.sessionID = s.getID();
 		agent.subscriptionID = s.getEngine().getMessages().addSubscription();
 		
@@ -409,8 +409,8 @@ public class BotHallAPIOld
 	{
 		Integer id = Utils.tryParseInt(sessionID);
 		BHSession s = null;
-		BHClientAgent agent = null;
-		BHClientAgent oldAgent = getAgent();
+		BHClientRegistration agent = null;
+		BHClientRegistration oldAgent = getAgent();
 		
 		if (id == null && oldAgent != null)
 		{
@@ -482,7 +482,7 @@ public class BotHallAPIOld
 	@Produces(MediaType.APPLICATION_JSON)
 	public String joinMobile(@QueryParam("name") String name)
 	{
-		BHClientAgent agent = getAgent();
+		BHClientRegistration agent = getAgent();
 		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 
 		if (s == null)
@@ -511,7 +511,7 @@ public class BotHallAPIOld
 						|| a.getGrade() == nameGrade) 
 				{
 					int hID = a.getID();
-					BHClientAgent heroAgent = BHClientAgent.getAgents()
+					BHClientRegistration heroAgent = BHClientRegistration.getAgents()
 					.filter((q) -> q.atomID == hID)
 					.findFirst()
 					.orElse(null)
@@ -542,7 +542,7 @@ public class BotHallAPIOld
 	@Produces(MediaType.APPLICATION_JSON)
 	public String cycleMode(@QueryParam("run") String run)
 	{
-		BHClientAgent agent = getAgent();
+		BHClientRegistration agent = getAgent();
 		BHSession s = agent == null? null : BHSession.getSession(agent.sessionID);
 		
 		if (s == null || s.getEngine() == null || run == null)

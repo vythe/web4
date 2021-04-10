@@ -71,7 +71,7 @@ public class BHListener
 		public void invoke(BHSession.PublishEventArgs e)
 		{
 			// TODO Auto-generated method stub
-			BHClientAgent agent = BHClientAgent.getClient(null, this.clientKey);
+			BHClientRegistration agent = BHClientRegistration.getClient(null, this.clientKey);
 			if (agent == null)
 			{
 				System.out.println("Client not found for key: " + this.clientKey);
@@ -106,7 +106,7 @@ public class BHListener
 		/**
 		 * 
 		 */
-		public void setClient(BHClientAgent agent)
+		public void setClient(BHClientRegistration agent)
 		{
 			PacmanSession ps = PacmanSession.getSession(agent.sessionID);
 			if (ps == null || ps.getEngine() == null)
@@ -119,7 +119,7 @@ public class BHListener
 		
 		public void releaseClient()
 		{
-			BHClientAgent agent = BHClientAgent.getClient(null, clientKey);
+			BHClientRegistration agent = BHClientRegistration.getClient(null, clientKey);
 			if (agent != null)
 			{
 				PacmanSession ps = PacmanSession.getSession(agent.sessionID);

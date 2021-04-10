@@ -50,24 +50,28 @@ public class PacmanShambler
 
 	private static int[] pacmanValidDirs = new int[]{1,2,3,6};
 
+	private static final String TERRAIN_LAND = "LAND".intern();
+	private static final String TERRAIN_VOID = "VOID".intern();
+	
 	public static boolean mayTurnMonster(BHClient.Cell[] closest, int currentDir) 
 	{
-
 		if (currentDir == 0) return true;
 		//if (!closest[currentDir]) {
 		//	console.log("INVALID currentDir: " + currentDir);
 		//	return true;
 		//}
 		
-		if (closest[currentDir].terrain != "LAND") return true;
+		if (closest[currentDir].terrain != TERRAIN_LAND) return true;
 		
 		int cnt = 0;
 		for (int k = 0; k < pacmanValidDirs.length && cnt < 3; k++) {
-			if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;		
+			if (closest[pacmanValidDirs[k]].terrain == TERRAIN_LAND) cnt++;		
 		}
 		return cnt != 2;		 
 	}
 	
+	
+	private BHClient.Cell currentPos = null;
 	/**
 	 * Choose a valid direction at random
 	 */
@@ -99,8 +103,22 @@ public class PacmanShambler
 				//System.out.println("Shamble, mobile ID=" + myMobileID + " not found");
 				return;
 			}
-			BHClient.Cell[] closest = this.client.collection.closestCells(me.x, me.y, me.z, "VOID");
-			BHClient.Mobile[] mobs = this.client.collection.getMobiles(me.x, me.y, me.z);
+			
+			BHClient.Cell[] closest = this.client.collection.closestCells(me.x, me.y, me.z, TERRAIN_VOID);
+			
+			
+			if (me.dir > 0 && closest[me.dir].terrain != TERRAIN_LAND) 
+			{
+				me.dir = 0;
+			}
+			
+			// if we haven't finished a step, don't start a new one
+			if (currentPos != null && me.dir > 0 && currentPos.compareTo(closest[0]) == 0)
+			{
+				return;
+			}
+			
+			BHClient.Mobile[] mobs = this.client.collection.getClosestMobiles(me.x, me.y, me.z);
 			
 			if (!mayTurnMonster(closest, me.dir))
 			{
@@ -114,12 +132,13 @@ public class PacmanShambler
 			{
 				BHClient.Cell c = closest[pacmanValidDirs[k]];
 				boolean goodDir = true;
-				if (!"LAND".equals(c.terrain)) goodDir = false;
-				for (BHClient.Mobile m : this.client.collection.mobiles.values())
+				if (c.terrain != TERRAIN_LAND) 
+					goodDir = false;
+				for (BHClient.Mobile m : mobs)
 				{
 					if (m.x == c.x && m.y == c.y && m.z == c.z
-							&& (m.dir == 0 || m.dir == BHClient.cellShifts[k][3])
-							)
+						&& (m.dir == 0 || m.dir == BHClient.cellShifts[k][3])
+					)
 					{
 						goodDir = false;
 						break;
@@ -133,6 +152,7 @@ public class PacmanShambler
 			if (cnt == 0) return; // no good options
 			int selectedDir = goodDirs[Utils.random.nextInt(cnt)];
 			
+			currentPos = closest[0];
 			this.client.writeCommand("move", new int[] {selectedDir}, null);
 			System.out.println("Shambling! pos=" + me.toString() + ", moved to " + selectedDir);
 		//this.client.

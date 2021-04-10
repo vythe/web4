@@ -26,6 +26,7 @@ public class BHSession
 		public static final String JOINCLIENT = "JOINCLIENT".intern();
 		public static final String JOIN = "JOIN".intern(); //inrArgs: [direction]
 		public static final String CREATE = "CREATE".intern();
+		public static final String CYCLE = "CYCLE".intern();
 		//public static final String DIE = "die".intern();
 		//public static final String ROBOT = "robot".intern(); // stringArgs: [clientKey, robotType], where clientKey may be null
 		
@@ -185,16 +186,16 @@ public class BHSession
 		
 	}
 	
-	public BHClientAgent createAgent()
+	public BHClientRegistration createAgent()
 	{
-		BHClientAgent agent = BHClientAgent.createAgent();
+		BHClientRegistration agent = BHClientRegistration.createAgent();
 		agent.sessionID = this.getID();
 		agent.subscriptionID = this.getEngine().getMessages().addSubscription();
 		
 		return agent;
 	}
 
-	public void detachAgent(BHClientAgent agent)
+	public void detachAgent(BHClientRegistration agent)
 	{
 		if (agent == null  || agent.getID() == 0) return;
 		// we need to check the session and possibly stop it...
@@ -297,7 +298,7 @@ public class BHSession
 	 * 
 	 * This method should be overridden in a subclass. 
 	 */
-	public BHClient.Element processCommand(BHClientAgent agent, BHClient.Command cmd)
+	public BHClient.Element processCommand(BHClientRegistration agent, BHClient.Command cmd)
 	{
 		return null;
 	}
@@ -308,62 +309,15 @@ public class BHSession
 	 */
 	public static BHClient.Element processCommand(String clientKey, BHClient.Command cmd)
 	{
-		BHClientAgent agent = null;
+		BHClientRegistration agent = null;
 		BHClient.Element res;
 		if (clientKey != null)
 		{
-			agent = BHClientAgent.getClient(null, clientKey);
+			agent = BHClientRegistration.getClient(null, clientKey);
 		}
 		
 		// server-level commands do not require an agent
-		if (cmd.command.equals(COMMAND.JOIN)) // intArgs: [sessionID, atom ID], stringArgs: [userKey, sessionKey] return clientKey
-		{
-			BHClient.Command resCommand = new BHClient.Command(0, 1);
-			res = resCommand;
-			resCommand.command = "AGENT";
-			int sessionID = cmd.intArgs[0];
-			int atomID = cmd.intArgs[1];
-			String userKey = cmd.stringArgs.length > 0? cmd.stringArgs[0] : "";
-			String sessionKey = cmd.stringArgs.length > 1? cmd.stringArgs[1] : "";
-			boolean success = true;
-			BHSession s = BHSession.getSession(sessionID);
-			
-			if (s.isProtected && (Utils.IsEmpty(sessionKey) || !sessionKey.equals(s.getSessionKey())))
-			{
-				//res.stringArgs[0] = "";
-				success = false;
-			}
-			else
-			{
-				synchronized(BHClientAgent.lock)
-				{
-					if (atomID > 0)
-					{
-						// check that the atom is available
-						List<BHClientAgent> agents = BHClientAgent.agentList(s.sessionID);
-						for (BHClientAgent a : agents)
-						{
-							if (a.atomID == atomID)
-								//res.stringArgs[0] = ""; // already used; do not create agent
-								success = false;
-						}
-					}
-					if (success)
-					{
-						agent = s.createAgent();
-						agent.atomID = atomID;
-						agent.controlledBy = "User " + userKey;
-						resCommand.stringArgs[0] = agent.clientKey;
-					}			
-				}				
-			}
-			if (!success)
-			{
-				resCommand.stringArgs[0] = "";
-			}
-			return res;
-		}
-		else if (COMMAND.CREATE.equals(cmd.command))  // [userKey, session type, is protected]
+		if (COMMAND.CREATE.equals(cmd.command))  // [userKey, session type, is protected]
 		{
 			String userKey = cmd.stringArgs.length > 0? cmd.stringArgs[0] : "";
 			String sessionType = cmd.stringArgs.length > 1? cmd.stringArgs[1] : "";
@@ -393,6 +347,87 @@ public class BHSession
 			else
 			{
 				res = null; // won't happen
+			}
+			return res;
+		}
+		else if (cmd.command.equals(COMMAND.CYCLE)) // intArgs: [], stringArgs: [sessionKey, mode]; mode Y = start, N = stop, O = one cycle; 
+		{
+			String sessionKey = cmd.stringArgs.length > 0? cmd.stringArgs[0] : "";
+			String mode = cmd.stringArgs.length > 1? cmd.stringArgs[1] : "";
+			
+			BHClient.Command resCommand = new BHClient.Command(1, 0);
+			resCommand.command = "SESSION";
+			BHSession s = BHSession.getSession(sessionKey);
+			res = resCommand;
+			if (s == null)
+			{
+				res = new BHClient.Error(0, "Invalid session key");
+			}
+			else if (mode.equals("Y"))
+			{
+				s.getEngine().startCycling();
+				resCommand.intArgs[0] = s.getID();
+			}
+			else if (mode.equals("N"))
+			{
+				s.getEngine().stopCycling();
+				resCommand.intArgs[0] = s.getID();				
+			}
+			else if (mode.equals("O"))
+			{
+				BHOperations.BHAction stopAction = new BHOperations.BHAction();
+				stopAction.actionType  = BHOperations.ACTION_STOPCYCLING;
+				
+				s.getEngine().postAction(stopAction, 0);
+				s.getEngine().startCycling();
+				resCommand.intArgs[0] = s.getID();				
+			}
+			return res;			
+		}
+		else if (cmd.command.equals(COMMAND.JOIN)) // intArgs: [sessionID, atom ID], stringArgs: [userKey, sessionKey] return clientKey
+		{
+			BHClient.Command resCommand = new BHClient.Command(0, 1);
+			res = resCommand;
+			resCommand.command = "AGENT";
+			int sessionID = cmd.intArgs[0];
+			int atomID = cmd.intArgs[1];
+			String userKey = cmd.stringArgs.length > 0? cmd.stringArgs[0] : "";
+			String sessionKey = cmd.stringArgs.length > 1? cmd.stringArgs[1] : "";
+			boolean success = true;
+			BHSession s = BHSession.getSession(sessionID);
+			
+			if (s.isProtected && (Utils.IsEmpty(sessionKey) || !sessionKey.equals(s.getSessionKey())))
+			{
+				//res.stringArgs[0] = "";
+				success = false;
+			}
+			else
+			{
+				synchronized(BHClientRegistration.lock)
+				{
+					if (atomID > 0)
+					{
+						// check that the atom is available
+						List<BHClientRegistration> agents = BHClientRegistration.agentList(s.sessionID);
+						for (BHClientRegistration a : agents)
+						{
+							if (a.atomID == atomID)
+								//res.stringArgs[0] = ""; // already used; do not create agent
+								success = false;
+						}
+					}
+					if (success)
+					{
+						agent = s.createAgent();
+						agent.atomID = atomID;
+						agent.userKey = userKey;
+						resCommand.stringArgs[0] = agent.clientKey;
+					}			
+				}				
+			}
+			if (!success)
+			{
+				resCommand.stringArgs[0] = "";
 			}
 			return res;
 		}
@@ -438,12 +473,12 @@ public class BHSession
 
 	public static boolean postMessage(String clientKey, BHCollection.EntityTypeEnum target, int targetID, String message)
 	{
-		BHClientAgent agent = null;
+		BHClientRegistration agent = null;
 		BHClient.Element res;
 		BHSession s = null;
 		if (clientKey != null)
 		{
-			agent = BHClientAgent.getClient(null, clientKey);
+			agent = BHClientRegistration.getClient(null, clientKey);
 		}
 		if (agent != null && agent.sessionID > 0)
 		{
@@ -571,7 +606,7 @@ public class BHSession
 			{
 				BHClient.Cell cell = new BHClient.Cell();
 				cell.id = c.getID();
-				cell.terrain = c.getTerrain().name();
+				cell.terrain = c.getTerrain().name().intern();
 				cell.x = c.getX();
 				cell.y = c.getY();
 				cell.z = c.getZ();

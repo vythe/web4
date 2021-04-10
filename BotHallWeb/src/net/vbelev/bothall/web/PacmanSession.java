@@ -21,6 +21,7 @@ public class PacmanSession extends BHSession
 	public static class INT_PROPS //extends BHCollection.Atom.INT_PROPS
 	{
 		private static final int COUNT = 8;
+		/** here be session status from PS_STATUS*/
 		public static final int STATUS = 0;
 		public static final int X = 1;
 		public static final int Y = 2;
@@ -43,6 +44,13 @@ public class PacmanSession extends BHSession
 		public static final int NAME = 0;
 	}
 		
+	public static class PS_STATUS
+	{
+		public static final int NEW = 0;
+		public static final int ACTIVE = 1;
+		public static final int PAUSE = 2;
+		public static final int COMPLETE = 3;
+	}
 	public static class ATOM
 	{
 		public static final String GOLD = "GOLD".intern(); 
@@ -61,6 +69,7 @@ public class PacmanSession extends BHSession
 		public static final String PACMAN = "pacman".intern();
 		public static final String DIE = "die".intern();
 		public static final String ROBOT = "robot".intern(); // stringArgs: [clientKey, robotType], where clientKey may be null
+		public static final String START = "start".intern(); //stringArgs: [sessionKey]
 		
 		private COMMAND() {}
 	}
@@ -98,6 +107,9 @@ public class PacmanSession extends BHSession
 	//public final EventBox.Event<BHSession.PublishEventArgs> publishEvent = new EventBox.Event<BHSession.PublishEventArgs>();
 	public final Map<Integer, BHLandscape.Coords> startingPoints = new java.util.Hashtable<Integer, BHLandscape.Coords>();
 	
+	/** values from PS_STATUS */
+	public int sessionStatus = PS_STATUS.NEW;
+	
 	public static PacmanSession createSession()
 	{
 		BHEngine e = PacmanSession.loadFile("/../data/pacman.txt");
@@ -116,6 +128,7 @@ public class PacmanSession extends BHSession
 	public static PacmanSession createSession(BHEngine e)
 	{
 		PacmanSession s = new PacmanSession();
+		s.sessionStatus = PS_STATUS.NEW;
 		s.engine = e;
 		e.clientCallback = s.new EngineCallback();
 		
@@ -412,6 +425,18 @@ public class PacmanSession extends BHSession
 		
 		public void processAction(BHAction action)
 		{
+			// 1) priority actions that work on stopped sessions
+			if (action.actionType == BHOperations.ACTION_STOPCYCLING)
+			{
+				engine.stopCycling();
+				return;
+			}
+			
+			if (PacmanSession.this.sessionStatus != PS_STATUS.ACTIVE)
+			{
+				return;
+			}
+			// 2) normal actions that work only on running sessions
 			BHCollection.Atom me = engine.getCollection().getItem(action.actorID);
 			if (action.actionType == PacmanSession.ACTION_DIE)
 			{
@@ -610,7 +635,7 @@ public class PacmanSession extends BHSession
 	}
 	
 	@Override
-	public BHClient.Element processCommand(BHClientAgent agent, BHClient.Command cmd)
+	public BHClient.Element processCommand(BHClientRegistration agent, BHClient.Command cmd)
 	{
 		if (COMMAND.MOVE.equals(cmd.command)) 
 		{
@@ -621,6 +646,11 @@ public class PacmanSession extends BHSession
 				return new BHClient.Error(agent.timecode, "move to dir " + direction + " failed");
 			}
 		}
+		else if (COMMAND.START.equals(cmd.command))
+		{
+			return PacmanSession.this.actionStart(cmd);
+		}
+		
 		else if (COMMAND.PACMAN.equals(cmd.command))
 		{
 			triggerPacman();
@@ -754,6 +784,11 @@ public class PacmanSession extends BHSession
 		return null;
 	}
 	
+	/** 
+	 * Moved to a separate class PacmanShambler; deprecated here
+	 * @author Vythe
+	 *
+	 */
 	public static class Shambler
 	{
 		private StreamClient client;
@@ -801,6 +836,9 @@ public class PacmanSession extends BHSession
 		}
 
 		private static int[] pacmanValidDirs = new int[]{1,2,3,6};
+		private static final String TERRAIN_LAND = "LAND".intern();
+		private static final String TERRAIN_VOID = "VOID".intern();
+		
 
 		public static boolean mayTurnMonster(BHClient.Cell[] closest, int currentDir) 
 		{
@@ -811,11 +849,11 @@ public class PacmanSession extends BHSession
 			//	return true;
 			//}
 			
-			if (closest[currentDir].terrain != "LAND") return true;
+			if (closest[currentDir].terrain != TERRAIN_LAND) return true;
 			
 			int cnt = 0;
 			for (int k = 0; k < pacmanValidDirs.length && cnt < 3; k++) {
-				if (closest[pacmanValidDirs[k]].terrain == "LAND") cnt++;		
+				if (closest[pacmanValidDirs[k]].terrain == TERRAIN_LAND) cnt++;		
 			}
 			return cnt != 2;		 
 		}
@@ -854,7 +892,8 @@ public class PacmanSession extends BHSession
 				{
 					BHClient.Cell c = closest[pacmanValidDirs[k]];
 					boolean goodDir = true;
-					if (c.terrain != "LAND") goodDir = false;
+					if (c.terrain != TERRAIN_LAND)
+						goodDir = false;
 					for (BHClient.Mobile m : this.client.collection.mobiles.values())
 					{
 						if (m.x == c.x && m.y == c.y && m.z == c.z
@@ -888,7 +927,7 @@ public class PacmanSession extends BHSession
 		
 	}
 	
-	public BHClient.Element commandRobot(BHClientAgent agent, BHClient.Command cmd)
+	public BHClient.Element commandRobot(BHClientRegistration agent, BHClient.Command cmd)
 	{
 		try
 		{
@@ -1059,6 +1098,63 @@ public class PacmanSession extends BHSession
 		this.engine.postBuff(dieBuff);
 		
 		return dieBuff.ID;
+	}
+	
+	public BHClient.Element actionStart(BHClient.Command cmd)
+	{
+		if (cmd.stringArgs.length == 0 || !this.getSessionKey().equals(cmd.stringArgs[0]))
+		{
+			return new BHClient.Error(0, "Invalid session key");
+		}
+		if (this.sessionStatus == PS_STATUS.ACTIVE) //it is already running
+		{
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.GLOBAL, 0, "Pacman session is already running");
+			return new BHClient.Error(0, "Pacman session is already running");
+		}
+		/*
+		// check that there are gold items left... who cares
+		boolean hasItems = false;
+		for  (BHCollection.Atom a : this.engine.getCollection().all())
+		{
+			if (a.getGrade() == BHCollection.Atom.GRADE.ITEM  && a.getType() == ATOM.GOLD && a.getStatus() == BHCollection.Atom.ITEM_STATUS.OK)
+			{
+				hasItems = true;
+				break;
+			}
+		}
+		*/
+		// check if there are any unattached mobiles
+		List<BHClientRegistration> allAgents = BHClientRegistration.agentList(this.getID());
+		for  (BHCollection.Atom a : this.engine.getCollection().all())
+		{
+			if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER)
+			{
+				boolean hasAgent = false;
+				for(BHClientRegistration r : allAgents)
+				{
+					if (r.atomID == a.getID())
+					{
+						hasAgent = true;
+						break;
+					}
+				}
+				if (!hasAgent)
+				{
+					BHClientRegistration r = BHClientRegistration.createAgent();
+					r.sessionID = this.getID();
+					r.subscriptionID = this.getEngine().getMessages().addSubscription();
+					r.atomID = a.getID();
+					BHClient.Command robotCmd = new BHClient.Command(0, 0);
+					robotCmd.command = COMMAND.ROBOT;
+					this.commandRobot(r, robotCmd);
+					engine.getMessages().addMessage(BHCollection.EntityTypeEnum.GLOBAL, 0, "Created a robot for mobileID: " + a.getID());
+				}
+			}
+		}
+		
+		this.sessionStatus = PS_STATUS.ACTIVE;
+		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.GLOBAL, 0, "Pacman started!");
+		return cmd;
 	}
 	
 	public boolean processBuffResurrect(BHBuff buff)

@@ -138,7 +138,7 @@ public class BHClient
 		public int x;
 		public int y;
 		public int z;
-		
+		/** These values should always be interned */
 		public String terrain;
 		
 		public Buff[] buffs;
@@ -152,7 +152,7 @@ public class BHClient
 			this.x = x;
 			this.y = y;
 			this.z = z;
-			this.terrain = terrain;
+			this.terrain = terrain.intern();
 		}
 		
 		public int getElementCode() { return ElementCode.CELL; }
@@ -179,7 +179,7 @@ public class BHClient
 			x = from.next().getShort();
 			y = from.next().getShort();
 			z = from.next().getShort();
-			terrain = from.next().getString();
+			terrain = from.next().getString().intern();
 			short key = from.next().getShort();
 			buffs = new Buff[key];
 			for (int b = 0; b < key; b++)
@@ -671,6 +671,23 @@ public class BHClient
 			for (Mobile m : this.mobiles.values())
 			{
 				if (m.x == x && m.y == y && m.z == z)
+				{
+					res[cnt++] = m;
+				}
+			}
+			return Arrays.copyOf(res, cnt);
+		}
+
+		public  Mobile[] getClosestMobiles(int x, int y, int z)
+		{
+			Mobile[] res = new Mobile[this.mobiles.size()];
+			int cnt = 0;
+			for (Mobile m : this.mobiles.values())
+			{
+				if (m.x >= x - 1 && m.x <= x + 1 
+					&& m.y >= y -1 && m.y <= y + 1 
+					&& m.z >= z - 1 & m.z <= z + 1
+				)
 				{
 					res[cnt++] = m;
 				}

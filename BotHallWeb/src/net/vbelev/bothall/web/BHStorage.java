@@ -146,7 +146,7 @@ public class BHStorage
 	{
 		BHClient.Cell cell = new BHClient.Cell();
 		cell.id = c.getID();
-		cell.terrain = c.getTerrain().name();
+		cell.terrain = c.getTerrain().name().intern();
 		cell.x = c.getX();
 		cell.y = c.getY();
 		cell.z = c.getZ();

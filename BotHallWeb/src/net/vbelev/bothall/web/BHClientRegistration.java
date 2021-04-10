@@ -9,44 +9,43 @@ import java.io.*;
 
 /**
  * A layer between a (remote) client and BHSession.
- * Later, it will be split into a base class and a specifis "pacman" client
- * NB: so far, the client is session-type-agnostic, it's just a client.
+ * All clients, internal and external, are registered in the global list,
+ * where api calls can find them.
  */
-public class BHClientAgent
+public class BHClientRegistration
 {
 	private static int agentInstanceSeq = 0;
 	
 	private int agentID;
+	/** Externally, client connections are identified by this client key. 
+	 * TCP clients use the key once, to establish the connection; API clients use it with every call.*/
+	public String clientKey;
 	
+	public int sessionID;
+	public int atomID = 0;
 	public int timecode;
 	public int subscriptionID;
-	public int sessionID;
-	/** A little security: external calls to the client should present this password.
-	 * I am not sure about TCP-connected clients... but there should be a way to reconnect a client.*/
-	public String clientKey;
 	
 	/** If it's a push client, this stream will receive updates */
 	//public OutputStream pushStream = null;
 	
-	/** this is for pacman: which atom (mobile) this client controls */
-	public int atomID = 0;
-	public String controlledBy;
+	public String userKey;
 	
-	private static final ArrayList<BHClientAgent> agentList = new ArrayList<BHClientAgent>();
+	private static final ArrayList<BHClientRegistration> agentList = new ArrayList<BHClientRegistration>();
 	
 	public static final Object lock = new Object();
 	
-	private BHClientAgent()
+	private BHClientRegistration()
 	{
 	}
 	
 	public int getID() { return agentID; }
 	
-	public static BHClientAgent getClient(int id)
+	public static BHClientRegistration getClient(int id)
 	{
 		synchronized(lock)
 		{
-			for (BHClientAgent a : agentList)
+			for (BHClientRegistration a : agentList)
 			{
 				if (a.agentID == id) return a;
 			}
@@ -54,13 +53,13 @@ public class BHClientAgent
 		return null;		
 	}
 	
-	public static BHClientAgent getClient(Integer sessionID, String clientKey)
+	public static BHClientRegistration getClient(Integer sessionID, String clientKey)
 	{
 		if (clientKey == null) return null;
 		
 		synchronized(lock)
 		{
-			for (BHClientAgent a : agentList)
+			for (BHClientRegistration a : agentList)
 			{
 				if ((sessionID == null || sessionID <= 0 || sessionID == a.sessionID) && clientKey.equals(a.clientKey)) return a;
 			}
@@ -68,9 +67,9 @@ public class BHClientAgent
 		return null;
 	}
 	
-	public static List<BHClientAgent> agentList()
+	public static List<BHClientRegistration> agentList()
 	{
-		ArrayList<BHClientAgent> res = new ArrayList<BHClientAgent>();
+		ArrayList<BHClientRegistration> res = new ArrayList<BHClientRegistration>();
 		
 		synchronized(lock)
 		{
@@ -84,13 +83,13 @@ public class BHClientAgent
 	}	
 	
 	
-	public static List<BHClientAgent> agentList(int sessionID)
+	public static List<BHClientRegistration> agentList(int sessionID)
 	{
-		ArrayList<BHClientAgent> res = new ArrayList<BHClientAgent>();
+		ArrayList<BHClientRegistration> res = new ArrayList<BHClientRegistration>();
 		
 		synchronized(lock)
 		{
-			for (BHClientAgent a : agentList)
+			for (BHClientRegistration a : agentList)
 			{
 				if (a.sessionID == sessionID)
 					res.add(a);
@@ -99,24 +98,24 @@ public class BHClientAgent
 		return res;
 	}	
 
-	public static Stream<BHClientAgent> getAgents() 
+	public static Stream<BHClientRegistration> getAgents() 
 	{
 		return agentList.stream();
 	}
 
-	public static BHClientAgent createAgent()
+	public static BHClientRegistration createAgent()
 	{
-		BHClientAgent agent = new BHClientAgent();
+		BHClientRegistration agent = new BHClientRegistration();
 		agent.agentID = ++agentInstanceSeq;
 		synchronized(lock)
 		{
-			agent.clientKey = generatePassword(6);
+			agent.clientKey = generateClientKey(6);
 			agentList.add(agent);
 		}
 		return agent;
 	}
 
-	public static String generatePassword(int length) 
+	public static String generateClientKey(int length) 
 	{
 		int cnt = 0;
 		if (length <= 0) return "";
@@ -124,7 +123,7 @@ public class BHClientAgent
 		do
 		{
 			String res = Utils.randomString(length);			
-			BHClientAgent a = getClient(0, res);
+			BHClientRegistration a = getClient(0, res);
 			if (a == null)
 			{
 				return res;

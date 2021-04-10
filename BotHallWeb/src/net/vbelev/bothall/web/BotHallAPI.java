@@ -40,15 +40,15 @@ public class BotHallAPI
 	}
 	
 
-	private static BHClientAgent createAgent(PacmanSession s)
+	private static BHClientRegistration createAgent(PacmanSession s)
 	{
-		BHClientAgent agent = BHClientAgent.createAgent();
+		BHClientRegistration agent = BHClientRegistration.createAgent();
 		agent.sessionID = s.getID();
 		agent.subscriptionID = s.getEngine().getMessages().addSubscription();
 		return agent;
 	}
 
-	private static void detachAgent(BHClientAgent agent)
+	private static void detachAgent(BHClientRegistration agent)
 	{
 		if (agent == null  || agent.getID() == 0) return;
 		// we need to check the session and possibly stop it...
@@ -63,18 +63,8 @@ public class BotHallAPI
 		agent.detach();
 	}
 	
-	private static StreamClient createSocketAgent(PacmanSession s, int atomID)
-	{
-		BHClientAgent agent = createAgent(s);
-		//agent.
-		//StreamClient sAgent = new StreamClient();
-		//sAgent.
-		return null;
-	}
-	
 	/**
-	 * 
-	 * @return
+	 * A temporary method to serve as a login, to obtain the user key
 	 */
 	@Path("/getuserkey")
 	@GET
@@ -85,7 +75,7 @@ public class BotHallAPI
 	}
 	
 	/**
-	 * Creates a new session. Anybody can create a new session.
+	 * Creates a new session. Anybody (with a user key) can create a new session.
 	 * @return
 	 */
 	@Path("/create")
@@ -117,7 +107,7 @@ public class BotHallAPI
 		return item;
 	}
 	
-	public SessionInfo createSessionOld(
+	private SessionInfo createSessionOld(
 			@QueryParam("user") String userKey,
 			@QueryParam("protected") String isProtected
 			)
@@ -178,7 +168,7 @@ public class BotHallAPI
 	public List<SessionInfo> sessionList()
 	{
 		ArrayList<SessionInfo> list = new ArrayList<SessionInfo>();
-		List<BHClientAgent> agentList = BHClientAgent.agentList();
+		List<BHClientRegistration> agentList = BHClientRegistration.agentList();
 		
 		for (PacmanSession s : PacmanSession.sessionList())
 		{
@@ -198,7 +188,7 @@ public class BotHallAPI
 					ci.atomID = a.getID();
 					ci.atomType = a.getType();
 					ci.controlledBy = null;
-					for (BHClientAgent g : agentList)
+					for (BHClientRegistration g : agentList)
 					{
 						if (g.sessionID == item.sessionId && g.atomID == ci.atomID)
 						{
@@ -218,6 +208,20 @@ public class BotHallAPI
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
 	public String cycle(//@QueryParam("id") String sessionID,
+			@QueryParam("session") String sessionKey,
+			@QueryParam("run") String run)
+	{
+		
+		BHClient.Command cmd = new BHClient.Command(0, 2);
+		cmd.command = BHSession.COMMAND.CYCLE;
+		cmd.stringArgs[0] = sessionKey;
+		cmd.stringArgs[1] = run;
+		BHClient.Element res = BHSession.processCommand("", cmd);
+
+		return res.toString();
+	}
+	
+	private String cycleOld(//@QueryParam("id") String sessionID,
 			@QueryParam("session") String sessionKey,
 			@QueryParam("run") String run)
 	{
@@ -289,7 +293,7 @@ public class BotHallAPI
 			}
 		}
 		
-		BHClientAgent agent = null;
+		BHClientRegistration agent = null;
 /*
 		BHClientAgent oldAgent = getAgent();
 		
@@ -299,13 +303,13 @@ public class BotHallAPI
 			detachAgent(oldAgent);
 		}
 */		
-		synchronized(BHClientAgent.lock)
+		synchronized(BHClientRegistration.lock)
 		{
 			if (aID != null)
 			{
 				// check that the atom is available
-				List<BHClientAgent> agents = BHClientAgent.agentList(sID);
-				for (BHClientAgent a : agents)
+				List<BHClientRegistration> agents = BHClientRegistration.agentList(sID);
+				for (BHClientRegistration a : agents)
 				{
 					if (a.atomID == aID)
 						return ""; // already used
@@ -313,7 +317,7 @@ public class BotHallAPI
 			}
 			agent = createAgent(s);
 			agent.atomID = aID;
-			agent.controlledBy = "Somebody";
+			agent.userKey = "Somebody"; // we'll need to add the user key to this method.
 			
 		}
 		//request.getSession().setAttribute(BOTHALL_AGENT_ID_ATTR, agent.getID());
@@ -329,7 +333,7 @@ public class BotHallAPI
 	@Produces(MediaType.APPLICATION_JSON)
 	public String releaseClient(@QueryParam("client") String clientKey)
 	{
-		BHClientAgent agent = BHClientAgent.getClient(null, clientKey);
+		BHClientRegistration agent = BHClientRegistration.getClient(null, clientKey);
 		if (agent == null)
 		{
 			return "";
@@ -340,6 +344,7 @@ public class BotHallAPI
 		return Utils.encodeJSON("" + agent.sessionID);				
 	}	
 	
+	/*
 	protected static void startSocketClient(String clientKey) throws java.io.IOException
 	{
 		BHListener bhs = BHListener.getSocketServer(); // this will start the server if needed
@@ -350,6 +355,7 @@ public class BotHallAPI
 		throw new RuntimeException("boo");
 		//new StreamClient(s);
 	}
+	*/
 	//private static long lastUpdateTS = 0;
 	
 	@Path("/update")
@@ -360,7 +366,7 @@ public class BotHallAPI
 			@QueryParam("full") String full
 			) 
 	{
-		BHClientAgent agent = BHClientAgent.getClient(null, clientKey);
+		BHClientRegistration agent = BHClientRegistration.getClient(null, clientKey);
 		if (agent == null)
 		{
 			throw new IllegalArgumentException("Client not found");
@@ -414,7 +420,7 @@ public class BotHallAPI
 		
 		if (!Utils.IsEmpty(clientKey))
 		{
-			BHClientAgent agent = BHClientAgent.getClient(sID, clientKey);
+			BHClientRegistration agent = BHClientRegistration.getClient(sID, clientKey);
 			if (agent == null)
 			{
 				throw new IllegalArgumentException("Session not found");
@@ -496,7 +502,7 @@ public class BotHallAPI
 	//@Path("/command")
 	//@GET
 	@Produces(MediaType.APPLICATION_JSON)	
-	public String commandOld(
+	private String commandOld(
 			@QueryParam("client") String clientKey, 
 			@QueryParam("cmd") String cmd,
 			@QueryParam("args") List<String> args
@@ -505,7 +511,7 @@ public class BotHallAPI
 		try
 		{
 		//Integer sID = Utils.tryParseInt(sessionID);
-		BHClientAgent agent = BHClientAgent.getClient(null, clientKey);
+		BHClientRegistration agent = BHClientRegistration.getClient(null, clientKey);
 		if (agent == null || Utils.IsEmpty(cmd))
 		{
 			throw new IllegalArgumentException("Client not found");

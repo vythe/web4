@@ -109,7 +109,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 	{
 		if (clientKey == null) return;
 		
-		BHClientAgent agent = BHClientAgent.getClient(null, clientKey);
+		BHClientRegistration agent = BHClientRegistration.getClient(null, clientKey);
 		if (agent != null) 
 		{
 			BHSession s = BHSession.getSession(agent.sessionID);
@@ -130,7 +130,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 		if (Utils.IsEmpty(clientKey))
 			return; // continue living without a client key
 		
-		BHClientAgent agent = BHClientAgent.getClient(null, clientKey);
+		BHClientRegistration agent = BHClientRegistration.getClient(null, clientKey);
 		if (agent != null) 
 		{
 			this.clientKey = clientKey;			
@@ -166,7 +166,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 			}
 			invokeRunning = true;
 			
-			BHClientAgent agent = BHClientAgent.getClient(null, StreamServer.this.clientKey);
+			BHClientRegistration agent = BHClientRegistration.getClient(null, StreamServer.this.clientKey);
 			if (agent == null)
 			{
 				System.out.println("Client not found for key: " + StreamServer.this.clientKey);

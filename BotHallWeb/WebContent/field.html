@@ -55,6 +55,7 @@ button.movebutton {
 <div style="width: 30%; display: inline-block; vertical-align: top;">
 
 	<button id="btnRefresh">Refresh</button>
+	<button id="btnStartSession">Start Session</button>
 	<button id="btnLeaveSession">Leave Session</button>
 	<button id="btnEndSession" disabled="disabled">End Session</button>
 	<br/>
@@ -74,9 +75,9 @@ button.movebutton {
 
 	<fieldset>
 	<legend>Debug</legend>
-		<button id="btnStartBHCycling">Start Session</button> 
-		<button id="btnBHCycleOnce">Session Once</button> 
-		<button id="btnStopBHCycling">Stop Session</button><br/>
+		<button id="btnStartBHCycling">Start BH Cycling</button> 
+		<button id="btnBHCycleOnce">BH Cycle Once</button> 
+		<button id="btnStopBHCycling">Stop BH Cycling</button><br/>
 		
 		<button id="btnStartCycling">Start Cycling</button> 
 		<button id="btnCycleOnce">Cycle Once</button> 
@@ -106,6 +107,7 @@ button.movebutton {
 	<td>Load%::</td><td id="serverLoad"></td>
 	<td>Client Load%:</td><td id="clientLoad"></td>
 	<td>Tick msec:</td><td id="serverTick"></td>
+	<td>Status:</td><td id="sessionStatus"></td>
 	<td>Pos X:</td><td id="position_x"></td>
 </tr>
 <tr>
@@ -113,7 +115,8 @@ button.movebutton {
 	<td>controlled ID:</td><td id="controlledID"></td>
 	<td>Server Tick:</td><td id="serverMsec"></td>
 	<td>Client Tick:</td><td id="clientMsec"></td>
-	<td>Key pressed:</td><td id="keyPressSpan"></td>	
+	<td>Key pressed:</td><td id="keyPressSpan"></td>
+	<td></td><td></td>	
 	<td>Pos Y:</td><td id="position_y"></td>
 </tr>
 <tr><td>Info:</td><td id="infoString" colspan="10"></td></tr>
@@ -273,6 +276,26 @@ $(document).ready(function() {
 			addMessage("disconnect ignored - you are not connected");
 		}
 	});
+	
+	$("#btnStartSession").click(function(evt) {
+		evt.preventDefault();
+		console.log("btnStartSession clicked");
+		
+		if (!mybh.sessionKey) {
+			alert("No session key!");
+			return;
+		}
+		mybh.command("start", [], [mybh.sessionKey], function(res) {
+			//alert("my apiUrl is " + this.url + ", join res=" + res);
+			if (res) {
+				console.log("start error: " + res, "INFO");
+			} else {
+				console.log("start!", "INFO");
+			}
+		});
+		
+	});
+	
 	
 	
 	
