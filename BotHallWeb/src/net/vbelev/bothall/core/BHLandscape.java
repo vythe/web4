@@ -2,7 +2,7 @@ package net.vbelev.bothall.core;
 
 import java.util.*;
 import net.vbelev.utils.Utils;
-import net.vbelev.utils.Utils.EnumElement;
+//import net.vbelev.utils.Utils.EnumElement;
 /**
  * The landscape for now will be an array of cells, forming a (hopefully) 
  * contiguous field of travel.
@@ -13,17 +13,17 @@ public class BHLandscape
 {
 	public static enum TerrainEnum
 	{
-		@EnumElement(code = 0, description = "Out of bounds")
+		@Utils.EnumElement(code = 0, description = "Out of bounds")
 		VOID,
-		@EnumElement(code = 1, description = "Good land")
+		@Utils.EnumElement(code = 1, description = "Good land")
 		LAND,
-		@EnumElement(code = 2, description = "Road")
+		@Utils.EnumElement(code = 2, description = "Road")
 		ROAD,
-		@EnumElement(code = 3, description = "Water")
+		@Utils.EnumElement(code = 3, description = "Water")
 		WATER,
-		@EnumElement(code = 4, description = "Underwater")
+		@Utils.EnumElement(code = 4, description = "Underwater")
 		UNDERWATER,
-		@EnumElement(code = 5, description = "Stones")
+		@Utils.EnumElement(code = 5, description = "Stones")
 		STONE
 	}
 	

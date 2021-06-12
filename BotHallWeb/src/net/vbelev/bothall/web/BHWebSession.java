@@ -1,14 +1,13 @@
 package net.vbelev.bothall.web;
 
-import javax.servlet.ServletContext;
 import javax.servlet.http.*;
 
 import net.vbelev.bothall.core.*;
 
 /** 
  * Session storage object for whoever
- * @author Vythe
- *
+ * 
+ * Deprecated: session storage is in SessionBagAPI now, and API calls are stateless.
  */
 public class BHWebSession
 {

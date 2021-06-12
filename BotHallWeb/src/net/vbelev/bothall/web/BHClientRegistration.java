@@ -5,8 +5,6 @@ import java.util.stream.Stream;
 
 import net.vbelev.utils.Utils;
 
-import java.io.*;
-
 /**
  * A layer between a (remote) client and BHSession.
  * All clients, internal and external, are registered in the global list,

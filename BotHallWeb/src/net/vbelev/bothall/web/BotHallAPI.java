@@ -1,12 +1,10 @@
 package net.vbelev.bothall.web;
 
-import java.net.Socket;
 import java.util.*;
 import javax.servlet.ServletContext;
 import javax.servlet.http.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
-import javax.xml.bind.annotation.XmlRootElement;
 
 import net.vbelev.utils.Utils;
 import net.vbelev.bothall.client.*;
@@ -218,7 +216,7 @@ public class BotHallAPI
 		cmd.stringArgs[1] = run;
 		BHClient.Element res = BHSession.processCommand("", cmd);
 
-		return res.toString();
+		return Utils.encodeJSON(res.toString());
 	}
 	
 	private String cycleOld(//@QueryParam("id") String sessionID,

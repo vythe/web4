@@ -1,7 +1,6 @@
 package net.vbelev.utils;
 
 import java.util.*;
-import net.vbelev.utils.*;
 /**
  * Our own little session storage
  */

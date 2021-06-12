@@ -1,7 +1,4 @@
 package net.vbelev.utils;
-
-import java.util.ArrayList;
-
 /**
  * Helper methods for array arithmetics.
  * All arrays are in the "math" order; all values are assumed positive,
@@ -87,28 +84,6 @@ public static char[] arrMultiplySmall(char[] val, long factor, int radix)
 	return res;
 }
 
-private static void arrMultiplySmall1(ArrayList<Character> val, long factor, int radix)
-{
-	long overflow = 0;
-	if (val.size() == 0)
-	{
-		val.add((char)0);
-	}
-	//for (int i = val.size() - 1; i >= 0; i--)
-	for (int i = 0; i < val.size(); i++)
-	{
-		long c1 = val.get(i) * factor + overflow;
-		val.set(i, (char)(c1 % radix));
-		overflow = c1 / radix;
-	}
-	while(overflow > 0)
-	{
-		val.add((char)(overflow % radix));
-		overflow = overflow / radix;
-	}
-}
-
-
 public static char[] arrAddSmall(char[] val, long add, int radix)
 {
 	long overflow = add;
@@ -140,27 +115,6 @@ public static char[] arrAddSmall(char[] val, long add, int radix)
 }
 
 
-private static void arrAddSmall1(ArrayList<Character> val, long add, int radix)
-{
-	long overflow = add;
-	if (val.size() == 0)
-	{
-		val.add((char)0);
-	}
-	//for (int i = val.size() - 1; i >= 0; i--)
-	for (int i = 0; i < val.size(); i++)
-	{
-		long c1 = val.get(i) + overflow;
-		val.set(i, (char)(c1 % radix));
-		overflow = c1 / radix;
-	}
-	while(overflow > 0)
-	{
-		val.add((char)(overflow % radix));
-		overflow = overflow / radix;
-	}	
-}
-
 /** 
  * both val and add are in the "math" order.
  */
@@ -187,30 +141,6 @@ public static char[] arrAdd(char[] val, char[] add, int radix)
 		overflow = overflow / radix;
 	}
 	return res;
-}
-
-private static void arrAdd1(ArrayList<Character> val, char[] add, int radix)
-{
-	if (add == null || add.length == 0) return;
-	
-	int overflow = add[0];
-	while (val.size() < add.length)
-	{
-		val.add((char)0);
-	}
-	//for (int i = val.size() - 1; i >= 0; i--)
-	for (int i = 0; i < val.size() || i < add.length; i++)
-	{
-		int c = i < add.length? add[i] : 0;
-		int c1 = val.get(i) + c + overflow;
-		val.set(i, (char)(c1 % radix));
-		overflow = c1 / radix;
-	}
-	while(overflow > 0)
-	{
-		val.add((char)(overflow % radix));
-		overflow = overflow / radix;
-	}	
 }
 
 public static char[] arrSubtractSmall(char[] val, long sub, int radix) throws SubtractFailedException
@@ -268,49 +198,6 @@ public static char[] arrSubtractSmall(char[] val, long sub, int radix) throws Su
 		dest = CharMath.copyArray(dest, tail + 1);
 	}
 	return dest; 
-}
-
-/** returns true if the result is positive, false if the result is negative */
-private static boolean arrSubtractSmall1(ArrayList<Character> val, long sub, int radix) throws SubtractFailedException
-{
-	long overflow = sub;
-	if (val.size() == 0)
-	{
-		val.add((char)0);
-	}
-	//for (int i = val.size() - 1; i >= 0; i--)
-	for (int i = 0; i < val.size(); i++)
-	{
-		char overflowLastDigit = (char)(overflow % radix);
-		if (overflowLastDigit > val.get(i))
-		{
-			val.set(i, (char)(val.get(i) + radix));
-			overflow += radix;
-		}
-		val.set(i, (char)(val.get(i) - overflowLastDigit));
-		overflow = overflow / radix;				
-	}
-	/*
-	while(overflow > 0)
-	{
-		val.add((char)(overflow % radix));
-		overflow = overflow / radix;
-	}
-	*/
-	if (overflow > 0)
-	{
-		//throw new IllegalArgumentException("subtraction turned negative, not supproted yet");
-		throw new SubtractFailedException();
-		/*
-		char[] neg = digitsFromLong(overflow, 10);
-		val.clear();
-		for (int i = 0; i < neg.length; i++)
-			val.add(neg[i]);
-		
-		return false;
-		*/
-	}
-	return true; 
 }
 
 public static char[] arrSubtract(char[] val, char[] sub, int radix) throws SubtractFailedException

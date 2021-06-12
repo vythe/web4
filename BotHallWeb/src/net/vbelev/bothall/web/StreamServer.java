@@ -1,12 +1,10 @@
 package net.vbelev.bothall.web;
 
-import java.util.*;
 import java.io.*;
 import java.net.*;
 
 import net.vbelev.bothall.client.*;
 import net.vbelev.bothall.core.BHCollection.EntityTypeEnum;
-import net.vbelev.bothall.web.*;
 import net.vbelev.utils.*;
 
 /**
@@ -43,30 +41,10 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 	
 	public StreamServer(InputStream in, OutputStream out)
 	{
-		//reader = new BufferedReader(new InputStreamReader(in));
-		//writer = new BufferedWriter(new OutputStreamWriter(out));
 		dryReader = new DryCereal.Reader(in);
 		dryWriter = new DryCereal(out);
 		//BHClient.Error msg = new BHClient.Error(0, "Hello, world");
-		/*
-		BHClient.Cell c = new BHClient.Cell();
-		c.x = 17;
-		c.y = 18;
-		c.z = 19;
-		c.terrain = "STONE";
-		c.buffs = new BHClient.Buff[0];
 
-		try
-		{
-			dryWriter.addByte(c.getElementCode());
-			c.toCereal(dryWriter);
-			System.out.println("drywriter-1 success: " + c.toString());
-		}
-		catch (IOException x)
-		{
-			System.out.println("drywriter-1 failed: " + x.getMessage());
-		}
-		*/
 		clientSocket = null;
 	}
 	
@@ -78,26 +56,6 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 		dryReader = new DryCereal.Reader(socket.getInputStream());
 		dryWriter = new DryCereal(socket.getOutputStream());
 		clientSocket = socket;
-		
-		//BHClient.Error msg = new BHClient.Error(0, "Hello, world");
-		/*
-		BHClient.Cell c = new BHClient.Cell();
-		c.x = 17;
-		c.y = 18;
-		c.z = 19;
-		c.terrain = "STONE";
-		c.buffs = new BHClient.Buff[0];
-		try
-		{
-			dryWriter.addByte(c.getElementCode());
-			c.toCereal(dryWriter);
-			System.out.println("drywriter-2 success: " + c.toString());
-		}
-		catch (IOException x)
-		{
-			System.out.println("drywriter-2 failed: " + x.getMessage());
-		}
-		*/
 	}
 	
 	public String getClientKey()
@@ -188,9 +146,12 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 			try
 			{
 				//System.out.println("StreamServer.PublishListener write update started, timecode " + res.status.timecode);
+				synchronized(StreamServer.this.dryWriter)
+				{
 				StreamServer.this.dryWriter.addByte(BHClient.ElementCode.UPDATEBIN);
 				res.toCereal(StreamServer.this.dryWriter);
 				StreamServer.this.dryWriter.flush();
+				}
 				//System.out.println("StreamServer.PublishListener successful write update, timecode " + res.status.timecode);
 			}
 			catch (IOException x)

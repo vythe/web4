@@ -107,6 +107,7 @@ public class Utils
 		return ann.description();
 	}
 	
+	@SafeVarargs
 	public static <T extends Object>T NVL(T... vals)
 	{
 		for (T v : vals)
@@ -284,6 +285,7 @@ public class Utils
 		}
 	}
 	
+	@SafeVarargs
 	public static <T>boolean InList(T val, T... list)
 	{
 		if (list == null) return false;

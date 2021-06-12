@@ -616,12 +616,12 @@ function glideLoop() {
 		//console.log("glide check id=" + id);
 		var glideRecord = glidePool[id];
 	//	console.dir(glideRecord);
-		var elem = itemTiles[id];
-		if (!elem || !elem.svg) {
+		var elemTile = itemTiles[id];
+		if (!elemTile || !elemTile.svg) {
 			delete glidePool[id];
 			continue;
 		}
-		elem = elem.svg;
+		var elem = elemTile.svg;
 		
 		if (elem.attr("x") != glideRecord.currentX || elem.attr("y") != glideRecord.currentY || id != glideRecord.id) {
 			delete glidePool[id];
@@ -634,7 +634,7 @@ function glideLoop() {
 		if (glideRecord.targetTS <= ts0) {
 			elem.attr("x", glideRecord.targetX);
 			elem.attr("y", glideRecord.targetY);
-			console.log("glide delete id=" + id + " because ts"); 
+			console.log("glide delete id=" + id + " because ts, jump to x=" + glideRecord.targetX + ", y=" + glideRecord.targetY); 
 			delete glidePool[id];
 			continue;
 		}

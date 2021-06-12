@@ -5,7 +5,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.*;
 import net.vbelev.utils.*;
-import net.vbelev.utils.EventBox.EventArgs;
 
 public class ConsoleClient
 {

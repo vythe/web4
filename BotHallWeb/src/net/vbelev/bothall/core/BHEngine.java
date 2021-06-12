@@ -4,12 +4,11 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.io.*;
 
-import com.sun.xml.internal.ws.api.pipe.Engine;
-
 import net.vbelev.utils.*;
 /**
- * The first place to store and handle the bothall processes
- * @author Vythe
+ * The base class for implementing the bothall processes.
+ * It implements the main process loop (actions, buffs, triggers) 
+ * without any details of the business rules.
  *
  */
 public class BHEngine
@@ -27,29 +26,95 @@ public class BHEngine
 		PUBLISH
 	}
 	
-	public interface IClientCallback
+	/** 
+	 * Actions are posted to the engine, then submitted to IClientCallback for processing.
+	 */
+	public static class Action
 	{
-		void onPublish(int timecode);
-		void processAction(BHOperations.BHAction action);
-		void processTriggers();
-		boolean processBuff(BHOperations.BHBuff buff);
+		private static int instanceCounter = 0;
+		public final int ID = ++instanceCounter;
+		
+		private static final String[] emptyStringProps = new String[0];
+		private static final int[] emptyIntProps = new int[0];
+		
+		/** actionType should be interned or assigned from some constants */
+		public String actionType;
+		/** The acting entity ID - it should be clear from actionType as to what kind of entity this is*/
+		public int actorID;
+		/** Description can be used for debugging */
+		public String description;
+		// different action types will have different props, but we know which prop is where
+		public int[] intProps = emptyIntProps;
+		public String[] stringProps = emptyStringProps;
+		// later
+		
+		public String toString()
+		{
+			return "[BHA:" + actionType + ", actorID=" + actorID + ", props=" + Arrays.toString(intProps) + "]"; 
+		}
+		
+		public Action() 
+		{
+		}
+		
+		public Action(String type, int id, int intPropCount, int strPropCount)
+		{
+			actionType = type;
+			actorID = id;
+			intProps = intPropCount <= 0? emptyIntProps : new int[intPropCount];
+			stringProps = strPropCount <= 0? emptyStringProps : new String[strPropCount];
+		}
 	}
 	
+	/**
+	 * Timers are delayed actions, submitted for processing at the specified engine timecode.
+	 */
+	public static class Timer implements Comparable<Timer>
+	{
+		public Action action;
+		public long timecode;
+		@Override
+		public int compareTo(Timer arg0)
+		{
+			if (timecode < arg0.timecode) return -1;
+			if (timecode > arg0.timecode) return 1;
+			return action.ID - arg0.action.ID;
+		}
+	}	
+	
+	/**
+	 * Buffs are repeated actions. The same action is submitted for processing every tick
+	 * until the buff expires or is cancelled.
+	 * If the ticks value is <= 0, the buff does not expire, otherwise it is repeated "ticks" times.
+	 */
+	public static class Buff 
+	{
+		public Action action;
+		/** This is when the buff was created or changed, 
+		 * for reporting it to the clients
+		 */
+		public long timecode;
+		/** If ticks is <= 0, the buff does not expire; otherwise the buff's action is processed "ticks" times */
+		public int ticks;
+		/** buffs stay alive (processed every tick) until cancelled */
+		public boolean isCancelled = false;
+		/** If the buff is visible, it is reported to the clients*/
+		public boolean isVisible = true;
+	}
+		
 	//public static final long CYCLE_MSEC = 2500;
 	public static int engineInstanceCounter = 0;
 	
 	public final int engineInstance = ++engineInstanceCounter;
 	
-	private BHLandscape landscape = null;
-	private BHCollection items = null;
 	//private ConcurrentLinkedDeque<BHOperations.BHAction> actionQueue = new ConcurrentLinkedDeque<BHOperations.BHAction>();
 	//private ConcurrentLinkedDeque<BHOperations.BHAction> actionQueueNext = new ConcurrentLinkedDeque<BHOperations.BHAction>();
-	private QueueHelper.QueueHolder<BHOperations.BHAction> actionQueueHolder = new QueueHelper.QueueHolder<BHOperations.BHAction>(new ConcurrentLinkedQueue<BHOperations.BHAction>());
-	private QueueHelper.QueueHolder<BHOperations.BHAction> actionQueueHolderNext = new QueueHelper.QueueHolder<BHOperations.BHAction>(new ConcurrentLinkedQueue<BHOperations.BHAction>());
-	private PriorityBlockingQueue<BHOperations.BHTimer> timers = new PriorityBlockingQueue<BHOperations.BHTimer>();
+	private QueueHelper.QueueHolder<Action> actionQueueHolder = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
+	private QueueHelper.QueueHolder<Action> actionQueueHolderNext = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
+	private PriorityBlockingQueue<Timer> timers = new PriorityBlockingQueue<Timer>();
 	/** Buffs should become immutable, but the list needs to be visible */
-	public List<BHOperations.BHBuff> buffs = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
-	private List<BHOperations.BHBuff> buffsNext = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
+	public List<Buff> buffs = Collections.synchronizedList(new ArrayList<Buff>());
+	private List<Buff> buffsNext = Collections.synchronizedList(new ArrayList<Buff>());
 	
 	private BHMessageList messages = new BHMessageList();
 
@@ -58,220 +123,29 @@ public class BHEngine
 	/** Processing load (share of the cycle time spent working) in percents */
 	public int cycleLoad = 0;
 	public int cycleCount = 0;
-
-	public IClientCallback clientCallback = null;
 	
 	public BHEngine()
 	{
-		this.landscape = new BHLandscape();
-		this.items = new BHCollection();			
 	}
 	
 	/** Landscape property cannot be made final, because of re-publishing it,
 	 * but it should be protected from damage.
 	 */
-	public BHLandscape getLandscape() { return landscape; }
-	
-	public BHCollection getCollection() { return items; }
-	
 	public BHMessageList getMessages() { return messages; }
 	
-	public static BHEngine testEngine(int size)
-	{
-		BHEngine res = new BHEngine();
-		
-		res.landscape = testLandscape(size);
-		BHLandscape.Cell[] landCells = res.landscape.cells.stream()
-				.filter(q -> q.getTerrain() == BHLandscape.TerrainEnum.LAND)
-				.toArray(BHLandscape.Cell[]::new)
-		;
-		int heroCell = Utils.random.nextInt(landCells.length - 1);
-		int m1Cell = Utils.random.nextInt(landCells.length - 1);
-		int m2Cell = Utils.random.nextInt(landCells.length - 1);
-		int m3Cell = Utils.random.nextInt(landCells.length - 1);
-		
-		res.items = new BHCollection();
-		BHCollection.Atom hero = res.items.addAtom("HERO", BHCollection.Atom.GRADE.HERO);
-		hero.setCoords(landCells[heroCell]);
-		BHCollection.Atom m1 = res.items.addAtom("MONSTER", BHCollection.Atom.GRADE.MONSTER);
-		m1.setCoords(landCells[m1Cell]);
-		BHCollection.Atom m2 = res.items.addAtom("MONSTER", BHCollection.Atom.GRADE.MONSTER);
-		m2.setCoords(landCells[m2Cell]);
-		BHCollection.Atom m3 = res.items.addAtom("MONSTER", BHCollection.Atom.GRADE.MONSTER);
-		m3.setCoords(landCells[m3Cell]);
-		
-		res.publish();
-		return res;
-	}
-	
-	public static BHEngine loadFileEngine(String fileName)
-	{
-		BHEngine res = new BHEngine();
 
-		try
-		{
-		InputStream is = BHEngine.class.getResourceAsStream(fileName);
-		BufferedReader br = new BufferedReader(new InputStreamReader(is));
-		String line = null;
-		int x = -1;
-		int y = -1;
-		int z = 0;
-		//BHCollection.Atom hero = null;
-		while ((line = br.readLine()) != null)
-		{
-			y++;
-			StringReader sr = new StringReader(line);
-			int c;
-			x = -1;
-			while ((c = sr.read())!= -1)
-			{
-				x++;
-				BHLandscape.TerrainEnum terrain;
-				if (c == '#')
-				{
-					res.landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.STONE));					
-				}
-				else if (c == ' ')
-				{
-					res.landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));					
-				}
-				else if (c == '@')
-				{
-					res.landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
-					BHCollection.Atom hero = res.items.addAtom("HERO", BHCollection.Atom.GRADE.HERO);
-					hero.setX(x);
-					hero.setY(y);
-					hero.setZ(z);
-				}
-				else if (c == 'M')
-				{
-					res.landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
-					BHCollection.Atom hero = res.items.addAtom("MONSTER", BHCollection.Atom.GRADE.MONSTER);
-					hero.setX(x);
-					hero.setY(y);
-					hero.setZ(z);
-				}
-				else if (c == '.')
-				{
-					res.landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.LAND));
-					BHCollection.Atom item = res.items.addAtom("GOLD", BHCollection.Atom.GRADE.ITEM);
-					item.setX(x);
-					item.setY(y);
-					item.setZ(z);
-				}
-				else
-				{
-					//res.landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.VOID));
-					System.out.println("Unsupported mark [" + (char)c + "] when reading " + fileName);
-				}
-			}
-				
-		}
-		}
-		catch (IOException x)
-		{
-			System.out.println("Failed to read " + fileName);
-			x.printStackTrace();
-		}
-		res.publish();
-		res.timecode++; // make it at least 1 so the clients will load it
-		return res;
-	}
-	
-	public static BHLandscape testLandscape(int size)
-	{
-		BHLandscape res = new BHLandscape();
-		
-		for (int x = 0; x < size; x++)
-		{
-			for (int y = 0; y < size; y++)
-			{
-				res.setCell(new BHLandscape.Cell(x, y, 0, BHLandscape.TerrainEnum.VOID));
-			}
-		}
-		
-		
-		// add a mountain
-		res.setCell(new BHLandscape.Cell(Utils.random.nextInt(size - 1), Utils.random.nextInt(size - 1), 0, BHLandscape.TerrainEnum.STONE));
-		res = res.publish(0); // no need to advance the timecode at the initialization 		
-		boolean hasMore = true;
-		int rounds = 0;
-		while (hasMore && rounds < 100)
-		{
-			hasMore = false;
-			rounds++;
-			for (int x = 0; x < size; x++)
-			{
-				for (int y = 0; y < size; y++)
-				{
-					BHLandscape.Cell c = res.getCell(x, y, 0);
-					if (c.getTerrain() == BHLandscape.TerrainEnum.STONE)
-					{
-						BHLandscape.Cell[] closest = res.closestCells(c.getX(), c.getY(), c.getZ());
-						for (BHLandscape.Cell c1 : closest)
-						{
-							
-							if (c1.getTerrain() != BHLandscape.TerrainEnum.VOID
-								|| c1.getX() < 0 || c1.getX() >= size
-								|| c1.getY() < 0 || c1.getY() >= size
-								|| c1.getZ() != 0
-								)
-							{
-								continue;
-							}
-							BHLandscape.Cell[] closest2 = res.closestCells(c1.getX(), c1.getY(), c1.getZ());
-							int stoneCount = 0;
-							int rndMark = 0;
-							for (BHLandscape.Cell c2 : closest2)
-							{
-								if (c2.getTerrain() == BHLandscape.TerrainEnum.STONE) stoneCount++;
-							}
-							if (stoneCount == 1) rndMark = 70;
-							else if  (stoneCount == 2) rndMark = 50;
-							else if (stoneCount == 3) rndMark = 30;
-							
-							int rnd = Utils.random.nextInt(100);
-							
-							//System.out.println("for x=" + c1.getX() + ", y=" + c1.getY() + ", rnd=" + rnd);
-							if (rnd <= rndMark)
-							{
-								res.setCell(c1.terrain(BHLandscape.TerrainEnum.STONE));
-								hasMore = true;
-							}
-							else
-							{
-								res.setCell(c1.terrain(BHLandscape.TerrainEnum.LAND));
-							}
-						}
-					}
-				}
-			}	
-			res = res.publish(0); // no need to advance the timecode at the initialization 			
-		}
-		for (int x = 0; x < size; x++)
-		{
-			for (int y = 0; y < size; y++)
-			{
-				if (res.getCell(x, y, 0).getTerrain() == BHLandscape.TerrainEnum.VOID)
-				res.setCell(new BHLandscape.Cell(x, y, 0, BHLandscape.TerrainEnum.LAND));
-			}
-		}
-		
-		
-		return res;
-	}
-
+	/** Returns the updated timecode.
+	 * This method will be overridden in subclasses (BHBoard) to handle their publishing.
+	 * Those implementations are expected to call super.publish() to let the engine to its part.  */
 	public long publish()
 	{
 		timecode++;
-		this.landscape = this.landscape.publish(timecode);
-		this.items = items.publish(timecode);
 		this.messages.publish();
 		
 		synchronized(this.buffsNext)
 		{
-			List<BHOperations.BHBuff> newBuffs = new ArrayList<BHOperations.BHBuff>(); //this.buffsNext);
-			for (BHOperations.BHBuff b : this.buffs)
+			List<Buff> newBuffs = new ArrayList<Buff>(); //this.buffsNext);
+			for (Buff b : this.buffs)
 			{
 				if (!b.isCancelled && b.ticks >= 0)
 				{
@@ -284,14 +158,30 @@ public class BHEngine
 			}
 			newBuffs.addAll(this.buffsNext);
 			this.buffs = Collections.unmodifiableList(newBuffs);
-			this.buffsNext = Collections.synchronizedList(new ArrayList<BHOperations.BHBuff>());
+			this.buffsNext = Collections.synchronizedList(new ArrayList<Buff>());
 		}
 		
-		if (clientCallback != null)
-		{
-			clientCallback.onPublish(timecode);
-		}
 		return timecode;
+	}
+	
+	public void processAction(Action action)
+	{
+		System.out.println("Action: " + action.toString());
+	}
+	
+	public boolean processBuff(Buff buff)
+	{
+		System.out.println("Buff: " + buff.toString());
+		return false;
+	}
+	
+	/**
+	 * Triggeres are "triggered responses": various checks and situations 
+	 * that need to be reviewed every cycle. Triggers complete the previous cycle; 
+	 * this method is called after publishing, but before processing any actions in the queue. 
+	 */
+	public void processTriggers()
+	{
 	}
 	
 	/** java8+ : interface with a single method can be instantiated as a lambda */
@@ -311,13 +201,13 @@ public class BHEngine
 	{
 		public final int instanceID = ++queueProcessorCounter;
 		
-		private QueueHelper.QueueHolder<BHOperations.BHAction> holder;
+		private QueueHelper.QueueHolder<Action> holder;
 		//private Iterator<BHAction> queue;
 		private IQueueProcessorDoneNotify notifyMethod;
 		//private BHEngine myEngine;
 		private boolean isRunning = false;
 
-		public QueueProcessor(QueueHelper.QueueHolder<BHOperations.BHAction> holder, IQueueProcessorDoneNotify onNotify)
+		public QueueProcessor(QueueHelper.QueueHolder<Action> holder, IQueueProcessorDoneNotify onNotify)
 		{
 			this.holder = holder;
 			this.notifyMethod = onNotify;
@@ -347,29 +237,17 @@ public class BHEngine
 					{
 						while (holder.isOpen && !holder.iterator().hasNext())
 						{
-							long wt = new Date().getTime();
+							//long wt = new Date().getTime();
 							holder.wait(CYCLE_MSEC * 10);
 							//System.out.println("queueProcessor " + instanceID + " waited for " + (new Date().getTime() - wt) + " msec, isopen=" + holder.isOpen);
 						}
 					}
 					if (holder.iterator().hasNext())
 					{
-						BHOperations.BHAction action = holder.iterator().next();
-					//myEngine.getMessages().addMessage(action.targetType, action.targetID, "Action " + action.ID + ": " + action.message);
-						//BHOperations.processAction(BHEngine.this, action);
-						if (clientCallback != null)
-						{
-							clientCallback.processAction(action);
-						}
-						//System.out.println("Action processed by queueProcessor " + instanceID + ": #" + action.ID + " " + action.message);
+						Action action = holder.iterator().next();
+						processAction(action);
 						Thread.yield();
 					}
-					//else
-					//{
-					//	workIsDone = true;
-					//	break;
-					//			
-					//}
 				}
 				catch (InterruptedException x)
 				{
@@ -389,7 +267,7 @@ public class BHEngine
 		}		
 	}
 		
-	public class CycleRunnable implements Runnable
+	private class CycleRunnable implements Runnable
 	{
 		public void run()
 		{
@@ -478,14 +356,10 @@ public class BHEngine
 		{
 			// 1) active stage: listen to the actionqueue and process it for CYCLE_MSEC milliseconds;
 			// 1.1) triggers - triggers complete the previous cycle, so they are processed first here
-			if (clientCallback != null)
-			{
-				clientCallback.processTriggers();
-				//BHOperations.processTriggers(this);
-			}
+			processTriggers();
 			 
 			// 1.2) process timers - move their actions to the processing queue
-			BHOperations.BHTimer t;
+			Timer t;
 			synchronized (this.timers)
 			{
 				while ((t = this.timers.peek()) != null)
@@ -503,20 +377,10 @@ public class BHEngine
 				}
 			}
 			// 1.3) buffs - to be implemented later
-			if (clientCallback != null)
+			for (Buff buff : this.buffs)
 			{
-				for (BHOperations.BHBuff buff : this.buffs)
-				{
-					//if (!BHOperations.processBuff(this, buff))
-					if (!clientCallback.processBuff(buff))
-					{
-						buff.isCancelled = true;
-					}					
-				}
-			}
-			else
-			{
-				for (BHOperations.BHBuff buff : this.buffs)
+				//if (!BHOperations.processBuff(this, buff))
+				if (!processBuff(buff))
 				{
 					buff.isCancelled = true;
 				}
@@ -544,7 +408,7 @@ public class BHEngine
 			// we continue processing actionQueue to completion
 			///actionQueueNext = new ConcurrentLinkedDeque<BHOperations.BHAction>();
 			//DequeHelper.DequeHolder<BHOperations.BHAction> nextHolder
-			this.actionQueueHolderNext = new QueueHelper.QueueHolder<BHOperations.BHAction>(new ConcurrentLinkedQueue<BHOperations.BHAction>());
+			this.actionQueueHolderNext = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
 			QueueProcessor actorNext = new QueueProcessor(this.actionQueueHolderNext, (boolean isDone) -> {
 				// what should we do if it's interrupted (isDone false)?
 				synchronized(cycleLock)
@@ -564,7 +428,7 @@ public class BHEngine
 			{
 				while (actor.isRunning && this.stage != CycleStageEnum.IDLE)
 				{
-					long waitStart = new Date().getTime();
+					//long waitStart = new Date().getTime();
 					cycleLock.wait(CYCLE_MSEC);
 					//System.out.println("waited for QueueProcessor : " + actor.instanceID + " for "+ (new Date().getTime() - waitStart) +  " msec");
 				}
@@ -609,7 +473,7 @@ public class BHEngine
 	/** delay is in cycle ticks (over the timecode value); if delay is zero,
 	 * add action directly to the cycle queue
 	 */
-	public void postAction(BHOperations.BHAction action, int delay)
+	public void postAction(Action action, int delay)
 	{
 		if (action == null) return;
 		/*
@@ -622,7 +486,7 @@ public class BHEngine
 		*/
 		if (delay > 0)
 		{
-			BHOperations.BHTimer timer = new BHOperations.BHTimer();
+			Timer timer = new Timer();
 			timer.action = action;
 			timer.timecode = this.timecode + delay;
 			this.timers.add(timer);
@@ -647,7 +511,7 @@ public class BHEngine
 		}
 	}
 	
-	public void postBuff(BHOperations.BHBuff buff)
+	public void postBuff(Buff buff)
 	{
 		
 		if (buff != null)
@@ -659,15 +523,15 @@ public class BHEngine
 		}
 	}
 	
-	public List<BHOperations.BHBuff> getBuffs(BHCollection.EntityTypeEnum entityType, int entityID, String actionType)
+	public List<Buff> getBuffs(int entityID, String actionType)
 	{
-		ArrayList<BHOperations.BHBuff> res = new ArrayList<BHOperations.BHBuff>();
+		ArrayList<Buff> res = new ArrayList<Buff>();
 		synchronized (this.buffs)
 		{
-			for (BHOperations.BHBuff b : this.buffs)
+			for (Buff b : this.buffs)
 			{
-				if (b.actorType != entityType || b.actorID != entityID) continue;
-				if (actionType == null || actionType == b.actionType)
+				if (b.action.actorID != entityID) continue;
+				if (actionType == null || actionType == b.action.actionType)
 					res.add(b);				
 			}
 		}
@@ -681,15 +545,15 @@ public class BHEngine
 	 * @param actionType
 	 * @return
 	 */
-	public BHOperations.BHBuff getBuff(BHCollection.EntityTypeEnum entityType, int entityID, String actionType)
+	public Buff getBuff(int entityID, String actionType)
 	{
-		BHOperations.BHBuff res = null;
+		Buff res = null;
 		synchronized (this.buffs)
 		{
-			for (BHOperations.BHBuff b : this.buffs)
+			for (Buff b : this.buffs)
 			{
-				if (b.actorType != entityType || b.actorID != entityID) continue;
-				if (actionType == null || actionType == b.actionType)
+				if (b.action.actorID != entityID) continue;
+				if (actionType == null || actionType == b.action.actionType)
 				{
 					res = b;
 					break;

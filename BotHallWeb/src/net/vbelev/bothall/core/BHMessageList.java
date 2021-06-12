@@ -1,7 +1,6 @@
 package net.vbelev.bothall.core;
 
 import java.util.*;
-import java.util.concurrent.*;
 
 /**
  * Unlike BHCollection, the list of messages is emptied and started again at every publish.

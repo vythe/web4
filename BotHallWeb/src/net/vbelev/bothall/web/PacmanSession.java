@@ -12,7 +12,11 @@ import net.vbelev.bothall.core.BHOperations.BHBuff;
 import net.vbelev.utils.*;
 /**
  * Here we put the methods specific to pacman
- * @author Vythe
+ *
+ * Let's try this hierarchy:
+ * 1) BHEngine implements the main loop, doesn't know anything about particular actions;
+ * 2) BHBoard implements a 3-d basic arena (board): landscape, items, mobs;
+ * 3) Pacman extends BHBoard to implement pacman details and rules
  *
  */
 public class PacmanSession extends BHSession
@@ -44,13 +48,6 @@ public class PacmanSession extends BHSession
 		public static final int NAME = 0;
 	}
 		
-	public static class PS_STATUS
-	{
-		public static final int NEW = 0;
-		public static final int ACTIVE = 1;
-		public static final int PAUSE = 2;
-		public static final int COMPLETE = 3;
-	}
 	public static class ATOM
 	{
 		public static final String GOLD = "GOLD".intern(); 
@@ -91,6 +88,8 @@ public class PacmanSession extends BHSession
 	public static final String ACTION_DIE = "DIE".intern();
 
 	public static final int PACMAN_DURATION = 1000;
+	public static int MOVE_SPEED = 4;
+	
 	
 	//public static final Object lock = new Object();
 	//private static int sessionInstanceSeq = 0;
@@ -107,17 +106,15 @@ public class PacmanSession extends BHSession
 	//public final EventBox.Event<BHSession.PublishEventArgs> publishEvent = new EventBox.Event<BHSession.PublishEventArgs>();
 	public final Map<Integer, BHLandscape.Coords> startingPoints = new java.util.Hashtable<Integer, BHLandscape.Coords>();
 	
-	/** values from PS_STATUS */
-	public int sessionStatus = PS_STATUS.NEW;
-	
+	/*
 	public static PacmanSession createSession()
 	{
-		BHEngine e = PacmanSession.loadFile("/../data/pacman.txt");
+		BHBoard e = PacmanSession.loadFile("/../data/pacman.txt");
 		e.CYCLE_MSEC = 200;
 		PacmanSession s =  PacmanSession.createSession(e);
 		
 		return s;
-	}
+	}*/
 
 	/*
 	public static int getSessionCount()
@@ -125,24 +122,26 @@ public class PacmanSession extends BHSession
 		return sessionList.size();
 	}
 	*/
-	public static PacmanSession createSession(BHEngine e)
+	
+	private final BHBoard engine;
+	
+	public PacmanSession()
+	{
+		engine = this;
+	}
+	
+	public static PacmanSession createSession()
 	{
 		PacmanSession s = new PacmanSession();
+		s.loadFile("/../data/pacman.txt");
+		s.CYCLE_MSEC = 200;
 		s.sessionStatus = PS_STATUS.NEW;
-		s.engine = e;
-		e.clientCallback = s.new EngineCallback();
+		//s.engine = e;
+		//e.clientCallback = s.new EngineCallback();
+				
+		s.publish();
 		
-/* session will be registed in the super constructor BHSession()
- * 		s.sessionID = ++sessionInstanceSeq;
-		synchronized(lock)
-		{
-			s.sessionKey = PacmanSession.generateSessionKey(8);
-			sessionList.add(s);
-		}
-*/		
-		e.publish();
-		
-		for (BHCollection.Atom a : e.getCollection().all())
+		for (BHCollection.Atom a : s.getCollection().all())
 		{
 			if (a.getGrade() != BHCollection.Atom.GRADE.ITEM)
 			{
@@ -297,9 +296,9 @@ public class PacmanSession extends BHSession
 		return res;		
 	}
 	
-	public static BHEngine loadFile(String fileName)
+	public void loadFile(String fileName)
 	{
-		BHEngine res = new BHEngine();
+		BHBoard res = this; //new BHBoard();
 		
 		try
 		{
@@ -322,7 +321,7 @@ public class PacmanSession extends BHSession
 			while ((c = sr.read())!= -1)
 			{
 				x++;
-				BHLandscape.TerrainEnum terrain;
+				//BHLandscape.TerrainEnum terrain;
 				if (c == '#')
 				{
 					landscape.setCell(new BHLandscape.Cell(x, y, z, BHLandscape.TerrainEnum.STONE));					
@@ -387,18 +386,168 @@ public class PacmanSession extends BHSession
 		}
 		res.publish();
 		res.timecode++; // make it at least 1 so the clients will load it
-		return res;
+		//return res;
+	}
+	
+	@Override
+	public long publish()
+	{
+		return super.publish();
 	}
 	
 	
+	@Override
+	public void processAction(BHEngine.Action action)
+	{
+		// 1) priority actions that work on stopped sessions
+		if (action.actionType == BHBoard.ACTION.STOPCYCLING)
+		{
+			super.processAction(action);
+			return;
+			//engine.stopCycling();
+			//PacmanSession.this.sessionStatus = PS_STATUS.PAUSE;
+			//return;
+		}
+		
+		if (PacmanSession.this.sessionStatus != PS_STATUS.ACTIVE)
+		{
+			return;
+		}
+		// 2) normal actions that work only on running sessions
+		BHCollection.Atom me = this.getCollection().getItem(action.actorID);
+		if (action.actionType == PacmanSession.ACTION_DIE)
+		{
+			if (me == null || me.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE)
+			{
+				return; //"No atom id" + session.myID;
+			}
+			PacmanSession.this.actionDie(action.actorID);
+		}
+		else
+		{
+			super.processAction(action);
+		}
+		
+	}
+
+	@Override
+	public boolean processBuff(BHEngine.Buff buff)
+	{
+		if (buff.action.actionType == PacmanSession.BUFF.RESURRECT)
+		{
+			return PacmanSession.this.processBuffResurrect(buff);
+		}
+		else if (buff.action.actionType == PacmanSession.BUFF.PACMONSTER)
+		{
+			return PacmanSession.this.processBuffPacMonster(buff);
+		}
+		else if (buff.action.actionType == PacmanSession.BUFF.PACHERO)
+		{
+			return PacmanSession.this.processBuffPacHero(buff);
+		}
+		else if (buff.action.actionType == PacmanSession.BUFF.PORT)
+		{
+			return PacmanSession.this.processBuffPortal(buff);
+		}
+		else
+		{
+			return super.processBuff(buff);
+		}
+	}
 	
-	public class EngineCallback implements BHEngine.IClientCallback
+	@Override
+	public void processTriggers()
+	{
+		for (BHCollection.Atom a : this.getCollection().all())
+		{
+			if (a.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE) continue;
+			
+			if (a.getGrade() == BHCollection.Atom.GRADE.HERO)
+			{
+				// *) eat the gold here
+				Collection<BHCollection.Atom> spot = this.getCollection().atCoords(a, false);
+				if (spot.size() <= 1) continue;  // nothing to see here
+				for (BHCollection.Atom it : spot)
+				{
+					if (it.getID() == a.getID()) continue;
+					if (it.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE) continue;
+					
+					if (it.getType() == PacmanSession.ATOM.GOLD)
+					{
+						int goldCount = a.getIntProp(PacmanSession.INT_PROPS.HERO_GOLD) + 1;
+						a.setIntProp(PacmanSession.INT_PROPS.HERO_GOLD, goldCount);
+						this.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  a.getID(), "Yum! Count=" + goldCount);
+						it.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
+					}
+					else if (it.getType() == PacmanSession.ATOM.PAC) 
+					{
+						triggerPacman();
+						it.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
+					}
+					else if (it.getType() == PacmanSession.ATOM.PORTAL)
+					{
+						triggerPortal(a);
+					}
+				}
+			}
+			else if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER)
+			{
+				int moveDir = a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
+				// *) eat the hero here					
+				Collection<BHCollection.Atom> spot = this.getCollection().atCoords(a, false);
+				if (spot.size() <= 1) continue;  // nothing to see here
+				for (BHCollection.Atom it : spot)
+				{
+					if (it.getID() == a.getID()) continue;
+					if (it.getGrade() == BHCollection.Atom.GRADE.HERO)
+					{
+						/*
+						BHOperations.BHAction action = new BHOperations.BHAction();
+						action.actionType = PacmanSession.ACTION_DIE;
+						action.actorID = it.getID();
+						//action.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+
+						
+						PacmanSession.this.getEngine().postAction(action, 0);
+						//return action.ID; //"action ID=" + action.ID;
+						*/
+						
+						BHEngine.Buff monsterBuff = this.getBuff(a.getID(), BUFF.PACMONSTER);
+						if (monsterBuff != null && !monsterBuff.isCancelled)
+						{
+							it.setIntProp(INT_PROPS.HERO_GOLD, it.getIntProp(INT_PROPS.HERO_GOLD) + 100);
+							this.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  it.getID(), "CHOMP!");
+							actionDie(a.getID());
+						}
+						else
+						{
+							actionDie(it.getID());
+							BHLandscape.Coords c = startingPoints.get(a.getID());
+							a.setCoords(c);
+							this.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  a.getID(), "M-M-M-CHOMP!");
+						}
+					}
+					else if (it.getGrade() == BHCollection.Atom.GRADE.MONSTER
+							&& moveDir != 0
+							&& it.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == moveDir
+							&& a.getID() < it.getID()
+							)
+					{
+						this.getMessages().addMessage(BHCollection.EntityTypeEnum.GLOBAL,  0, "Jam! id1=" + a.getID() + ", id2=" + it.getID());
+						doStop(it, true);
+					}
+				}
+			}
+		}
+	}
+		
+	public class EngineCallback implements BHBoard.IClientCallback
 	{
 
-		public void onPublish(int timecode)
+		public void onPublish(long timecode)
 		{
 			//System.out.println("session publish called! tc=" + timecode);
-	
+	/*
 			for (BHCollection.Atom a : engine.getCollection().allByTimecode(PacmanSession.this.engineTimecode))
 			{
 				String cereal;
@@ -421,14 +570,17 @@ public class PacmanSession extends BHSession
 			}
 			PacmanSession.this.engineTimecode = timecode;
 			publishEvent.trigger(new BHSession.PublishEventArgs(timecode));
+			*/
 		}
 		
-		public void processAction(BHAction action)
+		public void processAction(BHEngine.Action action)
 		{
+			/*
 			// 1) priority actions that work on stopped sessions
 			if (action.actionType == BHOperations.ACTION_STOPCYCLING)
 			{
 				engine.stopCycling();
+				PacmanSession.this.sessionStatus = PS_STATUS.PAUSE;
 				return;
 			}
 			
@@ -448,26 +600,27 @@ public class PacmanSession extends BHSession
 			}
 			else
 			{
-				BHOperations.processAction(engine, action);
+				BHOperations.processAction(engine, (BHAction)action);
 			}
-			
+			*/
 		}
 
-		public boolean processBuff(BHBuff buff)
+		public boolean processBuff(BHEngine.Buff buff)
 		{
-			if (buff.actionType == PacmanSession.BUFF.RESURRECT)
+			/*
+			if (buff.action.actionType == PacmanSession.BUFF.RESURRECT)
 			{
 				return PacmanSession.this.processBuffResurrect(buff);
 			}
-			else if (buff.actionType == PacmanSession.BUFF.PACMONSTER)
+			else if (buff.action.actionType == PacmanSession.BUFF.PACMONSTER)
 			{
 				return PacmanSession.this.processBuffPacMonster(buff);
 			}
-			else if (buff.actionType == PacmanSession.BUFF.PACHERO)
+			else if (buff.action.actionType == PacmanSession.BUFF.PACHERO)
 			{
 				return PacmanSession.this.processBuffPacHero(buff);
 			}
-			else if (buff.actionType == PacmanSession.BUFF.PORT)
+			else if (buff.action.actionType == PacmanSession.BUFF.PORT)
 			{
 				return PacmanSession.this.processBuffPortal(buff);
 			}
@@ -475,31 +628,13 @@ public class PacmanSession extends BHSession
 			{
 				return BHOperations.processBuff(engine, buff);
 			}
+			*/
+			return false;
 		}
 		
 		public void processTriggers()
 		{
-			//BHOperations.processTriggers(engine);
 			/*
-			// *) eat the gold here
-			for (BHCollection.Atom hero : (Iterable<BHCollection.Atom>)engine.getCollection().all().stream().filter(q -> q.getType() == "HERO")::iterator)
-			{
-				Collection<BHCollection.Atom> spot = engine.getCollection().atCoords(hero);
-				if (spot.size() <= 1) continue;  // nothing to see here
-				for (BHCollection.Atom it : spot)
-				{
-					if (it.getID() == hero.getID()) continue;
-					if (it.getType() == "GOLD" && it.getStatus() != BHCollection.Atom.ITEM_STATUS.DELETE)
-					{
-						int goldCount = hero.getIntProp(BHCollection.Atom.INT_PROPS.HERO_GOLD) + 1;
-						hero.setIntProp(BHCollection.Atom.INT_PROPS.HERO_GOLD, goldCount);
-						engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  hero.getID(), "Yum! Count=" + goldCount);
-						it.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
-					}
-				}
-				
-			}			
-			*/
 			for (BHCollection.Atom a : engine.getCollection().all())
 			{
 				if (a.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE) continue;
@@ -543,18 +678,9 @@ public class PacmanSession extends BHSession
 						if (it.getID() == a.getID()) continue;
 						if (it.getGrade() == BHCollection.Atom.GRADE.HERO)
 						{
-							/*
-							BHOperations.BHAction action = new BHOperations.BHAction();
-							action.actionType = PacmanSession.ACTION_DIE;
-							action.actorID = it.getID();
-							//action.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
 
 							
-							PacmanSession.this.getEngine().postAction(action, 0);
-							//return action.ID; //"action ID=" + action.ID;
-							*/
-							
-							BHBuff monsterBuff = engine.getBuff(BHCollection.EntityTypeEnum.ITEM, a.getID(), BUFF.PACMONSTER);
+							BHEngine.Buff monsterBuff = engine.getBuff(a.getID(), BUFF.PACMONSTER);
 							if (monsterBuff != null && !monsterBuff.isCancelled)
 							{
 								it.setIntProp(INT_PROPS.HERO_GOLD, it.getIntProp(INT_PROPS.HERO_GOLD) + 100);
@@ -581,6 +707,7 @@ public class PacmanSession extends BHSession
 					}
 				}
 			}
+			*/
 		}
 	}
 	
@@ -639,6 +766,12 @@ public class PacmanSession extends BHSession
 	{
 		if (COMMAND.MOVE.equals(cmd.command)) 
 		{
+			if (PacmanSession.this.sessionStatus != PS_STATUS.ACTIVE)
+			{
+				return new BHClient.Error(agent.timecode, "The session is not started: " + PacmanSession.this.sessionStatus);
+			}
+
+			
 			Integer direction = cmd.intArgs[0]; //Utils.tryParseInt(cmd.intArgs[0]);			
 			Integer actionID = commandMove(agent.atomID, direction);
 			if (actionID == null)
@@ -681,7 +814,7 @@ public class PacmanSession extends BHSession
 	{
 		PacmanSession s = this;
 		
-		BHCollection.Atom me = s.engine.getCollection().getItem(mobileID);
+		BHCollection.Atom me = s.getCollection().getItem(mobileID);
 		if (me == null || me.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE)
 		{
 			return null; //"No atom id" + session.myID;
@@ -690,18 +823,27 @@ public class PacmanSession extends BHSession
 		{
 			return null; //return "Invalid direction: " + direction;
 		}
+		if (direction == 2)
+		{
+			System.out.println("move left!");
+		}
+		boolean hasMove = (me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) > 0
+				&& me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) > 0);
+		//boolean hasMove = false; // this test did not work: auto-continue in BHOperations.actionJump keeps posting
+		// new moves, so there is always a move in progress
+		
 		if (me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == direction)
 		{
 			return null; // already moving that way
 		}
-		BHLandscape.Cell tCell = s.engine.getLandscape().getNextCell(me, direction);
-		if (tCell.getTerrain() == BHLandscape.TerrainEnum.LAND)
+		BHLandscape.Cell tCell = s.getLandscape().getNextCell(me, direction);
+		if (!hasMove && tCell.getTerrain() == BHLandscape.TerrainEnum.LAND)
 		{
 			// monsters won't move into each other
 			boolean canMove = true;
 			if (me.getGrade() == BHCollection.Atom.GRADE.MONSTER)
 			{
-				for(BHCollection.Atom a : s.engine.getCollection().atCoords(tCell, false))
+				for(BHCollection.Atom a : s.getCollection().atCoords(tCell, false))
 				{
 					if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER 
 						&& (a.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR) == 0
@@ -716,17 +858,17 @@ public class PacmanSession extends BHSession
 			}
 			if (canMove)
 			{
-				BHOperations.BHAction action = new BHOperations.BHAction();
+				BHEngine.Action action = new BHEngine.Action();
 				action.actorID = me.getID();
-				action.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+				action.intProps = Utils.intArray(s.timecode, direction, 1, MOVE_SPEED);
 				
 				//action.actionType = BHOperations.ACTION_MOVE;
 				//s.engine.postAction(action, 0);
 				me.setCoords(me);
 				me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timecode);
 				me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
-				action.actionType = BHOperations.ACTION_JUMP;
-				s.engine.postAction(action, BHOperations.MOVE_SPEED);
+				action.actionType = BHBoard.ACTION.JUMP;
+				s.engine.postAction(action, MOVE_SPEED);
 				return action.ID; //"action ID=" + action.ID;
 			}			
 		}
@@ -736,18 +878,20 @@ public class PacmanSession extends BHSession
 		{
 			//s.engine.g
 			// the way buff_move works: 
-			BHOperations.BHBuff moveBuff = new BHOperations.BHBuff();
-			moveBuff.actionType = BHOperations.BUFF_MOVE;
-			moveBuff.actorID = me.getID();
-			moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
-			moveBuff.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+			BHEngine.Buff moveBuff = new BHEngine.Buff();
+			BHEngine.Action moveAction = new BHEngine.Action(BHBoard.BUFF.MOVE, me.getID(), 0, 0);
+			//moveBuff.actionType = BHOperations.BUFF_MOVE;
+			//moveBuff.actorID = me.getID();
+			//moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
+			moveAction.intProps = Utils.intArray(s.engine.timecode, direction, 1, MOVE_SPEED);
+			moveBuff.action = moveAction;
 			
-			BHOperations.BHBuff oldBuff = null;
-			for (BHOperations.BHBuff b : s.engine.buffs)
+			BHEngine.Buff oldBuff = null;
+			for (BHEngine.Buff b : s.engine.buffs)
 			{
 				if (!b.isCancelled 
-						&& b.actorID == moveBuff.actorID 
-						&& b.actionType == moveBuff.actionType
+						&& b.action.actorID == moveBuff.action.actorID 
+						&& b.action.actionType == moveBuff.action.actionType
 						//&& b.intProps[1] == direction
 						)
 				{
@@ -756,7 +900,7 @@ public class PacmanSession extends BHSession
 				}
 			}
 			
-			if (oldBuff != null && oldBuff.intProps[1] != direction)
+			if (oldBuff != null && oldBuff.action.intProps[1] != direction)
 			{
 				oldBuff.isCancelled = true;
 				oldBuff = null;			
@@ -782,149 +926,6 @@ public class PacmanSession extends BHSession
 		return action.ID; //"action ID=" + action.ID;
 		*/
 		return null;
-	}
-	
-	/** 
-	 * Moved to a separate class PacmanShambler; deprecated here
-	 * @author Vythe
-	 *
-	 */
-	public static class Shambler
-	{
-		private StreamClient client;
-		public String clientKey;
-		
-		public void setClient(StreamClient c)
-		{
-			if (client != null)
-			{
-				client.setOnUpdate(null);
-			}
-			client = c;
-			if (c != null)
-			{
-				client.setOnUpdate(new StreamClient.OnUpdate()
-				{
-					
-					@Override
-					public void onUpdate()
-					{
-						shamble();
-					}
-				});
-				c.start();
-			}
-			/*
-			client.updateEvent.subscribe(new EventBox.EventHandler<EventBox.EventArgs>()
-			{
-
-				@Override
-				public boolean isListening()
-				{
-					// TODO Auto-generated method stub
-					return true;
-				}
-
-				@Override
-				public void invoke(EventBox.EventArgs e)
-				{
-					// TODO Auto-generated method stub
-					shamble();
-				}
-			});
-			*/
-		}
-
-		private static int[] pacmanValidDirs = new int[]{1,2,3,6};
-		private static final String TERRAIN_LAND = "LAND".intern();
-		private static final String TERRAIN_VOID = "VOID".intern();
-		
-
-		public static boolean mayTurnMonster(BHClient.Cell[] closest, int currentDir) 
-		{
-
-			if (currentDir == 0) return true;
-			//if (!closest[currentDir]) {
-			//	console.log("INVALID currentDir: " + currentDir);
-			//	return true;
-			//}
-			
-			if (closest[currentDir].terrain != TERRAIN_LAND) return true;
-			
-			int cnt = 0;
-			for (int k = 0; k < pacmanValidDirs.length && cnt < 3; k++) {
-				if (closest[pacmanValidDirs[k]].terrain == TERRAIN_LAND) cnt++;		
-			}
-			return cnt != 2;		 
-		}
-		
-		/**
-		 * Choose a valid direction at random
-		 */
-		public void shamble()
-		{
-			
-			try
-			{
-				int myMobileID = this.client.collection.status.controlledMobileID;
-				System.out.println("I am shambling with the key " + this.clientKey + ", controlled ID=" + myMobileID);
-				BHClient.Mobile me = null;
-				for (BHClient.Mobile m : this.client.collection.mobiles.values())
-				{
-					if  (m.id == myMobileID) me = m;
-					System.out.println("mobile " + m.toString());
-				}
-				if (me == null)
-				{
-					return;
-				}
-				BHClient.Cell[] closest = this.client.collection.closestCells(me.x, me.y, me.z, BHLandscape.TerrainEnum.VOID.name());
-				BHClient.Mobile[] mobs = this.client.collection.getMobiles(me.x, me.y, me.z);
-				
-				if (!mayTurnMonster(closest, me.dir))
-				{
-					return;
-				}
-				// test all valid dirs and select one at random
-				int cnt = 0;
-				int[] goodDirs = new int[pacmanValidDirs.length];
-				for (int k = 0; k < pacmanValidDirs.length; k++) 
-				{
-					BHClient.Cell c = closest[pacmanValidDirs[k]];
-					boolean goodDir = true;
-					if (c.terrain != TERRAIN_LAND)
-						goodDir = false;
-					for (BHClient.Mobile m : this.client.collection.mobiles.values())
-					{
-						if (m.x == c.x && m.y == c.y && m.z == c.z
-								&& (m.dir != 0 && m.dir != BHClient.cellShifts[k][3])
-								)
-						{
-							goodDir = false;
-							break;
-						}						
-					}
-					if (goodDir)
-					{
-						goodDirs[cnt++] = pacmanValidDirs[k];
-					}
-				}
-				if (cnt == 0) return; // no good options
-				int selectedDir = goodDirs[Utils.random.nextInt(cnt)];
-				
-				this.client.writeCommand("move", new int[] {selectedDir}, null);
-				System.out.println("Shambling! pos=" + me.toString() + ", moved to " + selectedDir);
-			//this.client.
-//			System.out.println("I am shambling! timecode=" + 
-//					client.collection.status.timecode
-//			);
-			}
-			catch (Exception x)
-			{
-				System.out.println("I am shambling, exception=" + Utils.NVL(x.getMessage(), x.getClass().getName()));
-			}
-		}
-		
 	}
 	
 	public BHClient.Element commandRobot(BHClientRegistration agent, BHClient.Command cmd)
@@ -971,14 +972,15 @@ public class PacmanSession extends BHSession
 		{
 			if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER)			
 			{
-				BHOperations.BHBuff b = engine.getBuff(EntityTypeEnum.ITEM, a.getID(), BUFF.PACMONSTER);
+				BHEngine.Buff b = engine.getBuff(a.getID(), BUFF.PACMONSTER);
 				if (b == null)
 				{
-					b = new BHOperations.BHBuff();
-					b.actionType = PacmanSession.BUFF.PACMONSTER;
+					b = new BHEngine.Buff();
+					b.action = new BHEngine.Action(PacmanSession.BUFF.PACMONSTER, a.getID(), 0, 0);
+					//b.actionType = PacmanSession.BUFF.PACMONSTER;
 					b.isVisible = true;
-					b.actorID = a.getID();
-					b.actorType = BHCollection.EntityTypeEnum.ITEM;
+					//b.actorID = a.getID();
+					//b.actorType = BHCollection.EntityTypeEnum.ITEM;
 					b.ticks = PACMAN_DURATION;
 					engine.postBuff(b);
 				}
@@ -989,14 +991,15 @@ public class PacmanSession extends BHSession
 			}
 			else if (a.getGrade() == BHCollection.Atom.GRADE.HERO)
 			{
-				BHOperations.BHBuff b = engine.getBuff(EntityTypeEnum.ITEM, a.getID(), BUFF.PACHERO);
+				BHEngine.Buff b = engine.getBuff(a.getID(), BUFF.PACHERO);
 				if (b == null)
 				{
-					b = new BHOperations.BHBuff();
-					b.actionType = PacmanSession.BUFF.PACHERO;
+					b = new BHEngine.Buff();
+					b.action = new BHEngine.Action(PacmanSession.BUFF.PACHERO, a.getID(), 0, 0);
+					//b.actionType = PacmanSession.BUFF.PACHERO;
 					b.isVisible = true;
-					b.actorID = a.getID();
-					b.actorType = BHCollection.EntityTypeEnum.ITEM;
+					//b.actorID = a.getID();
+					//b.actorType = BHCollection.EntityTypeEnum.ITEM;
 					b.ticks = PACMAN_DURATION;
 					engine.postBuff(b);
 				}
@@ -1011,7 +1014,7 @@ public class PacmanSession extends BHSession
 	public void triggerPortal(BHCollection.Atom me)
 	{
 		// 0) check for a pre-existing buff
-		BHOperations.BHBuff oldBuff = engine.getBuff(EntityTypeEnum.ITEM, me.getID(), PacmanSession.BUFF.PORT);
+		BHEngine.Buff oldBuff = engine.getBuff(me.getID(), PacmanSession.BUFF.PORT);
 		if (oldBuff != null && !oldBuff.isCancelled)
 		{
 			return;
@@ -1057,13 +1060,15 @@ public class PacmanSession extends BHSession
 			return;
 		}
 		
-		BHOperations.BHBuff portBuff = new BHOperations.BHBuff();
-		portBuff.actionType = PacmanSession.BUFF.PORT;
-		portBuff.actorID = me.getID();
-		portBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
-		portBuff.intProps = Utils.intArray(thePortal.getID(), engine.timecode, direction, 0);
+		BHEngine.Buff portBuff = new BHEngine.Buff();
+		BHEngine.Action portAction = new BHEngine.Action(PacmanSession.BUFF.PORT, me.getID(), 0, 0);
+		//portBuff.actionType = PacmanSession.BUFF.PORT;
+		//portBuff.actorID = me.getID();
+		//portBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
+		portAction.intProps = Utils.intArray(thePortal.getID(), engine.timecode, direction, 0);
+		portBuff.action = portAction;
 		portBuff.isVisible = true;
-		portBuff.ticks = BHOperations.MOVE_SPEED - 1;
+		portBuff.ticks = MOVE_SPEED - 1;
 		engine.postBuff(portBuff);
 		
 		// 2) add fake move props to imitate movement
@@ -1079,25 +1084,25 @@ public class PacmanSession extends BHSession
 			return 0; //"No atom id" + session.myID;
 		}		
 		me.setStatus(BHCollection.Atom.ITEM_STATUS.DELETE);
-		BHOperations.doStop(engine, me, true);
+		doStop(me, true);
 		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  mobileID, "You got died!");
 		
-		for (BHOperations.BHBuff b : engine.getBuffs(BHCollection.EntityTypeEnum.ITEM, mobileID, null))
+		for (BHEngine.Buff b : engine.getBuffs(mobileID, null))
 		{
 			b.isCancelled = true;
 		}
 		
-		BHOperations.BHBuff dieBuff = new BHOperations.BHBuff();
-		dieBuff.actionType = PacmanSession.BUFF.RESURRECT;
-		dieBuff.actorID = mobileID;
-		dieBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
-		//moveBuff.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+		BHEngine.Buff dieBuff = new BHEngine.Buff();
+		dieBuff.action = new BHEngine.Action(PacmanSession.BUFF.RESURRECT, mobileID, 0, 0);
+		//dieBuff.actionType = PacmanSession.BUFF.RESURRECT;
+		//dieBuff.actorID = mobileID;
+		//dieBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
 		
 		dieBuff.ticks = 5;
 		
 		this.engine.postBuff(dieBuff);
 		
-		return dieBuff.ID;
+		return dieBuff.action.ID;
 	}
 	
 	public BHClient.Element actionStart(BHClient.Command cmd)
@@ -1157,16 +1162,16 @@ public class PacmanSession extends BHSession
 		return cmd;
 	}
 	
-	public boolean processBuffResurrect(BHBuff buff)
+	public boolean processBuffResurrect(BHEngine.Buff buff)
 	{
 		if (buff.ticks > 0)
 		{
-			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Dying... " + buff.ticks);
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.action.actorID, "Dying... " + buff.ticks);
 			return true;
 		}
 		else
 		{
-			BHCollection.Atom me = engine.getCollection().getItem(buff.actorID);
+			BHCollection.Atom me = engine.getCollection().getItem(buff.action.actorID);
 			if (me != null)
 			{
 				BHLandscape.Coords c = startingPoints.get(me.getID());
@@ -1177,12 +1182,12 @@ public class PacmanSession extends BHSession
 		}
 	}
 		
-	public boolean processBuffPacMonster(BHBuff buff)
+	public boolean processBuffPacMonster(BHEngine.Buff buff)
 	{
 		return true; // let's handle pacman in PacHero
 	}	
 
-	public boolean processBuffPacHero(BHBuff buff)
+	public boolean processBuffPacHero(BHEngine.Buff buff)
 	{
 		/*
 		BHCollection.Atom me = engine.getCollection().getItem(buff.actorID);
@@ -1204,15 +1209,15 @@ public class PacmanSession extends BHSession
 	}
 
 	/** props: [target portal item ID, moveTC, post-shift direction, phase] */
-	public boolean processBuffPortal(BHBuff buff)
+	public boolean processBuffPortal(BHEngine.Buff buff)
 	{
-		BHCollection.Atom me = engine.getCollection().getItem(buff.actorID);
+		BHCollection.Atom me = engine.getCollection().getItem(buff.action.actorID);
 		if (me == null) return false;
 		
-		int direction = buff.intProps[2];
-		int phase = buff.intProps[3];
+		int direction = buff.action.intProps[2];
+		int phase = buff.action.intProps[3];
 		
-		if (phase == 0 && buff.intProps[1] != me.getIntProp(INT_PROPS.MOVE_TC)
+		if (phase == 0 && buff.action.intProps[1] != me.getIntProp(INT_PROPS.MOVE_TC)
 				//&& direction != me.getIntProp(INT_PROPS.MOVE_DIR)
 				)
 		{
@@ -1221,33 +1226,34 @@ public class PacmanSession extends BHSession
 		
 		if (buff.ticks > 0)
 		{
-			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Beaming! " + buff.ticks);
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.action.actorID, "Beaming! " + buff.ticks);
 			return true;
 		}
-		BHCollection.Atom dest = engine.getCollection().getItem(buff.intProps[0]);
+		BHCollection.Atom dest = engine.getCollection().getItem(buff.action.intProps[0]);
 		
 		if (phase == 0)
 		{
 			// finally, do the port
 			if (dest == null || dest.getType() != ATOM.PORTAL)
 			{
-				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Beaming failed! ");
+				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.action.actorID, "Beaming failed! ");
 				return false;
 			}
 			me.setCoords(dest);
-			buff.intProps[3] = 1;
+			buff.action.intProps[3] = 1;
 			
 			//doMove(me.getID(), buff.intProps[2]);
-			BHOperations.BHAction action = new BHOperations.BHAction();
-			action.actionType = BHOperations.ACTION_JUMP;
-			action.actorID = me.getID();
-			action.intProps = Utils.intArray(engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+			BHEngine.Action action = new BHEngine.Action(BHBoard.ACTION.JUMP, me.getID(), 0, 0);
+			//action.actionType = BHOperations.ACTION_JUMP;
+			//action.actorID = me.getID();
 			
-			engine.postAction(action, BHOperations.MOVE_SPEED);
+			action.intProps = Utils.intArray(engine.timecode, direction, 1, MOVE_SPEED);
+			
+			engine.postAction(action, MOVE_SPEED);
 			me.setIntProp(INT_PROPS.MOVE_TC, engine.timecode);
 			me.setIntProp(INT_PROPS.MOVE_DIR, direction);
 			
-			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.actorID, "Beamed! " + me.toString());			
+			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  buff.action.actorID, "Beamed! " + me.toString());			
 		}
 
 		if (phase == 1 && !BHLandscape.equalCoords(dest, me)) // check if it's time to remove the buff

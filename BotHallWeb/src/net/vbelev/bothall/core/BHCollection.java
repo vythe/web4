@@ -480,7 +480,7 @@ public class BHCollection
 		}		
 	}
 	
-	private DryCereal dryer = new DryCereal();
+	//private DryCereal dryer = new DryCereal();
 	
 	/** This works over the published atom */
 	public static String atomToItemCereal(DryCereal dryer, Atom atom)

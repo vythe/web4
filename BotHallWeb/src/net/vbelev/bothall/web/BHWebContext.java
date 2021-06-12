@@ -10,7 +10,7 @@ import net.vbelev.bothall.core.*;
  */
 public class BHWebContext
 {
-	public BHEngine engine = new BHEngine(); 
+	public BHBoard engine = new BHBoard(); 
 	//public BHLandscape landscape = new BHLandscape();
 	
 	public static final String CONTEXT_APPLICATION_ATTR = "BH_ENGINE";
@@ -55,7 +55,8 @@ public class BHWebContext
 		BHWebContext res = new BHWebContext();
 		//res.landscape = res.engine.testLandscape(20);
 		//res.engine = BHEngine.testEngine(20);
-		res.engine = BHEngine.loadFileEngine("/../data/pacman.txt");
+		res.engine = new BHBoard();
+		res.engine.loadFileEngine("/../data/pacman.txt");
 		context.setAttribute(CONTEXT_APPLICATION_ATTR, res);
 		
 		return res;

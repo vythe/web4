@@ -38,7 +38,7 @@ public class BHOperations
 	
 	public static int MOVE_SPEED = 4;
 	
-	public static class BHAction
+	public static class BHAction1
 	{
 		private static int instanceCounter = 0;
 		public final int ID = ++instanceCounter;
@@ -60,7 +60,13 @@ public class BHOperations
 		}
 	}
 
-	public final static class BHTimer implements Comparable<BHTimer>
+	public static class BHAction extends BHEngine.Action
+	{
+		public BHCollection.EntityTypeEnum actorType;
+		public BHCollection.EntityTypeEnum targetType;		
+	}
+	
+	public final static class BHTimer1 implements Comparable<BHTimer>
 	{
 		public BHAction action;
 		public long timecode;
@@ -73,6 +79,11 @@ public class BHOperations
 		}
 	}
 	
+	public static class BHTimer extends BHEngine.Timer
+	{
+	}
+	
+	
 	/**
 	 * Buff is an action that is executed every tick for a given number of ticks, 
 	 * or until the buff cancels itself.
@@ -80,7 +91,7 @@ public class BHOperations
 	 * @author Vythe
 	 *
 	 */
-	public static class BHBuff extends BHAction
+	public static class BHBuff1 extends BHAction
 	{
 		/** This is when the buff was created or changed, 
 		 * for reporting it to the clients
@@ -93,7 +104,11 @@ public class BHOperations
 		public boolean isVisible;
 	}
 	
-	public static void processAction(BHEngine engine, BHAction action)
+	public static class BHBuff extends BHEngine.Buff
+	{
+	}
+	
+	public static void processAction(BHBoard engine, BHEngine.Action action)
 	{
 		//System.out.println("Action processed by " + engine.engineInstance + ": #" + action.ID + " " + action.message);
 		
@@ -118,6 +133,7 @@ public class BHOperations
 		}
 		else if (action.actionType == ACTION_STOPCYCLING)
 		{
+			// this should be overridden in the bhsession class
 			engine.stopCycling();
 		}
 	}
@@ -139,7 +155,7 @@ public class BHOperations
 	/** 
 	 * get the atom, update it to "moving", set the timer to jump after the delay.
 	 */
-	public static void processActionMove(BHEngine engine, BHCollection.Atom me, BHAction action)
+	public static void processActionMove(BHBoard engine, BHCollection.Atom me, BHEngine.Action action)
 	{
 		//[basetimecode, direction, repeatflag, delay]
 		int actionTimecode = action.intProps[0];
@@ -179,17 +195,21 @@ public class BHOperations
 			}
 			else
 			{
-				BHBuff moveBuff = new BHBuff();
-				moveBuff.actionType = BHOperations.BUFF_MOVE;
-				moveBuff.actorID = me.getID();
-				moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
-				moveBuff.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
+				BHEngine.Buff moveBuff = new BHEngine.Buff();
+				BHEngine.Action moveAction = new BHEngine.Action(BHOperations.BUFF_MOVE, me.getID(), 0, 0);
+				//moveBuff.actionType = BHOperations.BUFF_MOVE;
+				//moveBuff.actorID = me.getID();
+				//moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
+				moveAction.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
+				moveBuff.action = moveAction;
+				moveBuff.ticks = 0;
 				engine.postBuff(moveBuff);
 				engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,  me.getID(), "Posted buff to move to " + direction);
 				System.out.println("Posted buff move, delay=" + delay);
 			}
 			return;
 		}
+		
 		BHAction jump = new BHAction();
 		jump.actionType = BHOperations.ACTION_JUMP;
 		jump.actorID = me.getID();
@@ -209,7 +229,7 @@ public class BHOperations
 		
 	}
 
-	public static void actionJump(BHEngine engine, BHCollection.Atom me, BHAction action)
+	public static void actionJump(BHBoard engine, BHCollection.Atom me, BHEngine.Action action)
 	{
 		//[basetimecode, direction, repeatflag, delay]
 		int actionTimecode = action.intProps[0];
@@ -312,15 +332,15 @@ public class BHOperations
 	/** Return false to mark the buff as disabled and subject to removal.
 	 * [basetimecode, direction, repeatflag, delay]
 	 *  */
-	public static boolean processBuffMove(BHEngine engine, BHBuff buff)
+	public static boolean processBuffMove(BHBoard engine, BHEngine.Buff buff)
 	{
-		if (buff.isCancelled || buff.actorID <= 0) 
+		if (buff.isCancelled || buff.action.actorID <= 0) 
 		{
 			System.out.println("buffMove: buff is cancelled, stopping");
 			return false;
 		}
 		
-		BHCollection.Atom me = engine.getCollection().getItem(buff.actorID);
+		BHCollection.Atom me = engine.getCollection().getItem(buff.action.actorID);
 
 		if (me == null || me.getID() == BHCollection.Atom.ITEM_STATUS.DELETE)
 		{
@@ -329,11 +349,11 @@ public class BHOperations
 			return false;
 		}
 	
-		int actionTimecode = buff.intProps[0];
-		int direction = buff.intProps[1];
-		int repeatFlag = buff.intProps[2];
+		int actionTimecode = buff.action.intProps[0];
+		int direction = buff.action.intProps[1];
+		int repeatFlag = buff.action.intProps[2];
 		//int delay = (repeatFlag > 0 && buff.intProps.length > 3)? buff.intProps[3] : 0;
-		int delay = ( buff.intProps.length > 3)? buff.intProps[3] : 0;
+		int delay = ( buff.action.intProps.length > 3)? buff.action.intProps[3] : 0;
 		int baseTimecode = me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC);
 		int baseDirection = me.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
 		
@@ -408,15 +428,15 @@ public class BHOperations
 		*/
 	}
 	
-	public static boolean processBuff(BHEngine engine, BHBuff buff)
+	public static boolean processBuff(BHBoard engine, BHEngine.Buff buff)
 	{
-		if (buff.actionType == BUFF_MOVE)
+		if (buff.action.actionType == BUFF_MOVE)
 		{
 			return processBuffMove(engine, buff);
 		}
 		else
 		{
-			engine.getMessages().addMessage(EntityTypeEnum.GLOBAL, 0, "Unknown buff: " + buff.actionType);
+			engine.getMessages().addMessage(EntityTypeEnum.GLOBAL, 0, "Unknown buff: " + buff.action.actionType);
 			return false;
 		}
 	}

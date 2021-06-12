@@ -3,7 +3,7 @@ package net.vbelev.utils;
 import java.util.*;
 import java.util.regex.*;
 
-public class Decimal implements Comparable
+public class Decimal implements Comparable<Object>
 {
 	/** this is the sign , true = positive */
 	private boolean sign;

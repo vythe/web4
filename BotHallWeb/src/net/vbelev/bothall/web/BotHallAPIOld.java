@@ -5,15 +5,17 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.*;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
-import javax.xml.bind.annotation.XmlRootElement;
+//import javax.xml.bind.annotation.XmlRootElement;
 
 import net.vbelev.utils.Utils;
 import net.vbelev.bothall.client.*;
 import net.vbelev.bothall.core.*;
 import net.vbelev.bothall.core.BHOperations.BHAction;
 //import net.vbelev.bothall.core.BHLandscape.Cell;
-import net.vbelev.bothall.web.*;
 
+/**
+ * This class is deprecated and only kept for memories
+ */
 //@Path("/")
 public class BotHallAPIOld
 {
@@ -31,7 +33,7 @@ public class BotHallAPIOld
 		String res = "Hello, " + name + ", land=" + Utils.getEnumDescription(BHLandscape.TerrainEnum.LAND) + "<br/>";
 		
 		int size = 20;
-		BHLandscape sc = BHEngine.testLandscape(size);
+		BHLandscape sc = BHBoard.testLandscape(size);
 		
 		res += "<h3>Test:</h3><br/>";
 		
@@ -311,8 +313,8 @@ public class BotHallAPIOld
 	{
 		BHWebContext app = BHWebContext.getApplication(request.getServletContext());
 		//return "Engine id=" + app.engine.engineInstance + ", stage=" + app.engine.stage;
-		BHOperations.BHAction action = new BHOperations.BHAction();
-		action.message = msg + " at " + Utils.formatDateTime(new Date());
+		BHEngine.Action action = new BHEngine.Action();
+		action.description = msg + " at " + Utils.formatDateTime(new Date());
 		app.engine.postAction(action, 0);
 		return "OK";
 	}
@@ -372,8 +374,8 @@ public class BotHallAPIOld
 			throw new IllegalArgumentException("Session " + oldS.getID() + " already exists");
 		}		
 		*/
-		BHEngine e = BHEngine.loadFileEngine("/../data/pacman.txt");
-		BHSession s = BHSession.createSession(e);
+		BHSession s = BHSession.createSession();
+		s.loadFileEngine("/../data/pacman.txt");
 		BHClientRegistration agent = createAgent(s);
 		
 		//agent.attachTo(s);
@@ -421,7 +423,7 @@ public class BotHallAPIOld
 		}
 		else if (id == null)
 		{
-			s = BHSession.createSession();
+			s = PacmanSession.createSession();
 			// there is no old client
 		}
 		else if ("N".equals(sessionID)) // new session; if there exists an old session - kill it
@@ -437,7 +439,7 @@ public class BotHallAPIOld
 				}
 				oldAgent = null;
 			}
-			s = BHSession.createSession();
+			s = PacmanSession.createSession();
 		}
 		else if ("S".equals(sessionID)) // stop the current session, do not create anything
 		{

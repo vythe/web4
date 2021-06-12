@@ -6,9 +6,11 @@ import net.vbelev.utils.*;
 import net.vbelev.utils.DryCereal.Reader;
 import net.vbelev.bothall.client.*;
 import net.vbelev.bothall.core.*;
-import net.vbelev.bothall.core.BHOperations.BHAction;
-import net.vbelev.bothall.core.BHOperations.BHBuff;
 
+/**
+ * Part of BHSession extracted to a separate class. 
+ * It is used to get updates from BHEngine and put it into a BHStorage.UpdateBin instance. 
+ */
 public class BHStorage
 {
 	
@@ -118,7 +120,7 @@ public class BHStorage
 		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
 		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
 		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
-		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
+		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC); // + BHOperations.MOVE_SPEED;
 		mobile.status = atom.getStatus();
 		mobile.mobiletype = atom.getType();
 		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
@@ -134,7 +136,7 @@ public class BHStorage
 		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
 		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
 		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
-		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
+		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC); // + BHOperations.MOVE_SPEED;
 		mobile.status = atom.getStatus();
 		mobile.mobiletype = atom.getType();
 		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
@@ -221,7 +223,7 @@ public class BHStorage
 	
 	
 	/** returns an update set from the given timecode until now */
-	public UpdateBin getUpdate(BHEngine engine, int timecode, int subscriptionID, int mobileID)
+	public UpdateBin getUpdate(BHBoard engine, int timecode, int subscriptionID, int mobileID)
 	{
 		UpdateBin res = new UpdateBin();
 		
@@ -230,6 +232,7 @@ public class BHStorage
 			if (a.getGrade() == BHCollection.Atom.GRADE.ITEM)
 			{
 				BHClient.Item item = itemExports.get(a.getID());
+				item = null; // disable the cache for now.
 				if (item == null)
 				{
 					item = atomToItemCache(a);
@@ -243,6 +246,7 @@ public class BHStorage
 			{
 				
 				BHClient.Mobile mobile = mobileExports.get(a.getID());
+				mobile = null; // disable the cache for now.
 				if (mobile == null)
 				{
 					mobile = atomToMobileCache(a);
@@ -256,7 +260,7 @@ public class BHStorage
 		
 		for (BHLandscape.Cell c : engine.getLandscape().cells)
 		{
-			if (c.getTimecode() > timecode)
+			if (c.getTimecode() >= timecode)
 			{
 				BHClient.Cell cell = bhCellToClient(c);
 				res.cells.add(cell);
@@ -284,17 +288,17 @@ public class BHStorage
 			res.messages.add(message);
 		}
 
-		for (BHOperations.BHBuff b : engine.buffs)
+		for (BHEngine.Buff b : engine.buffs)
 		{
 			if (!b.isVisible || b.isCancelled) continue;
 			BHClient.Buff b2 = new BHClient.Buff();
-			b2.id = b.ID;
+			b2.id = b.action.ID;
 			//b2.isCancelled = b.isCancelled;
 			b2.ticks = b.ticks;
 			b2.timecode = b.timecode;
-			b2.type = b.actionType;
-			b2.actorID = b.actorID;
-			b2.actorType = Utils.getEnumCode(b.actorType);
+			b2.type = b.action.actionType;
+			b2.actorID = b.action.actorID;
+			b2.actorType = 0; //Utils.getEnumCode(b.actorType);
 			
 			res.buffs.add(b2);
 			

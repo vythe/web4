@@ -9,11 +9,21 @@ import net.vbelev.bothall.core.BHOperations.BHAction;
 import net.vbelev.bothall.core.BHOperations.BHBuff;
 
 /** 
- * A set of objects to run a session over an engine.
+ * A subclass of BHBoard (engine plus pacman-style board) 
+ * with a set of objects to run a session over an engine.
  * Session is shared across threads (multiple clients).
  */
-public class BHSession
+public class BHSession extends BHBoard
 {
+	
+	public static class PS_STATUS
+	{
+		public static final int NEW = 0;
+		public static final int ACTIVE = 1;
+		public static final int PAUSE = 2;
+		public static final int COMPLETE = 3;
+	}
+
 	/**
 	 * These commands are processed by BHSession itself, not by the subclasses 
 	 */
@@ -47,11 +57,11 @@ public class BHSession
 	/** Event handler for the engine.publishEvent */
 	public static class PublishEventArgs extends EventBox.EventArgs
 	{
-		public int timecode;
+		public long timecode;
 		
-		public PublishEventArgs(int timestamp)
+		public PublishEventArgs(long timecode)
 		{
-			this.timecode = timestamp;
+			this.timecode = timecode;
 		}
 	}
 	
@@ -63,9 +73,9 @@ public class BHSession
 	private int sessionID;
 	private String sessionKey;
 
-	protected BHEngine engine;
+	//protected BHBoard engine;
 
-	public int engineTimecode = 0;
+	public long engineTimecode = 0;
 	public boolean isProtected = false;
 	public final Map<Integer, String> itemCereals;
 	public final Map<Integer, BHClient.Item> itemExports;
@@ -78,18 +88,12 @@ public class BHSession
 	public final EventBox.Event<PublishEventArgs> publishEvent = new EventBox.Event<PublishEventArgs>();
 	public final BHStorage storage = new BHStorage();
 	
+	/** values from PS_STATUS */
+	public int sessionStatus = PS_STATUS.NEW;
+	
 	public static BHSession createSession()
 	{
-		BHEngine e = BHEngine.loadFileEngine("/../data/pacman.txt");
-		e.publish();
-		e.CYCLE_MSEC = 200;
-		return BHSession.createSession(e);
-	}
-	
-	
-	public static BHSession createSession(BHEngine e)
-	{
-		BHSession s = new BHSession(e);
+		BHSession s = new BHSession();
 		registerSession(s);
 		
 		return s;
@@ -103,12 +107,8 @@ public class BHSession
 				; // whatever
 				//return false;			
 		}
-		BHEngine engine = s.getEngine();
-		if (engine != null)
-		{
-			engine.stopCycling();
-			engine.getMessages().clear();
-		}
+		s.stopCycling();
+		s.getMessages().clear();
 		s.sessionID = 0;
 		s.sessionKey = null;
 		
@@ -190,7 +190,7 @@ public class BHSession
 	{
 		BHClientRegistration agent = BHClientRegistration.createAgent();
 		agent.sessionID = this.getID();
-		agent.subscriptionID = this.getEngine().getMessages().addSubscription();
+		agent.subscriptionID = this.getMessages().addSubscription();
 		
 		return agent;
 	}
@@ -212,7 +212,8 @@ public class BHSession
 		agent.subscriptionID = 0;
 		agent.sessionID = 0;
 		agent.detach();
-	}		
+	}
+	
 	protected BHSession()
 	{
 		itemCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
@@ -222,8 +223,8 @@ public class BHSession
 		
 		registerSession(this);
 	}
-	
-	private BHSession(BHEngine e)
+	/*
+	private BHSession(BHBoard e)
 	{		
 		this();
 		
@@ -231,23 +232,77 @@ public class BHSession
 		engine.clientCallback = new EngineCallback();
 	}
 	
-	private BHSession(BHEngine e, BHEngine.IClientCallback callback)
+	private BHSession(BHBoard e, BHBoard.IClientCallback callback)
 	{
 		this();
 		
 		engine = e;
 		engine.clientCallback = callback;
 	}
-	
+	*/
 	public void finalize()
 	{
 		destroySession(this);
 	}
 	
-	public class EngineCallback implements BHEngine.IClientCallback
+	@Override
+	public long publish()
 	{
-		public void onPublish(int timecode)
+		//System.out.println("session publish called! tc=" + timecode);
+		long newTimecode = super.publish();
+		
+		for (BHCollection.Atom a : getCollection().allByTimecode(newTimecode))
 		{
+			if (a.getGrade() == BHCollection.Atom.GRADE.ITEM)
+			{
+				atomToItemCache(a);
+			}
+			else if (a.getGrade() == BHCollection.Atom.GRADE.MONSTER || a.getGrade() == BHCollection.Atom.GRADE.HERO)
+			{
+				atomToMobileCache(a);
+			}
+			else
+			{
+				//cereal = null;
+			}
+		}
+		BHSession.this.engineTimecode = newTimecode; // this.timecode
+		publishEvent.trigger(new BHSession.PublishEventArgs(timecode));
+		
+		return newTimecode;
+	}
+	
+	@Override
+	public void processAction(BHEngine.Action action)
+	{
+		// 1) priority actions that work on stopped sessions
+		if (action.actionType == BHBoard.ACTION.STOPCYCLING)
+		{
+			super.processAction(action);
+			BHSession.this.sessionStatus = PS_STATUS.PAUSE;
+			return;
+		}
+		
+		super.processAction(action);
+	}
+	@Override
+	public boolean processBuff(BHEngine.Buff buff)
+	{
+		return super.processBuff(buff);		
+	}		
+	
+	@Override
+	public void processTriggers()
+	{
+		super.processTriggers();		
+	}
+	
+	
+	public class EngineCallback implements BHBoard.IClientCallback
+	{
+		public void onPublish(long timecode)
+		{
+			/*
 			//System.out.println("session publish called! tc=" + timecode);
 	
 			for (BHCollection.Atom a : engine.getCollection().allByTimecode(BHSession.this.engineTimecode))
@@ -267,22 +322,32 @@ public class BHSession
 				}
 			}
 			BHSession.this.engineTimecode = timecode;
+			*/
 		}
 		
-		public void processAction(BHAction action)
+		public void processAction(BHEngine.Action action)
 		{
-			BHOperations.processAction(engine, action);
+			/*
+			// 1) priority actions that work on stopped sessions
+			if (action.actionType == BHOperations.ACTION_STOPCYCLING)
+			{
+				engine.stopCycling();
+				BHSession.this.sessionStatus = PS_STATUS.PAUSE;
+				return;
+			}
 			
+			BHOperations.processAction(engine, action);
+			*/
 		}
 
-		public boolean processBuff(BHBuff buff)
+		public boolean processBuff(BHEngine.Buff buff)
 		{
-			return BHOperations.processBuff(engine, buff);		
+			return false; //BHOperations.processBuff(engine, buff);		
 		}		
 		
 		public void processTriggers()
 		{
-			BHOperations.processTriggers(engine);		
+			//BHOperations.processTriggers(engine);		
 		}
 	}
 	
@@ -290,7 +355,7 @@ public class BHSession
 	
 	public String getSessionKey() { return sessionKey; }
 	
-	public BHEngine getEngine() { return engine; }
+	public BHBoard getEngine() { return this; }
 	
 	/**
 	 * Takes a client command wrapped in BHClient.Command and returns 
@@ -366,20 +431,23 @@ public class BHSession
 			else if (mode.equals("Y"))
 			{
 				s.getEngine().startCycling();
+				s.sessionStatus = PS_STATUS.ACTIVE;
 				resCommand.intArgs[0] = s.getID();
 			}
 			else if (mode.equals("N"))
 			{
 				s.getEngine().stopCycling();
+				s.sessionStatus = PS_STATUS.PAUSE;
 				resCommand.intArgs[0] = s.getID();				
 			}
 			else if (mode.equals("O"))
 			{
-				BHOperations.BHAction stopAction = new BHOperations.BHAction();
-				stopAction.actionType  = BHOperations.ACTION_STOPCYCLING;
+				BHEngine.Action stopAction = new BHEngine.Action();
+				stopAction.actionType  = BHBoard.ACTION.STOPCYCLING;
 				
 				s.getEngine().postAction(stopAction, 0);
 				s.getEngine().startCycling();
+				s.sessionStatus = PS_STATUS.ACTIVE;
 				resCommand.intArgs[0] = s.getID();				
 			}
 			return res;			
@@ -446,35 +514,10 @@ public class BHSession
 		}
 		return session.processCommand(agent, cmd);
 	}
-	/*
-	public final List<BHClientAgent> agents = new ArrayList<BHClientAgent>();	
-
-	public BHClientAgent getAgent(int id)
-	{
-		synchronized(agents)
-		{
-			for (BHClientAgent a : agents)
-			{
-				if (a.agentID == id) return a;
-			}
-		}
-		return null;
-	}
-	
-	public void addAgent(BHClientAgent a)
-	{
-		a.subscriptionID = engine.getMessages().addSubscription();
-		synchronized(agents)
-		{			
-			agents.add(a);
-		}
-	}
-	*/
 
 	public static boolean postMessage(String clientKey, BHCollection.EntityTypeEnum target, int targetID, String message)
 	{
 		BHClientRegistration agent = null;
-		BHClient.Element res;
 		BHSession s = null;
 		if (clientKey != null)
 		{
@@ -537,7 +580,7 @@ public class BHSession
 		mobile.y = atom.getIntProp(BHCollection.Atom.INT_PROPS.Y);
 		mobile.z = atom.getIntProp(BHCollection.Atom.INT_PROPS.Z);
 		mobile.dir = atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR);
-		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC) + BHOperations.MOVE_SPEED;
+		mobile.moveTick =atom.getIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC); // + BHOperations.MOVE_SPEED;
 		mobile.status = atom.getStatus();
 		mobile.mobiletype = atom.getType();
 		mobile.name = atom.getStringProp(BHCollection.Atom.STRING_PROPS.NAME);
@@ -571,7 +614,7 @@ public class BHSession
 	{
 		UpdateBin res = new UpdateBin();
 		
-		for(BHCollection.Atom a : engine.getCollection().allByTimecode(timecode + 1))
+		for(BHCollection.Atom a : this.getCollection().allByTimecode(timecode + 1))
 		{
 			if (a.getGrade() == BHCollection.Atom.GRADE.ITEM)
 			{
@@ -600,7 +643,7 @@ public class BHSession
 			}
 		}
 		
-		for (BHLandscape.Cell c : engine.getLandscape().cells)
+		for (BHLandscape.Cell c : this.getLandscape().cells)
 		{
 			if (c.getTimecode() > timecode)
 			{
@@ -616,16 +659,16 @@ public class BHSession
 		}
 		
 		res.status = new BHClient.Status();
-		res.status.cycleLoad = engine.cycleLoad;
-		res.status.cycleMsec = (int)engine.CYCLE_MSEC;
+		res.status.cycleLoad = this.cycleLoad;
+		res.status.cycleMsec = (int)this.CYCLE_MSEC;
 		res.status.sessionID = this.sessionID;
 		res.status.controlledMobileID = 0; // we don't know the controlled id here. maybe it should be moved
-		res.status.timecode = engine.timecode;
-		res.status.sessionStatus = engine.isRunning? BHClient.Status.SessionStatus.ACTIVE : BHClient.Status.SessionStatus.STOPPED;
+		res.status.timecode = this.timecode;
+		res.status.sessionStatus = this.isRunning? BHClient.Status.SessionStatus.ACTIVE : BHClient.Status.SessionStatus.STOPPED;
 		//res.status.updateTS = engine.pub
 		
 		// everything is visible for now
-		for (BHMessageList.Message m : engine.getMessages().getMessages(subscriptionID))
+		for (BHMessageList.Message m : this.getMessages().getMessages(subscriptionID))
 		{
 			BHClient.Message message = new BHClient.Message();
 			message.id = m.ID;
@@ -647,7 +690,7 @@ public class BHSession
 	 */
 	public static Integer doMove(BHSession s, int mobileID, int direction)
 	{
-		
+		/*
 		BHCollection.Atom me = s.getEngine().getCollection().getItem(mobileID);
 		if (me == null)
 		{
@@ -698,18 +741,19 @@ public class BHSession
 		{
 			//s.engine.g
 			// the way buff_move works: 
-			BHOperations.BHBuff moveBuff = new BHOperations.BHBuff();
-			moveBuff.actionType = BHOperations.BUFF_MOVE;
-			moveBuff.actorID = me.getID();
-			moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
-			moveBuff.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
+			BHEngine.Buff moveBuff = new BHEngine.Buff();
+			moveBuff.action = new BHEngine.Action(BHOperations.BUFF_MOVE, me.getID(), 0, 0);
+			//moveBuff.actionType = BHOperations.BUFF_MOVE;
+			//moveBuff.actorID = me.getID();
+			//moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
+			moveBuff.action.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
 			
-			BHOperations.BHBuff oldBuff = null;
-			for (BHOperations.BHBuff b : s.engine.buffs)
+			BHEngine.Buff oldBuff = null;
+			for (BHEngine.Buff b : s.engine.buffs)
 			{
 				if (!b.isCancelled 
-						&& b.actorID == moveBuff.actorID 
-						&& b.actionType == moveBuff.actionType
+						&& b.action.actorID == moveBuff.action.actorID 
+						&& b.action.actionType == moveBuff.action.actionType
 						//&& b.intProps[1] == direction
 						)
 				{
@@ -718,7 +762,7 @@ public class BHSession
 				}
 			}
 			
-			if (oldBuff != null && oldBuff.intProps[1] != direction)
+			if (oldBuff != null && oldBuff.action.intProps[1] != direction)
 			{
 				oldBuff.isCancelled = true;
 				oldBuff = null;			
@@ -733,15 +777,6 @@ public class BHSession
 		}
 		
 
-		/*
-		BHOperations.BHAction action = new BHOperations.BHAction();
-		action.actionType = BHOperations.ACTION_MOVE;
-		action.actorID = agent.controlledMobileID;
-		action.intProps = Utils.intArray(s.engine.timecode, direction, 1, BHOperations.MOVE_SPEED);
-
-		
-		s.engine.postAction(action, 0);
-		return action.ID; //"action ID=" + action.ID;
 		*/
 		return null;
 	}

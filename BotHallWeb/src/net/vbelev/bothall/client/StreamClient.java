@@ -4,12 +4,13 @@ import java.io.*;
 import java.util.*;
 import java.net.*;
 
-import net.vbelev.bothall.client.*;
 import net.vbelev.utils.*;
 /**
  * This is the client ("browser") side of the connection. 
  * It maintains a BHClient.Collection by reading from a stream (a pipe)
  * and sends commands out through the other pipe.
+ * 
+ * It does not have any business logic and invokes its onUpdate method once every update cycle.
  *
  */
 public class StreamClient

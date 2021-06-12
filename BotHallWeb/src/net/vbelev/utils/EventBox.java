@@ -31,7 +31,7 @@ public class EventBox
 		//private boolean m_cloneArgs = true;
 		private boolean m_triggerAsync = true;
 		
-		private int[] r = new int[0];
+		//private int[] r = new int[0];
 		@SuppressWarnings("unchecked")
 		private EventHandler<? extends T>[] subscribers = new EventHandler[0];
 		private final Queue<EventHandler<? extends T>> inQueue = new ConcurrentLinkedQueue<EventHandler<? extends T>>();
