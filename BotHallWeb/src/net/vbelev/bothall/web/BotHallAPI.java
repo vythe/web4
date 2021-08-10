@@ -214,42 +214,11 @@ public class BotHallAPI
 		cmd.command = BHSession.COMMAND.CYCLE;
 		cmd.stringArgs[0] = sessionKey;
 		cmd.stringArgs[1] = run;
-		BHClient.Element res = BHSession.processCommand("", cmd);
+		BHClient.IElement res = BHSession.processCommand("", cmd);
 
 		return Utils.encodeJSON(res.toString());
 	}
-	
-	private String cycleOld(//@QueryParam("id") String sessionID,
-			@QueryParam("session") String sessionKey,
-			@QueryParam("run") String run)
-	{
-		//Integer sID = Utils.tryParseInt(sessionID);
-		//if (sID == null || run == null) return "0";
-		//PacmanSession s = PacmanSession.getSession(sID);
-		PacmanSession s = PacmanSession.getSession(sessionKey);
-		if (s == null || s.getEngine() == null)
-		{
-			return "0";
-		}
-		
-		if ("Y".equals(run) && !s.getEngine().isRunning)
-		{
-			s.getEngine().startCycling();
-		}
-		else if ("N".equals(run) && s.getEngine().isRunning)
-		{
-			s.getEngine().stopCycling();
-		}
-		else if ("O".equals(run) & !s.getEngine().isRunning)
-		{
-			BHOperations.BHAction stopAction = new BHOperations.BHAction();
-			stopAction.actionType  = BHOperations.ACTION_STOPCYCLING;
-			
-			s.getEngine().postAction(stopAction, 0);
-			s.getEngine().startCycling();
-		}
-		return "" + s.getEngine().timecode;
-	}
+
 	
 	/**
 	 * This creates an agent object and returns its clientKey.
@@ -281,7 +250,7 @@ public class BotHallAPI
 			s = PacmanSession.getSession(sID);
 		}
 		
-		if (s == null || (sID != null && sID != s.getID())) return "";
+		if (s == null || (sID != null && sID != s.getID())) return Utils.encodeJSON("");
 		
 		if (s.isProtected)
 		{
@@ -359,7 +328,7 @@ public class BotHallAPI
 	@Path("/update")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
-	public BHStorage.UpdateBin getUpdate(
+	public BHClient.UpdateBin getUpdate(
 			@QueryParam("client") String clientKey, 
 			@QueryParam("full") String full
 			) 
@@ -374,7 +343,7 @@ public class BotHallAPI
 
 		if (s == null)
 		{
-			BHStorage.UpdateBin dummy = new BHStorage.UpdateBin();
+			BHClient.UpdateBin dummy = new BHClient.UpdateBin();
 			dummy.status = new BHClient.Status();
 			dummy.status.sessionStatus = BHClient.Status.SessionStatus.NONE;
 			return dummy;
@@ -383,13 +352,13 @@ public class BotHallAPI
 		int timecode = ("Y".equals(full)? 0 : agent.timecode);
 		if (!s.getEngine().isRunning && timecode > 0)
 		{
-			BHStorage.UpdateBin dummy = new BHStorage.UpdateBin();
+			BHClient.UpdateBin dummy = new BHClient.UpdateBin();
 			dummy.status = new BHClient.Status();
 			dummy.status.sessionStatus = BHClient.Status.SessionStatus.STOPPED;
 			return dummy;
 		}
 		
-		BHStorage.UpdateBin res = s.storage.getUpdate(s.getEngine(), timecode, agent.subscriptionID, agent.atomID);
+		BHClient.UpdateBin res = s.storage.getUpdate(s.getEngine(), timecode, agent.subscriptionID, agent.atomID);
 		agent.timecode = s.getEngine().timecode;
 		res.status.controlledMobileID = agent.atomID;
 		return res;
@@ -475,7 +444,7 @@ public class BotHallAPI
 			{
 				bhcmd.stringArgs[i++] = s;
 			}
-			BHClient.Element bhres = BHSession.processCommand(clientKey, bhcmd);
+			BHClient.IElement bhres = BHSession.processCommand(clientKey, bhcmd);
 			 
 			if (bhres.getElementCode() == BHClient.ElementCode.ERROR)
 			{

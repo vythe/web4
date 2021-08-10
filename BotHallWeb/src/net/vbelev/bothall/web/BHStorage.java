@@ -12,78 +12,7 @@ import net.vbelev.bothall.core.*;
  * It is used to get updates from BHEngine and put it into a BHStorage.UpdateBin instance. 
  */
 public class BHStorage
-{
-	
-	/** 
-	 * The update pack that is sent to socket clients (push clients) once in a tick,
-	 * and generated for web clients (pull clients) upon request
-	 *  */
-	public static class UpdateBin implements BHClient.Element
-	{
-		public final List<BHClient.Cell> cells = new ArrayList<BHClient.Cell>();
-		public final List<BHClient.Item> items = new ArrayList<BHClient.Item>();
-		public final List<BHClient.Mobile> mobiles = new ArrayList<BHClient.Mobile>();
-		//public final List<BHClient.Mobile> heroes = new ArrayList<BHClient.Mobile>();
-		public final List<BHClient.Buff> buffs = new ArrayList<BHClient.Buff>();
-		public final List<BHClient.Message> messages = new ArrayList<BHClient.Message>();
-		public BHClient.Status status;
-		
-		/** The important part is to export status the last */
-		@Override
-		public void toCereal(DryCereal to) throws IOException
-		{
-			// TODO Auto-generated method stub
-			//System.out.println("UpdateBin.toCereal started");
-			//System.out.println("UpdateBin.toCereal cells: " + cells.size());
-			for (BHClient.Cell c : cells)
-			{
-				to.addByte(BHClient.ElementCode.CELL);
-				c.toCereal(to);
-			}			
-			//System.out.println("UpdateBin.toCereal items: " + items.size());
-			for (BHClient.Item i : items)
-			{
-				to.addByte(BHClient.ElementCode.ITEM);
-				i.toCereal(to);
-				//System.out.println("DR:" + i.toString());
-			}
-			//System.out.println("UpdateBin.toCereal mobiles: " + mobiles.size());
-			for (BHClient.Mobile m : mobiles)
-			{
-				to.addByte(BHClient.ElementCode.MOBILE);
-				m.toCereal(to);
-				//System.out.println("DR:" + m.toString());
-			}
-			//System.out.println("UpdateBin.toCereal buffs: " + buffs.size());
-			for (BHClient.Buff b : buffs)
-			{
-				to.addByte(BHClient.ElementCode.BUFF);
-				b.toCereal(to);
-			}
-			//System.out.println("UpdateBin.toCereal messages: " + messages.size());
-			for (BHClient.Message m : messages)
-			{
-				to.addByte(BHClient.ElementCode.MESSAGE);
-				m.toCereal(to);
-			}
-			//System.out.println("UpdateBin.toCereal status");
-			to.addByte(BHClient.ElementCode.STATUS);
-			status.toCereal(to);
-			//System.out.println("UpdateBin.toCereal done");
-		}
-		@Override
-		public void fromCereal(Reader from)
-		{
-			// TODO Auto-generated method stub
-		}
-		@Override
-		public int getElementCode()
-		{
-			// TODO Auto-generated method stub
-			return 0;
-		}
-	}
-	
+{	
 	public final Map<Integer, String> itemCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
 	public final Map<Integer, BHClient.Item> itemExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Item>());
 	public final Map<Integer, String> mobileCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
@@ -91,6 +20,7 @@ public class BHStorage
 	public final Map<Integer, String> heroCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
 	public final Map<Integer, BHClient.Mobile> heroExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Mobile>());
 	public final DryCereal dryer = new DryCereal();
+	public final BHClient.ElementCerealCache cache = new BHClient.ElementCerealCache();
 
 
 	
@@ -223,9 +153,9 @@ public class BHStorage
 	
 	
 	/** returns an update set from the given timecode until now */
-	public UpdateBin getUpdate(BHBoard engine, int timecode, int subscriptionID, int mobileID)
+	public BHClient.UpdateBin getUpdate(BHBoard engine, int timecode, int subscriptionID, int mobileID)
 	{
-		UpdateBin res = new UpdateBin();
+		BHClient.UpdateBin res = new BHClient.UpdateBin();
 		
 		for(BHCollection.Atom a : engine.getCollection().allByTimecode(timecode + 1))
 		{

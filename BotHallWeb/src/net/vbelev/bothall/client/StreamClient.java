@@ -22,7 +22,7 @@ public class StreamClient
 	
 
 	public final BHClient.Client collection = new BHClient.Client();
-	public final Queue<BHClient.Element> elementQueue = new java.util.concurrent.ConcurrentLinkedQueue<BHClient.Element>();
+	public final Queue<BHClient.IElement> elementQueue = new java.util.concurrent.ConcurrentLinkedQueue<BHClient.IElement>();
 	/* updateEvent is triggered after a successful update from the server. It runs synchronously 
 	public final EventBox.Event<EventBox.EventArgs> updateEvent = new EventBox.Event<EventBox.EventArgs>(false);	
 	 */
@@ -74,7 +74,7 @@ public class StreamClient
 		{
 			boolean isUpdateBin = false;
 			if (s != null && s.isClosed()) break;
-			BHClient.Element gotIt = null;
+			BHClient.IElement gotIt = null;
 			DryCereal.Flake typeCodeFlake = dryReader.next();
 			if (typeCodeFlake.type != DryCereal.CerealType.BYTE)
 			{
@@ -187,7 +187,7 @@ public class StreamClient
 				try {
 				//return false;
 				//throw new IOException("Unexpected element type: " + typeCode);
-				BHClient.Element elem = BHClient.fromCereal(typeCode, dryReader);
+				BHClient.IElement elem = BHClient.fromCereal(typeCode, dryReader);
 				if (elem != null)
 				{
 				elementQueue.add(elem);

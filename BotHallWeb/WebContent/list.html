@@ -5,6 +5,7 @@
 <title>Insert title here</title>
 	<script src="js/jquery-3.5.1.js"></script>
 	<script src="js/bhclient.js"></script>
+	<script src="js/user.js"></script>
 	
 	<script type="text/javascript">
 	var apiURL = "/BotHallWeb/api/";
@@ -13,6 +14,7 @@
 	var fullApiURL = new URL(apiURL, window.location.href);
 	
 	var mybh = BHClient(fullApiURL.href);
+	var myuser = BHUser(fullApiURL.href);
 	console.log("client API url=" + fullApiURL.href);
 	var sessionKeys = {};
 	</script>
@@ -76,7 +78,8 @@ $(document).ready(function() {
 	}
 	mybh.userKey = userKey;
 	
-	mybh.createBag(viewbagKey || "", function(key) {
+	myuser.createBag(mybh.userKey, viewbagKey || "", function(key) {
+		console.log("createBAg returned " + key);
 		if (!key) {
 			viewbagKey = "";
 			alert("could not get the viewbag key");
@@ -87,7 +90,7 @@ $(document).ready(function() {
 			return;
 		} else {
 			// get session keys
-			mybh.bag(viewbagKey, function(res) {
+			myuser.getBag(viewbagKey, function(res) {
 				sessionKeys = {};
 				for (var k in res) {
 					if (k.startsWith("sessionkey_")) {
@@ -178,7 +181,7 @@ $(document).ready(function() {
 			}
 		);
 		*/
-		mybh.bagSummary(viewbagKey, function(res) {
+		myuser.bagSummary(viewbagKey, function(res) {
 			$("#bagsummary").html(res);
 		});
 	});
@@ -254,7 +257,7 @@ function updateClientKeys() {
 	});
 	
 	if (atomList.length > 0) {
-		mybh.getBagValue(viewbagKey, atomList.join(","), function(res) {
+		myuser.getBagValue(viewbagKey, atomList.join(","), function(res) {
 			sessionTable.find("input.session_join").each(function() {
 				var inp = $(this);
 				
@@ -302,7 +305,7 @@ function createSession() {
 	mybh.create("N", function(resp) {
 		alert("create succesful: " + JSON.stringify(resp));
 		sessionKeys["sessionkey_" + resp.sessionId] = resp.sessionKey;
-		mybh.putBagValue(viewbagKey, "sessionkey_" + resp.sessionId, resp.sessionKey, function(oldKey) {
+		myuser.putBagValue(viewbagKey, "sessionkey_" + resp.sessionId, resp.sessionKey, function(oldKey) {
 			refreshList();
 		});
 	});

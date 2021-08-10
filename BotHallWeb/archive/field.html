@@ -14,6 +14,20 @@
 
 <script type="text/javascript">
 var apiURL = "/BotHallWeb/api/";
+var terrainURL = "/BotHallWeb/terrain/";
+var cellWidth = 30;
+var cellHeight = 30;
+var terrainTiles = {
+		"LAND": "/BotHallWeb/img/terrain/land.png",
+		"STONE": "/BotHallWeb/img/terrain/stone.png"
+};
+var spriteTiles = {
+		"HERO": "/BotHallWeb/img/sprites/sinnoh_2.png",
+		"GOLD": "/BotHallWeb/img/sprites/gold.png",
+		"PAC": "/BotHallWeb/img/sprites/pac.png",
+		"PORTAL": "/BotHallWeb/img/sprites/portal.png",
+		"MONSTER": "/BotHallWeb/img/sprites/sinnoh_3.png"
+};
 
 var fullApiURL = new URL(apiURL, window.location.href);
 </script>
@@ -407,7 +421,129 @@ $(document).ready(function() {
 	});
 });
 
+function getTile(x, y) {
+	for (var k in tiles) {
+		var tile = tiles[k];
+		if (tile && tile.x == x &&  tile.y == y) {
+			return tile;
+		}
+	}
+	var elem = $("#templateTile").clone();
+	elem.attr("x", x * cellWidth);
+	elem.attr("y", y * cellHeight);
+	elem.attr("xlink:href", terrainTiles["LAND"]);
+	
+	var res = {
+			x: x,
+			y: y,
+			terrain: "LAND",
+			image: elem
+	};
+	$("#mainSVG").append(elem);
+	tiles.push(res);
+	return res;
+}
+
+function setTerrainOld(x, y, terrain) {
+	var tile = getTile(x, y);
+	tile.terrain = terrain;
+	//tile.image.attr("xlink:href", tiles[terrain]);
+	tile.image.attr("xlink:href", terrainTiles[terrain]);
+}
+
+function setTerrain(x, y, terrain) {
+	bhfield.setTile(x, y, terrain);
+}
+
+
 bhItemStatusDelete = 1;
+function updateItemOld(dataItem) {
+	//console.log("updateItem: " + JSON.stringify(dataItem));
+	//console.log("updateItem: " + JSON.stringify(dataItem) + ", tile=" +  spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
+	//console.log("updateItem, ID=" + dataItem.id + ", svg=" + JSON.stringify(itemTiles[dataItem.id]));
+	if (dataItem.id == mybh.controlledMobileID) {
+		$("#position_x").text(dataItem.x);
+		$("#position_y").text(dataItem.y);
+	}
+	var svgItem = itemTiles[dataItem.id];
+	if (dataItem.status == bhItemStatusDelete) {
+		delete itemTiles[dataItem.id];
+		if (svgItem && svgItem.svg) {
+			svgItem.svg.remove();
+		}
+		
+	} else if (!svgItem) {
+		elem = $("#templateTile").clone();				
+		svgItem = {
+			//atom: dataItem,
+			svg: elem
+		};	
+		itemTiles[dataItem.id] = svgItem;
+		elem.attr("id", "sprite_" + dataItem.id);
+		elem.attr("x", dataItem.x * cellWidth);
+		elem.attr("y", dataItem.y * cellHeight);
+		elem.attr("xlink:href", spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
+		//console.log("append item id=" + dataItem.id + ", x=" + (dataItem.x * cellWidth) + ", y=" + (dataItem.y * cellHeight));
+		$("#mainSVG").append(elem);
+		
+	} else {
+		var elem = svgItem.svg;
+		var elemD = elem[0];
+		//svgItem.atom = dataItem;
+		var currX = +(elem.attr("x"));
+		var currY = +(elem.attr("y"));
+		//var currX = +(elemD.x.baseVal.value);
+		//var currY = +(elemD.y.baseVal.value);
+		
+		var newX = dataItem.x * cellWidth;
+		var newY = dataItem.y * cellHeight;
+		
+		// if the new position is too far - jump there
+		if (!(newX >= currX - cellWidth && newX <= currX + cellWidth && newY >= currY - cellHeight && newY <= currY + cellHeight)) {
+			elem.attr("x", newX);
+			elem.attr("y", newY);
+			currX = newX;
+			currY = newY;
+		}
+		
+		// if we are moving - do some forward gliding
+		if (dataItem.dir > 0) {
+			var closest = mybh.getClosest(dataItem.x, dataItem.y);
+			if (!closest[dataItem.dir]) {
+				alert("err! dir=" + dataItem.dir + ", dataItem=" + JSON.stringify(dataItem));
+			} else {
+				var forwardX = +(closest[dataItem.dir].x) * cellWidth;
+				var forwardY = +(closest[dataItem.dir].y) * cellHeight;
+				glideItem(dataItem.id, 
+						forwardX, forwardY,
+						new Date().getTime() + mybh.serverLoopMsec * 4
+				);			
+			}
+		} 		
+		//console.log("update item id=" + dataItem.id + ", currX=" + currX + ", newX=" + newX + ", currY=" + currY + ", newY=" + newY);
+		//if (newX >= currX - cellWidth && newX <= currX + cellWidth && newY >= currY - cellHeight && newY <= currY + cellHeight) {
+		else {
+			glideItem(dataItem.id, 
+					newX, newY,
+					new Date().getTime() + mybh.serverLoopMsec //* 4
+			);			
+		} 
+		
+		/*else { //if (dataItem.dir == 0) {
+			
+			elem.attr("x", dataItem.x * cellWidth);
+			elem.attr("y", dataItem.y * cellHeight);
+			//$("#mainSVG").remove(elem);				
+			//$("#mainSVG").append(elem);
+			
+			//elemD.x.baseVal.newValueSpecifiedUnits(1, dataItem.x * cellWidth);
+			//elemD.y.baseVal.newValueSpecifiedUnits(1, dataItem.y * cellHeight);
+			//elemD.setAttribute("x", dataItem.x * cellWidth);
+			//elemD.setAttribute("y", dataItem.y * cellHeight);			
+			//console.log("updateItem, set pos for id=" + dataItem.id + ", x=" + (dataItem.x * cellWidth) + ", y=" + (dataItem.y * cellHeight)); 
+		}*/				
+	}
+}
 
 function updateItem(dataItem) {
 	console.log("updateItem: " + JSON.stringify(dataItem));
@@ -422,6 +558,7 @@ function updateItem(dataItem) {
 		bhfield.deleteItem(dataItem.id);
 		
 	} else if (!svgItem) {
+		console.log("svg not found, set direct");
 		bhfield.setItem(dataItem.id, dataItem.x, dataItem.y, dataItem.itemtype || dataItem.mobiletype);
 		
 	} else {
@@ -433,28 +570,25 @@ function updateItem(dataItem) {
 		//var currX = +(elemD.x.baseVal.value);
 		//var currY = +(elemD.y.baseVal.value);
 		
-		// if the new position is too far - jump there
-		if (!(dataItem.x >= svgItem.x - 1 && dataItem.x  <= svgItem.x + 1 && dataItem.y >= svgItem.y - 1 && dataItem.y <= svgItem.y + 1)) {
-			bhfield.setItem(dataItem.id, dataItem.x, dataItem.y, svgItem.sprite);			
-		}
-		/*
 		var newX = dataItem.x * cellWidth;
 		var newY = dataItem.y * cellHeight;
+		// if the new position is too far - jump there
 		if (!(newX >= currX - cellWidth && newX <= currX + cellWidth && newY >= currY - cellHeight && newY <= currY + cellHeight)) {
+			console.log("svg found, jump from " + currX + "," + currY + " to " + newX + "," + newY);
 			elem.attr("x", newX);
 			elem.attr("y", newY);
 			currX = newX;
 			currY = newY;
 		}
-		*/
+		
 		// if we are moving - do some forward gliding
 		if (dataItem.dir > 0) {
 			var closest = mybh.getClosest(dataItem.x, dataItem.y);
 			if (!closest[dataItem.dir]) {
 				alert("err! dir=" + dataItem.dir + ", dataItem=" + JSON.stringify(dataItem));
 			} else {
-				var forwardX = +(closest[dataItem.dir].x); // * cellWidth;
-				var forwardY = +(closest[dataItem.dir].y); // * cellHeight;
+				var forwardX = +(closest[dataItem.dir].x) * cellWidth;
+				var forwardY = +(closest[dataItem.dir].y) * cellHeight;
 				console.log("svg found, forward from " + currX + "," + currY + " to " + forwardX + "," + forwardY);
 				bhfield.glideItem(dataItem.id, 
 						forwardX, forwardY,
@@ -465,8 +599,9 @@ function updateItem(dataItem) {
 		//console.log("update item id=" + dataItem.id + ", currX=" + currX + ", newX=" + newX + ", currY=" + currY + ", newY=" + newY);
 		//if (newX >= currX - cellWidth && newX <= currX + cellWidth && newY >= currY - cellHeight && newY <= currY + cellHeight) {
 		else {
+			console.log("svg found, glide from " + currX + "," + currY + " to " + newX + "," + newY);
 			bhfield.glideItem(dataItem.id, 
-					dataItem.x, dataItem.y,
+					newX, newY,
 					new Date().getTime() + mybh.serverLoopMsec //* 4
 			);			
 		} 
@@ -510,8 +645,8 @@ function moveIt(dir, id) {
 		var closest = mybh.getClosest(me.x, me.y);
 		
 		if (closest[dir]) {
-			var forwardX = +(closest[dataItem.dir].x); // * cellWidth;
-			var forwardY = +(closest[dataItem.dir].y); // * cellHeight;
+			var forwardX = +(closest[dataItem.dir].x) * cellWidth;
+			var forwardY = +(closest[dataItem.dir].y) * cellHeight;
 			bhfield.glideItem(me.id, 
 					forwardX, forwardY,
 					new Date().getTime() + mybh.serverLoopMsec * 4
@@ -527,6 +662,137 @@ function moveIt(dir, id) {
 			//console.log("posted moveit, dir=" + dir + ", id=" + id);
 		}
 	);
+}
+
+glideLoopDelay = 32;
+glideLoopFlex = 10;
+
+var glidePool = {};
+var glideTimer = null;
+var glideLatestTS = 0;
+
+function glideItem(id, targetX, targetY, targetTS) {
+	//console.log("glideItem id=" + id + " to x=" + targetX + ", y=" + targetY);
+	var elem = itemTiles[id];
+	if (!elem) return;
+	elem = elem.svg;
+	if (!elem) return;
+	
+	var glideRecord = {
+			id: id,
+			targetX: targetX,
+			targetY: targetY,
+			targetTS: targetTS,
+			currentX: +elem.attr("x"),
+			currentY: +elem.attr("y")			
+	};
+	glidePool[id] = glideRecord; // it will quietly replace the old glide record if there is any
+	if (targetTS > glideLatestTS) {
+		glideLatestTS = targetTS;
+	}
+	
+	if (!glideTimer) {
+		glideTimer = setInterval(glideLoop, glideLoopDelay);
+		glideLoop();
+	}
+}
+
+function glideLoop() {
+	var ts = new Date().getTime();
+	var ts0 = ts - glideLoopFlex;
+	var hasRecords = false;
+	for (var id in glidePool) {
+		//console.log("glide check id=" + id);
+		var glideRecord = glidePool[id];
+	//	console.dir(glideRecord);
+		var elemTile = itemTiles[id];
+		if (!elemTile || !elemTile.svg) {
+			delete glidePool[id];
+			continue;
+		}
+		var elem = elemTile.svg;
+		
+		if (elem.attr("x") != glideRecord.currentX || elem.attr("y") != glideRecord.currentY || id != glideRecord.id) {
+			delete glidePool[id];
+			elem.attr("x", glideRecord.targetX);
+			elem.attr("y", glideRecord.targetY);
+			console.log("glide delete id=" + id + " because x, y"); 
+			continue;
+		}
+		
+		if (glideRecord.targetTS <= ts0) {
+			elem.attr("x", glideRecord.targetX);
+			elem.attr("y", glideRecord.targetY);
+			console.log("glide delete id=" + id + " because ts, jump to x=" + glideRecord.targetX + ", y=" + glideRecord.targetY); 
+			delete glidePool[id];
+			continue;
+		}
+		
+		var steps = Math.ceil((glideRecord.targetTS - ts) / glideLoopDelay);
+		var newX = +glideRecord.currentX + Math.floor((glideRecord.targetX - glideRecord.currentX) / steps);
+		var newY = +glideRecord.currentY + Math.floor((glideRecord.targetY - glideRecord.currentY) / steps);
+		//console.log("steps=" + steps + ", newX=" + newX + ", newY=" + newY);
+		if (isNaN(newX) || isNaN(newY)) {
+			delete glidePool[id];
+			continue;			
+		}
+		elem.attr("x", newX);
+		elem.attr("y", newY);
+		glideRecord.currentX = newX;
+		glideRecord.currentY = newY;
+		
+		hasRecords = true;		
+	}
+	//console.log("glide loop, hasRecords=" + hasRecords);
+	if (!hasRecords || ts > glideLatestTS + glideLoopFlex) {
+		clearInterval(glideTimer);
+		glideTimer = null;		
+	}
+}
+
+function glideItemOld(id, currentX, currentY, targetX, targetY, targetTS) {
+	//console.log("glide id=" + id + " from x=" + currentX + ", y=" + currentY + " to newX=" + targetX + ", newY=" + targetY);
+	var svgItem = itemTiles[id];
+	if (!svgItem || !svgItem.svg) return;
+	
+	var elem = svgItem.svg;
+	var elemD = elem[0];
+	var currentTS = new Date().getTime();
+	//if (elem.attr("x") != currentX || elem.attr("y") != currentY) return;
+	
+	if (currentTS >= targetTS - glideLoopFlex) {
+		
+		elem.attr("x", targetX);
+		elem.attr("y", targetY);
+		//$("#mainSVG").remove(elem);				
+		//$("#mainSVG").append(elem);
+		
+		//elemD.x.baseVal.newValueSpecifiedUnits(1, targetX);
+		//elemD.y.baseVal.newValueSpecifiedUnits(1, targetY);
+		//console.log("glide1, for id=" + id + " set x=" + targetX + ", y=" + targetY + ", html=" + elemD.outerHTML);
+		//elemD.setAttribute("x", targetX);
+		//elemD.setAttribute("y", targetY);
+		return;	
+	}
+	
+	var steps = Math.ceil((targetTS - currentTS - glideLoopFlex) / glideLoopDelay);
+	var newX = currentX + Math.floor((targetX - currentX) / steps);
+	var newY = currentY + Math.floor((targetY - currentY) / steps);
+	
+	elem.attr("x", newX);
+	elem.attr("y", newY);
+	//$("#mainSVG").remove(elem);				
+	//$("#mainSVG").append(elem);
+	
+	//elemD.x.baseVal.newValueSpecifiedUnits(1, newX);
+	//elemD.y.baseVal.newValueSpecifiedUnits(1, newY);
+	//console.log("glide2, for id=" + id + " set x=" + newX + ", y=" + newY + ", html=" + elemD.outerHTML);
+	//elemD.setAttribute("x", newX);
+	//elemD.setAttribute("y", newY);
+	
+	setTimeout(function() {
+		glideItemOld(id, newX, newY, targetX, targetY, targetTS);
+	}, glideLoopDelay);
 }
 
 </script>

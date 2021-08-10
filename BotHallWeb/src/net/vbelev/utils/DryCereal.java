@@ -701,5 +701,14 @@ public class DryCereal
 		return key;
 	}
 	
+	/** appends a previously constructed cereal as is, without validation */
+	public synchronized void addRaw(String cereal) throws IOException
+	{
+		if (cereal == null || cereal.length() == 0) return;
+		flush(-1);
+		buff.append(cereal);
+		flush(0);
+	}
+	
 	//public static List<Flake> readList(Reader from, 
 }

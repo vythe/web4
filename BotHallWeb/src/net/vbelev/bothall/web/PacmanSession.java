@@ -6,9 +6,6 @@ import java.io.*;
 import net.vbelev.bothall.client.BHClient;
 import net.vbelev.bothall.client.StreamClient;
 import net.vbelev.bothall.core.*;
-import net.vbelev.bothall.core.BHCollection.EntityTypeEnum;
-import net.vbelev.bothall.core.BHOperations.BHAction;
-import net.vbelev.bothall.core.BHOperations.BHBuff;
 import net.vbelev.utils.*;
 /**
  * Here we put the methods specific to pacman
@@ -762,7 +759,7 @@ public class PacmanSession extends BHSession
 	}
 	
 	@Override
-	public BHClient.Element processCommand(BHClientRegistration agent, BHClient.Command cmd)
+	public BHClient.IElement processCommand(BHClientRegistration agent, BHClient.Command cmd)
 	{
 		if (COMMAND.MOVE.equals(cmd.command)) 
 		{
@@ -928,13 +925,13 @@ public class PacmanSession extends BHSession
 		return null;
 	}
 	
-	public BHClient.Element commandRobot(BHClientRegistration agent, BHClient.Command cmd)
+	public BHClient.IElement commandRobot(BHClientRegistration agent, BHClient.Command cmd)
 	{
 		try
 		{
 			// we only need the BotHallServer to get the port number.
 			// in a "real" client the port woult be configured somehow (and the server name, too)
-			BHListener bhs = BHListener.getSocketServer(); // this will start the server if needed
+			StreamListener bhs = StreamListener.getListener(); // this will start the server if needed
 			
 			java.net.Socket s = new java.net.Socket();
 			s.setSoTimeout(1000);
@@ -1105,7 +1102,7 @@ public class PacmanSession extends BHSession
 		return dieBuff.action.ID;
 	}
 	
-	public BHClient.Element actionStart(BHClient.Command cmd)
+	public BHClient.IElement actionStart(BHClient.Command cmd)
 	{
 		if (cmd.stringArgs.length == 0 || !this.getSessionKey().equals(cmd.stringArgs[0]))
 		{

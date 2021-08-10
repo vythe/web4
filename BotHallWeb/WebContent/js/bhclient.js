@@ -244,6 +244,9 @@ function BHClient(url) {
 			return sessionCycle(this, flag); 
 		}, 
 		
+		fullUpdate: function() {
+			getUpdateEx(this, "Y", null);
+		},
 		// === bag API ===
 		/**
 		 * If the provided bag key is valid, returns the same bag key;
@@ -455,12 +458,18 @@ function getJSONOld(bhclient, action, args, callback) {
  */
 function getUpdate(bhclient, callback, arg1, arg2, arg3)
 {
+	getUpdateEx(bhclient, "", callback, arg1, arg2, arg3);
+}
+
+function getUpdateEx(bhclient, full, callback, arg1, arg2, arg3)
+{
 	bhclient.log("getUpdate start " + new Date(), "INFO");
 	bhclient.log("url: " + bhclient.url + "update", "INFO");
 
 	var url = buildQuery(bhclient.url + "update", {
 		id: bhclient.sessionId,
-		client: bhclient.clientKey
+		client: bhclient.clientKey,
+		full: full
 	});
 	
 	var pingTS = new Date().getTime();

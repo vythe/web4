@@ -5,8 +5,6 @@ import java.util.*;
 import net.vbelev.utils.*;
 import net.vbelev.bothall.client.*;
 import net.vbelev.bothall.core.*;
-import net.vbelev.bothall.core.BHOperations.BHAction;
-import net.vbelev.bothall.core.BHOperations.BHBuff;
 
 /** 
  * A subclass of BHBoard (engine plus pacman-style board) 
@@ -44,7 +42,7 @@ public class BHSession extends BHBoard
 	}
 	/** Note that the update bin is not serialized, so as to support json clients.
 	 *  */
-	public static class UpdateBin
+	public static class UpdateBinOld
 	{
 		public final List<BHClient.Cell> cells = new ArrayList<BHClient.Cell>();
 		public final List<BHClient.Item> items = new ArrayList<BHClient.Item>();
@@ -363,7 +361,7 @@ public class BHSession extends BHBoard
 	 * 
 	 * This method should be overridden in a subclass. 
 	 */
-	public BHClient.Element processCommand(BHClientRegistration agent, BHClient.Command cmd)
+	public BHClient.IElement processCommand(BHClientRegistration agent, BHClient.Command cmd)
 	{
 		return null;
 	}
@@ -372,10 +370,10 @@ public class BHSession extends BHBoard
 	 * A special case: commands like "login", "create session", "join session"
 	 * can be performed without a BHClientAgent
 	 */
-	public static BHClient.Element processCommand(String clientKey, BHClient.Command cmd)
+	public static BHClient.IElement processCommand(String clientKey, BHClient.Command cmd)
 	{
 		BHClientRegistration agent = null;
-		BHClient.Element res;
+		BHClient.IElement res;
 		if (clientKey != null)
 		{
 			agent = BHClientRegistration.getClient(null, clientKey);
@@ -610,9 +608,9 @@ public class BHSession extends BHBoard
 	}	
 	
 	/** returns an update set from the given timecode until now */
-	public UpdateBin getUpdate(int timecode, int subscriptionID, int mobileID)
+	public UpdateBinOld getUpdateOld(int timecode, int subscriptionID, int mobileID)
 	{
-		UpdateBin res = new UpdateBin();
+		UpdateBinOld res = new UpdateBinOld();
 		
 		for(BHCollection.Atom a : this.getCollection().allByTimecode(timecode + 1))
 		{

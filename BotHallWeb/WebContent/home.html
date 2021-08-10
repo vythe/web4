@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+	<script src="js/jquery-3.5.1.js"></script>
+	<script src="js/bhclient.js"></script>
+	<script src="js/user.js"></script>
+	
+	<script type="text/javascript">
+	var apiURL = "/BotHallWeb/api/";
+	var myuser = BHUser(apiURL);
+	
+	var viewbagKey = getQueryParam("bag");
+	var userKey = getQueryParam("user");
+	//var fullApiURL = new URL(apiURL, window.location.href);
+	
+	var mybh = BHClient(apiURL); //fullApiURL.href);
+	//console.log("client API url=" + fullApiURL.href);
+	var mybag = {};
+	
+	var viewbagKey = getQueryParam("bag");
+
+	getbag();
+	
+	// validate/get the bag key and get the whole bag		
+	function getbag() {
+		myuser.createBag(viewbagKey || "", function(key) {
+			if (!key) {
+				viewbagKey = "";
+				alert("could not get the viewbag key");
+				return;
+			}
+			else if (viewbagKey != key) {
+				window.location.href="?bag=" + key;
+				return;
+			} else {
+				// get session keys
+				myuser.getbag(viewbagKey, function(res) {
+					mybag = {};
+					for (var k in res) {
+						//if (k.startsWith("sessionkey_")) {
+							mybag[k] = res[k];
+						//}
+					}
+					if (mybag.userkey) {
+						getUserInfo();
+					}
+				});
+			}
+		});		
+	}
+	
+	// can't get completely static, can we?
+	function getUserInfo() {
+		
+	}
+	</script>
+</head>
+<body>
+<h1>Home</h1>
+
+</body>
+</html>

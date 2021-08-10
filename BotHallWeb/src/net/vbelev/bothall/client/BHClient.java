@@ -18,17 +18,37 @@ import net.vbelev.utils.Utils;
  */
 public class BHClient
 {
-	public interface Element
+	public interface IElement
 	{
 		public void toCereal(DryCereal to) throws IOException;
 		public void fromCereal(DryCereal.Reader from);
 		public int getElementCode();
+		public long getTimecode();
 	}
+	
+	/** Nice but useless: we need to cache whole objects for UpdateBin, 
+	 * not just the cereals
+	 */
+	public interface IElementCerealCache
+	{
+		public String getCellCereal(int id, long timecode);
+		/** Returns the current cereal for this id (the same or later*/
+		public String setCellCereal(int id, long timecode, String cereal);
+		
+		public String getItemCereal(int id, long timecode);
+		/** Returns the current cereal for this id (the same or later*/
+		public String setItemCereal(int id, long timecode, String cereal);
+		
+		public String getMobileCereal(int id, long timecode);
+		/** Returns the current cereal for this id (the same or later*/
+		public String setMobileCereal(int id, long timecode, String cereal);
+	}
+	
 	
 	private BHClient() {}
 	
 	
-	public static class Buff implements Element
+	public static class Buff implements IElement
 	{
 		public int id;		
 		public String type;
@@ -41,6 +61,7 @@ public class BHClient
 		//public long changeTimecode;
 
 		public int getElementCode() { return ElementCode.BUFF; }
+		public long getTimecode() { return timecode; }
 		
 		public void toCereal(DryCereal to) throws IOException
 		{
@@ -111,9 +132,9 @@ public class BHClient
 		public static final int MESSAGE = 8;		
 	}
 	
-	public static Element fromCereal(int elementCode, DryCereal.Reader reader)
+	public static IElement fromCereal(int elementCode, DryCereal.Reader reader)
 	{
-		Element res = null;
+		IElement res = null;
 		switch (elementCode)
 		{
 			case ElementCode.BUFF: res = new BHClient.Buff(); break;
@@ -131,9 +152,10 @@ public class BHClient
 		
 	}
 	
-	public static class Cell implements Element, Comparable<Cell>
+	public static class Cell implements IElement, Comparable<Cell>
 	{
 		public int id;
+		public long timecode;
 		
 		public int x;
 		public int y;
@@ -156,11 +178,13 @@ public class BHClient
 		}
 		
 		public int getElementCode() { return ElementCode.CELL; }
+		public long getTimecode() { return timecode; }
 		
 
 		public void toCereal(DryCereal to) throws IOException
 		{
 			to.addInt(id);
+			to.addLong(timecode);
 			to.addShort(x);
 			to.addShort(y);
 			to.addShort(z);
@@ -176,6 +200,7 @@ public class BHClient
 		public void fromCereal(DryCereal.Reader from) //throws IOException
 		{
 			id = from.next().getInteger();
+			timecode = from.next().getLong();
 			x = from.next().getShort();
 			y = from.next().getShort();
 			z = from.next().getShort();
@@ -213,10 +238,11 @@ public class BHClient
 		}		
 	}
 
-	public static class Item implements Element
+	public static class Item implements IElement
 	{
 		public int id;
 		public int status;
+		public long timecode;
 		
 		public int x;
 		public int y;
@@ -227,6 +253,7 @@ public class BHClient
 		public Buff[] buffs;
 		
 		public int getElementCode() { return ElementCode.ITEM; }
+		public long getTimecode() { return timecode; }
 		
 		public String toString()
 		{
@@ -237,6 +264,7 @@ public class BHClient
 		public void toCereal(DryCereal to) throws IOException
 		{
 			to.addInt(id);
+			to.addLong(timecode);
 			to.addByte(status);
 			to.addShort(x);
 			to.addShort(y);
@@ -253,6 +281,7 @@ public class BHClient
 		public void fromCereal(DryCereal.Reader from) //throws IOException
 		{
 			id = (Integer)from.next().getInteger();
+			timecode = from.next().getLong();
 			status = (Byte)from.next().getByte();
 			x = (Short)from.next().getShort();
 			y = (Short)from.next().getShort();
@@ -270,10 +299,11 @@ public class BHClient
 		}		
 	}
 
-	public static class Mobile implements Element
+	public static class Mobile implements IElement
 	{
 		public int id;
 		public int status;
+		public long timecode;
 		
 		public int x;
 		public int y;
@@ -295,10 +325,12 @@ public class BHClient
 		}
 		
 		public int getElementCode() { return ElementCode.MOBILE; }
+		public long getTimecode() { return timecode; }
 		
 		public void toCereal(DryCereal to) throws IOException
 		{
 			to.addInt(id);
+			to.addLong(timecode);
 			to.addByte(status);
 			to.addShort(x);
 			to.addShort(y);
@@ -318,6 +350,7 @@ public class BHClient
 		public void fromCereal(DryCereal.Reader from)
 		{
 			id = (Integer)from.next().getInteger();
+			timecode = from.next().getLong();
 			status = (Byte)from.next().getByte();
 			x = (Short)from.next().getShort();
 			y = (Short)from.next().getShort();
@@ -338,7 +371,7 @@ public class BHClient
 		}		
 	}
 
-	public static class Message implements Element
+	public static class Message implements IElement
 	{		
 		public int id; 
 
@@ -352,6 +385,7 @@ public class BHClient
 		}
 		
 		public int getElementCode() { return ElementCode.MESSAGE; }
+		public long getTimecode() { return 0; }
 		
 		public void toCereal(DryCereal to) throws IOException
 		{
@@ -370,15 +404,16 @@ public class BHClient
 		}		
 	}
 	
-	public static class Command implements Element
+	public static class Command implements IElement
 	{
 		public String command = "";
 		/** the timecode at which the command was issued. It is for reference only */
-		public int timecode;
+		public long timecode;
 		public int[] intArgs;
 		public String[] stringArgs;
 			
 		public int getElementCode() { return ElementCode.COMMAND; }
+		public long getTimecode() { return 0; }
 		
 		public Command()
 		{
@@ -419,7 +454,7 @@ public class BHClient
 		public void toCereal(DryCereal to) throws IOException
 		{
 			to.addMoniker(command);
-			to.addInt(timecode);
+			to.addLong(timecode);
 			to.addObjectStart((short)(intArgs == null? 0 : intArgs.length));
 			if (intArgs != null)
 			{
@@ -437,7 +472,7 @@ public class BHClient
 		public void fromCereal(DryCereal.Reader from)
 		{
 			command = (String)from.next().getString();
-			timecode = (Integer)from.next().getInteger();
+			timecode = from.next().getLong();
 			short intArgsKey = (Short)from.next().getShort();
 			intArgs = new int[intArgsKey];
 			for (int b = 0; b < intArgsKey; b++)
@@ -467,10 +502,10 @@ public class BHClient
 		}
 	}
 	
-	public static class Error implements Element
+	public static class Error implements IElement
 	{
 		/** the timecode at which the error happened. It is for reference only */
-		public int timecode;
+		public long timecode;
 		public String message = "";
 		
 		public Error()
@@ -484,16 +519,17 @@ public class BHClient
 		}
 		
 		public int getElementCode() { return ElementCode.ERROR; }
+		public long getTimecode() { return timecode; }
 		
 		public void toCereal(DryCereal to) throws IOException
 		{
-			to.addInt(timecode);
+			to.addLong(timecode);
 			to.addString(message);
 		}
 		
 		public void fromCereal(DryCereal.Reader from)
 		{
-			timecode = (Integer)from.next().getInteger();
+			timecode = from.next().getLong();
 			message = (String)from.next().getString();
 		}		
 		
@@ -505,7 +541,7 @@ public class BHClient
 		}
 	}
 
-	public static class Status implements Element
+	public static class Status implements IElement
 	{
 		public static class SessionStatus
 		{
@@ -516,7 +552,7 @@ public class BHClient
 			public static final String DEAD = "DEAD";
 		}
 		
-		public int timecode;
+		public long timecode;
 		public long updateTS;
 		public int sessionID;
 		public int controlledMobileID;
@@ -528,10 +564,11 @@ public class BHClient
 		//
 
 		public int getElementCode() { return ElementCode.STATUS; }
+		public long getTimecode() { return timecode; }
 		
 		public void toCereal(DryCereal to) throws IOException
 		{
-			to.addInt(timecode);
+			to.addLong(timecode);
 			to.addLong(updateTS);
 			to.addInt(sessionID);
 			to.addInt(controlledMobileID);
@@ -542,7 +579,7 @@ public class BHClient
 
 		public void fromCereal(DryCereal.Reader from)
 		{
-			timecode = (Integer)from.next().getInteger();
+			timecode = from.next().getLong();
 			updateTS = (Long)from.next().getLong();
 			sessionID = (Integer)from.next().getInteger();
 			controlledMobileID = (Integer)from.next().getInteger();
@@ -551,6 +588,211 @@ public class BHClient
 			sessionStatus = (String)from.next().getString();
 		}
 	}
+	
+	/** 
+	 * The update pack that is sent to socket clients (push clients) once in a tick,
+	 * and generated for web clients (pull clients) upon request
+	 *  */
+	public static class UpdateBin implements BHClient.IElement
+	{
+		public final List<BHClient.Cell> cells = new ArrayList<BHClient.Cell>();
+		public final List<BHClient.Item> items = new ArrayList<BHClient.Item>();
+		public final List<BHClient.Mobile> mobiles = new ArrayList<BHClient.Mobile>();
+		//public final List<BHClient.Mobile> heroes = new ArrayList<BHClient.Mobile>();
+		public final List<BHClient.Buff> buffs = new ArrayList<BHClient.Buff>();
+		public final List<BHClient.Message> messages = new ArrayList<BHClient.Message>();
+		public BHClient.Status status;
+		
+		private IElementCerealCache cache = null;
+		private DryCereal cacher = null;
+		
+		public void setCache(IElementCerealCache cache)
+		{
+			if (cache == null)
+			{
+				this.cache = null;
+				this.cacher = null;
+			}
+			else
+			{
+				this.cache = cache;
+				this.cacher = new DryCereal();
+			}
+		}
+		
+		private synchronized String fromCacher(int typeCode, IElement c) throws IOException
+		{
+			cacher.addByte(typeCode);
+			c.toCereal(cacher);
+			return cacher.pull();
+		}
+		/** The important part is to export status the last */
+		@Override
+		public void toCereal(DryCereal to) throws IOException
+		{
+			// TODO Auto-generated method stub
+			//System.out.println("UpdateBin.toCereal started");
+			//System.out.println("UpdateBin.toCereal cells: " + cells.size());
+			for (BHClient.Cell c : cells)
+			{
+				if (cache == null)
+				{
+				to.addByte(BHClient.ElementCode.CELL);
+				c.toCereal(to);
+				}
+				else
+				{
+					long timecode = c.timecode;
+					String cereal = cache.getCellCereal(c.id, timecode);
+					if (cereal == null)
+					{
+						cereal = fromCacher(BHClient.ElementCode.CELL, c);
+						cereal = cache.setCellCereal(c.id, timecode, cereal);
+					}
+					to.addRaw(cereal);
+				}
+			}			
+			//System.out.println("UpdateBin.toCereal items: " + items.size());
+			for (BHClient.Item i : items)
+			{
+				to.addByte(BHClient.ElementCode.ITEM);
+				i.toCereal(to);
+				//System.out.println("DR:" + i.toString());
+			}
+			//System.out.println("UpdateBin.toCereal mobiles: " + mobiles.size());
+			for (BHClient.Mobile m : mobiles)
+			{
+				if (cache == null)
+				{
+				to.addByte(BHClient.ElementCode.MOBILE);
+				m.toCereal(to);
+				}
+				else
+				{
+					long timecode = m.timecode;
+					String cereal = cache.getMobileCereal(m.id, timecode);
+					if (cereal == null)
+					{
+						cereal = fromCacher(BHClient.ElementCode.MOBILE, m);
+						cereal = cache.setMobileCereal(m.id, timecode, cereal);
+					}
+					to.addRaw(cereal);
+				}
+				
+				//System.out.println("DR:" + m.toString());
+			}
+			//System.out.println("UpdateBin.toCereal buffs: " + buffs.size());
+			for (BHClient.Buff b : buffs)
+			{
+				to.addByte(BHClient.ElementCode.BUFF);
+				b.toCereal(to);
+			}
+			//System.out.println("UpdateBin.toCereal messages: " + messages.size());
+			for (BHClient.Message m : messages)
+			{
+				to.addByte(BHClient.ElementCode.MESSAGE);
+				m.toCereal(to);
+			}
+			//System.out.println("UpdateBin.toCereal status");
+			to.addByte(BHClient.ElementCode.STATUS);
+			status.toCereal(to);
+			//System.out.println("UpdateBin.toCereal done");
+		}
+		@Override
+		public void fromCereal(DryCereal.Reader from)
+		{
+			// TODO Auto-generated method stub
+		}
+		@Override
+		public int getElementCode()
+		{
+			// TODO Auto-generated method stub
+			return ElementCode.UPDATEBIN;
+		}
+		public long getTimecode() { return status == null? 0 : status.timecode; }
+		
+	}
+	
+	
+	private static class CacheElem
+	{
+		public long timecode;
+		public String elem;
+		
+		public CacheElem(long timecode, String elem)
+		{
+			this.timecode = timecode;
+			this.elem = elem;
+		}
+	}
+	/** 
+	 * The idea is to access the same cache from multiple clients, 
+	 * so we need it as a separate instance
+	 */
+	public static class ElementCerealCache implements IElementCerealCache
+	{
+		protected final Map<Integer, CacheElem> cellCerealMap = Collections.synchronizedMap(new TreeMap<Integer, CacheElem>());
+		protected final Map<Integer, CacheElem> itemCerealMap = Collections.synchronizedMap(new TreeMap<Integer, CacheElem>());
+		protected final Map<Integer, CacheElem> mobileCerealMap = Collections.synchronizedMap(new TreeMap<Integer, CacheElem>());
+		
+		public String getCellCereal(int id, long timecode)
+		{
+			CacheElem el = cellCerealMap.get(id);
+			if (el == null || el.timecode < timecode) 
+				return null;
+			return el.elem;
+		}
+		/** Returns the current cereal for this id (the same or later*/
+		public String setCellCereal(int id, long timecode, String cereal)
+		{
+			CacheElem el = cellCerealMap.get(id);
+			if (el == null || el.timecode < timecode) 
+			{
+				cellCerealMap.put(id, new CacheElem(timecode, cereal));
+				return cereal;
+			}
+			return el.elem;
+		}
+		
+		public String getItemCereal(int id, long timecode)
+		{
+			CacheElem el = itemCerealMap.get(id);
+			if (el == null || el.timecode < timecode) 
+				return null;
+			return el.elem;
+		}
+		/** Returns the current cereal for this id (the same or later*/
+		public String setItemCereal(int id, long timecode, String cereal)
+		{
+			CacheElem el = itemCerealMap.get(id);
+			if (el == null || el.timecode < timecode) 
+			{
+				itemCerealMap.put(id, new CacheElem(timecode, cereal));
+				return cereal;
+			}
+			return el.elem;
+		}
+		
+		public String getMobileCereal(int id, long timecode)
+		{
+			CacheElem el = mobileCerealMap.get(id);
+			if (el == null || el.timecode < timecode) 
+				return null;
+			return el.elem;
+		}
+		/** Returns the current cereal for this id (the same or later*/
+		public String setMobileCereal(int id, long timecode, String cereal)
+		{
+			CacheElem el = mobileCerealMap.get(id);
+			if (el == null || el.timecode < timecode) 
+			{
+				mobileCerealMap.put(id, new CacheElem(timecode, cereal));
+				return cereal;
+			}
+			return el.elem;
+		}
+	}
+	
 	/*
 	private static class CellsByCoordsComparator implements Comparator<Cell>
 	{

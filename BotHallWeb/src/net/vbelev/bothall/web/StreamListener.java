@@ -27,7 +27,116 @@ import net.vbelev.utils.*;
  * @author Vythe
  *
  */
-public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEventArgs>
+public class StreamListener
+{
+	/** StreamListener should be a true singleton, but it's too much effort,
+	 * so it is a static variable
+	 */
+	private static StreamListener socketServer = null;
+	
+	public synchronized static StreamListener getListener()
+	{
+		if (socketServer == null)
+		{
+			socketServer = new StreamListener();
+		}
+		if (!socketServer.isStarted())
+		{
+			socketServer.start();
+		}
+		
+		return socketServer;		
+	}
+	
+	
+	private ServerSocket theSocket = null;
+	private boolean isListening = false;
+	
+	private void registerSocket(Socket s) throws IOException
+	{
+		
+		Worker ss = new Worker(s);
+		ss.start();
+	}
+
+	public int getPort()
+	{
+		if (!isStarted()) return 0;
+		return theSocket.getLocalPort();
+	}
+	
+	public boolean isStarted()
+	{
+		return (theSocket != null && !theSocket.isClosed());
+	}
+	 
+	public void stop()
+	{
+		isListening = false;
+		try
+		{
+			if (theSocket != null && !theSocket.isClosed())
+			{
+				theSocket.close();
+			}
+		}
+		catch (IOException x)
+		{
+		}
+		theSocket = null;
+	}
+	
+	/** for now, the port is 8082 */
+	public void start()
+	{
+		if (theSocket != null)
+		{
+			stop();
+		}
+		try
+		{
+			theSocket = new ServerSocket(); //8082);
+			theSocket.setSoTimeout(1000);
+			theSocket.setReuseAddress(true);
+			theSocket.bind(new InetSocketAddress(8082));
+			
+			isListening = true;
+			new Thread(new Runnable() {
+				@Override
+				public void run()
+				{
+					while (isListening && theSocket != null && !theSocket.isClosed())
+					{
+						try
+						{
+							Socket s = theSocket.accept();							
+							registerSocket(s);
+						}
+						catch  (java.net.SocketTimeoutException x)
+						{
+							// it's okay
+						}
+						catch (java.net.SocketException x)
+						{
+							// the socket was closed, exit
+							isListening = false;
+						}
+						catch (IOException x)
+						{
+							isListening = false;
+						}			
+					}
+				}
+			}).start();;
+		}
+		catch (IOException x)
+		{
+		}
+	}
+
+
+
+public class Worker
 {
 
 	private final DryCereal dryWriter;
@@ -39,7 +148,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 	private String clientKey;
 	
 	
-	public StreamServer(InputStream in, OutputStream out)
+	public Worker(InputStream in, OutputStream out)
 	{
 		dryReader = new DryCereal.Reader(in);
 		dryWriter = new DryCereal(out);
@@ -48,7 +157,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 		clientSocket = null;
 	}
 	
-	public StreamServer(Socket socket) throws IOException
+	public Worker(Socket socket) throws IOException
 	{
 		if (socket == null || socket.isClosed()) throw new IOException("Invalid socket state");		
 		socket.setSoTimeout(1000);
@@ -108,8 +217,10 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 		public boolean isListening()
 		{
 			//return !Utils.IsEmpty(clientKey);
-			if (clientSocket != null) return !clientSocket.isClosed();
-			return true;
+			if (clientSocket != null) 
+				return !clientSocket.isClosed();
+			else
+				return false;
 		}
 		
 		private boolean invokeRunning = false;
@@ -122,35 +233,41 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 				//System.out.println("Invoke running for " + clientKey + ", timecode=" + e.timecode + ", skip");
 				return;
 			}
+			if (Utils.IsEmpty(clientKey))
+			{
+				return; // continue living without a client key
+			}
 			invokeRunning = true;
 			
-			BHClientRegistration agent = BHClientRegistration.getClient(null, StreamServer.this.clientKey);
+			do
+			{
+			BHClientRegistration agent = BHClientRegistration.getClient(null, Worker.this.clientKey);
 			if (agent == null)
 			{
-				System.out.println("Client not found for key: " + StreamServer.this.clientKey);
-				return;
+				System.out.println("Client not found for key: " + Worker.this.clientKey);
+				break;
 			}
 			if (agent.timecode >= e.timecode) 
 			{
 				System.out.println("Client " + clientKey + " got old timecode " + e.timecode);
-				return;
+				break;
 			}
 			BHSession session = BHSession.getSession(agent.sessionID);
 			if (session == null)
 			{
-				System.out.println("Invalid clientKey=" + StreamServer.this.clientKey + ", sessionID=" + agent.sessionID + ": session not found");
-				StreamServer.this.clientKey = null;
-				return;
+				System.out.println("Invalid clientKey=" + Worker.this.clientKey + ", sessionID=" + agent.sessionID + ": session not found");
+				Worker.this.clientKey = null;
+				break;
 			}
-			BHStorage.UpdateBin res = session.storage.getUpdate(session.getEngine(), agent.timecode, agent.subscriptionID, agent.atomID);
+			BHClient.UpdateBin res = session.storage.getUpdate(session.getEngine(), agent.timecode, agent.subscriptionID, agent.atomID);
 			try
 			{
 				//System.out.println("StreamServer.PublishListener write update started, timecode " + res.status.timecode);
-				synchronized(StreamServer.this.dryWriter)
+				synchronized(Worker.this.dryWriter)
 				{
-				StreamServer.this.dryWriter.addByte(BHClient.ElementCode.UPDATEBIN);
-				res.toCereal(StreamServer.this.dryWriter);
-				StreamServer.this.dryWriter.flush();
+					Worker.this.dryWriter.addByte(BHClient.ElementCode.UPDATEBIN);
+					res.toCereal(Worker.this.dryWriter);
+					Worker.this.dryWriter.flush();
 				}
 				//System.out.println("StreamServer.PublishListener successful write update, timecode " + res.status.timecode);
 			}
@@ -159,6 +276,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 				System.out.println("StreamServer.PublishListener failed to write update: " + x.getMessage());
 				//StreamServer.this.releaseClient(); // this should stop the loop
 			}
+			} while (false);
 			invokeRunning = false;
 		}
 	}
@@ -167,9 +285,9 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 	 * The method processes incoming commands as received by mainLoop().
 	 * Listening to the user (the client) is split between mainLoop() and process().
 	 */
-	public void process(BHClient.Element element) throws IOException
+	public void process(BHClient.IElement element) throws IOException
 	{
-		BHClient.Element res = null;
+		BHClient.IElement res = null;
 		if (element.getElementCode() == BHClient.ElementCode.ERROR)
 		{
 			element.toCereal(dryWriter);
@@ -244,7 +362,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 				System.out.println("failed toCereal: " + x.getMessage());
 			}
 			*/
-			BHSession.postMessage(this.clientKey, EntityTypeEnum.RECEIPT, cmd.timecode, cmd.toString());
+			BHSession.postMessage(this.clientKey, EntityTypeEnum.RECEIPT, 0, cmd.toString());
 			
 		}			
 		dryWriter.flush();
@@ -268,7 +386,7 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 						throw new IllegalArgumentException("Unexpected cereal element: " + typeCodeFlake);
 					}
 					byte typeCode = (Byte)typeCodeFlake.getByte();
-					BHClient.Element elem = BHClient.fromCereal(typeCode, dryReader);
+					BHClient.IElement elem = BHClient.fromCereal(typeCode, dryReader);
 					process(elem);
 					
 				}
@@ -297,8 +415,9 @@ public class StreamServer //implements EventBox.EventHandler<BHSession.PublishEv
 			public void run()
 			{
 				//r.mainLoop();
-				StreamServer.this.mainLoop();
+				Worker.this.mainLoop();
 			}
 		}).start();
 	}
+}
 }

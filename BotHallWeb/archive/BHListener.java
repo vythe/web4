@@ -33,7 +33,10 @@ public class BHListener
 	
 	private void registerSocket(Socket s) throws IOException
 	{
-		StreamServer ss = new StreamServer(s);
+		/*
+		StreamListener ss = new StreamListener(s);
+		ss.start();
+		*/
 		
 		//SocketRegistration r = new SocketRegistration(s);
 		//synchronized(registrationList)
@@ -41,7 +44,6 @@ public class BHListener
 		//	registrationList.add(r);
 		//}		
 		
-		ss.start();
 		/*
 		new Thread(new Runnable() {
 

@@ -179,7 +179,7 @@ public class BotHallAPIOld
 			return dummy;
 		}
 		
-		BHSession.UpdateBin res = s.getUpdate(agent.timecode, agent.subscriptionID, agent.atomID);
+		BHSession.UpdateBin res = s.getUpdateOld(agent.timecode, agent.subscriptionID, agent.atomID);
 		agent.timecode = s.getEngine().timecode;
 		res.status.controlledMobileID = agent.atomID;
 		

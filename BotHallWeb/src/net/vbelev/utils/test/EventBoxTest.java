@@ -4,7 +4,7 @@ package net.vbelev.utils.test;
 import org.junit.jupiter.api.Test;
 
 //import net.vbelev.bothall.client.BHClient;
-import net.vbelev.bothall.web.BHListener;
+import net.vbelev.bothall.web.StreamListener;
 import net.vbelev.utils.*;
 
 class EventBoxTest
@@ -85,8 +85,8 @@ class EventBoxTest
 	@Test
 	public void serverTest()
 	{
-		BHListener server = new BHListener();
-		server.startIt();
+		StreamListener server = new StreamListener();
+		server.start();
 		//System.console().printf("press any key");
 		//System.console().readLine();
 		try

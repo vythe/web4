@@ -37,77 +37,7 @@ public class BHOperations
 	public static final String BUFF_MOVE = "BUFF_MOVE".intern();
 	
 	public static int MOVE_SPEED = 4;
-	
-	public static class BHAction1
-	{
-		private static int instanceCounter = 0;
-		public final int ID = ++instanceCounter;
-		
-		/** actionType should be interned or set from BHOperations constants */
-		public String actionType; 
-		public BHCollection.EntityTypeEnum actorType;
-		public int actorID;
-		public BHCollection.EntityTypeEnum targetType;
-		public int targetID;
-		public String message;
-		// different action types will have different props, but we know which prop is where
-		public int[] intProps = null;
-		// later
-		
-		public String toString()
-		{
-			return "[BHA:" + actionType + ", actorID=" + actorID + ", props=" + Arrays.toString(intProps) + "]"; 
-		}
-	}
 
-	public static class BHAction extends BHEngine.Action
-	{
-		public BHCollection.EntityTypeEnum actorType;
-		public BHCollection.EntityTypeEnum targetType;		
-	}
-	
-	public final static class BHTimer1 implements Comparable<BHTimer>
-	{
-		public BHAction action;
-		public long timecode;
-		@Override
-		public int compareTo(BHTimer arg0)
-		{
-			if (timecode < arg0.timecode) return -1;
-			if (timecode > arg0.timecode) return 1;
-			return action.ID - arg0.action.ID;
-		}
-	}
-	
-	public static class BHTimer extends BHEngine.Timer
-	{
-	}
-	
-	
-	/**
-	 * Buff is an action that is executed every tick for a given number of ticks, 
-	 * or until the buff cancels itself.
-	 * Note that the buff is stateful.
-	 * @author Vythe
-	 *
-	 */
-	public static class BHBuff1 extends BHAction
-	{
-		/** This is when the buff was created or changed, 
-		 * for reporting it to the clients
-		 */
-		public long timecode;
-		/** ticks are decremented every tick until 0, then stay at 0 forever */
-		public int ticks;
-		/** buffs stay alive (processed every tick) until cancelled */
-		public boolean isCancelled;
-		public boolean isVisible;
-	}
-	
-	public static class BHBuff extends BHEngine.Buff
-	{
-	}
-	
 	public static void processAction(BHBoard engine, BHEngine.Action action)
 	{
 		//System.out.println("Action processed by " + engine.engineInstance + ": #" + action.ID + " " + action.message);
@@ -210,10 +140,10 @@ public class BHOperations
 			return;
 		}
 		
-		BHAction jump = new BHAction();
+		BHEngine.Action jump = new BHEngine.Action();
 		jump.actionType = BHOperations.ACTION_JUMP;
 		jump.actorID = me.getID();
-		jump.actorType = BHCollection.EntityTypeEnum.ITEM;
+		//jump.actorType = BHCollection.EntityTypeEnum.ITEM;
 		jump.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 		
 		//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
@@ -299,10 +229,10 @@ public class BHOperations
 			me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_TC, engine.timeco
 			engine.postAction(move, 0);
 			*/
-			BHAction jump = new BHAction();
+			BHEngine.Action jump = new BHEngine.Action();
 			jump.actionType = BHOperations.ACTION_JUMP;
 			jump.actorID = me.getID();
-			jump.actorType = BHCollection.EntityTypeEnum.ITEM;
+			//jump.actorType = BHCollection.EntityTypeEnum.ITEM;
 			jump.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 			
 			//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);
@@ -377,10 +307,10 @@ public class BHOperations
 		// if it's land, lodge a jump and stop the buff
 		if (targetCell.getTerrain() == BHLandscape.TerrainEnum.LAND) 
 		{
-			BHAction jump = new BHAction();
+			BHEngine.Action jump = new BHEngine.Action();
 			jump.actionType = BHOperations.ACTION_JUMP;
 			jump.actorID = me.getID();
-			jump.actorType = BHCollection.EntityTypeEnum.ITEM;
+			//jump.actorType = BHCollection.EntityTypeEnum.ITEM;
 			jump.intProps = Utils.intArray(engine.timecode, direction, repeatFlag, delay);
 			
 			//me.setIntProp(BHCollection.Atom.INT_PROPS.DX, delay * shift[0]);

@@ -1,0 +1,23 @@
+page one: list of sessions (taken slots, open slots, connect idle), new session, quick start
+	* can't see any agent keys from the list of sessions
+	* click on an open slot to create a client registration, grab the monster/hero and open the field page
+	* click on "view" to create a client registration, connect without a mob, open the field page
+	* "i know the key" - enter the client key and connect to that client session
+	
+page two : session control. You need the session key for that
+	* mobs do not need client keys as such, but even a server-hosted bot wants the key to mark the mob as controlled
+	and to restore the link after a disconnect;
+	* the list of mobs with their keys and controller names (the hero is also a mob, right?);
+	* a button to create a new client session and attach a bot, or no bot;
+	* you can create a new client for a mob that is alread controlled - that will kick the controlling user out;
+	* when we have real users, there will be invites to send the generated key to a user;
+	* start/stop the engine
+	* might have a view-only field view, since we need to read updates anyway
+page three: the field
+	*  (no session controls)
+	* pause button (monsters can pause, too)	
+	* leave button (the session will pause)
+ 
+ cookies or no cookies? no cookies means no jsp. Is there a reason for no cookies?
+ 
+ let's do it cookies + iframes (no spa's) because we can
