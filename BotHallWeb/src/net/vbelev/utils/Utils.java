@@ -3,6 +3,7 @@ package net.vbelev.utils;
 
 import java.lang.annotation.*;
 import java.util.*;
+import java.util.function.Predicate;
 //import java.nio.charset.Charset;
 
 //import com.sun.media.jfxmedia.track.Track.Encoding;
@@ -308,6 +309,31 @@ public class Utils
 		}
 	}
 	
+	public static <T>T FirstOrDefault(Iterable<T> elems, Predicate<T> condition)
+	{
+		return FirstOrDefault(elems, condition, null);
+	}
+
+	public static <T>T FirstOrDefault(Iterable<T> elems, Predicate<T> condition, T defaultValue)
+	{
+		if (elems == null || condition == null) return defaultValue;
+		/*
+		return elems.stream()
+				.filter(condition)
+				.findFirst()
+				.orElse(defaultValue)
+				;
+		*/
+		java.lang.reflect.Array a;
+		Iterator<T> it = elems.iterator();
+		while (it.hasNext())
+		{
+			T item = it.next();
+			if (condition.test(item)) return item;
+		}
+		return defaultValue;
+	}
+	
 	public static Integer[] box(int... args)
 	{
 		if (args == null) return new Integer[0];
@@ -324,6 +350,21 @@ public class Utils
 		for (int pos = 0; pos < args.length; pos++) res[pos] = args[pos];
 		
 		return res;
+	}
+	
+	public static double round(double val, int floatingPos)
+	{
+		if (floatingPos == 0) return (double)Math.round(val);
+		if (floatingPos < 0)
+		{
+			int pow = (int)Math.pow(10, -floatingPos);
+			return pow * (double)Math.round(val / pow);
+		}
+		else
+		{
+		int pow = (int)Math.pow(10, floatingPos);
+		return (double)Math.round(val * pow) / pow;
+		}
 	}
 	
 	private static class StringIterator<T> implements Iterator<String>

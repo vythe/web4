@@ -8,7 +8,7 @@ public class Decimal implements Comparable<Object>
 	/** this is the sign , true = positive */
 	private boolean sign;
 	
-	/** privately, mantissa is a very long decimal
+	/** privately, mantissa is a very long integer
 	 * stored as chars (9,8, 9, 2, 0, 1 etc);
 	 *  //the order is human-readable, 105469 -> [1, 0, 5, 4, 6, 9]
 	 * the order is now reversed to math: 105469 -> [9, 6, 4, 5, 0, 1]
@@ -26,16 +26,45 @@ public class Decimal implements Comparable<Object>
 	
 	public final static Decimal ZERO = new Decimal();
 //==== Constructors ====
+	
+	private void buildEmpty()
+	{
+		mantissa = EMPTY_CHAR_ARR;
+		power = 0;
+		ePower = 0;
+		sign = true;
+	}
 	/**
 	 * Returns zero value
 	 * @category constructor
 	 */
 	public Decimal()
 	{
-		mantissa = EMPTY_CHAR_ARR;
-		power = 0;
-		ePower = 0;
-		sign = true;
+		buildEmpty();
+	}
+	
+	private Decimal(char[] mantissa, int power, boolean sign)
+	{
+		this.mantissa = mantissa;
+		this.power = power;
+		this.ePower = power + mantissa.length - 1;
+		this.sign = sign;
+	}
+		
+	private void trimMantissa()
+	{
+		int resPower = 0;
+		while (resPower < mantissa.length && mantissa[resPower] == 0) 
+			resPower++;
+		int tail = 0;
+		while (tail < mantissa.length && mantissa[mantissa.length - tail - 1] == 0) 
+			tail++;
+		if (resPower == 0 && tail == 0) return;
+		
+		char[] newMantissa = new char[mantissa.length - resPower - tail];
+		System.arraycopy(mantissa, resPower, newMantissa, 0, newMantissa.length);
+		this.mantissa = newMantissa;
+		this.power += resPower;
 	}
 	
 	/**
@@ -54,23 +83,38 @@ public class Decimal implements Comparable<Object>
 	 */
 	public Decimal(long val)
 	{
-		sign = (val >= 0);
-		buildFromLong(sign? val : -val);
+		if (val == 0)
+		{
+			buildEmpty();
+		}
+		else
+		{
+			sign = (val >= 0);
+			buildFromLong(sign? val : -val);
+		}
 	}
 	
 	/**
 	 * @category constructor
+	 * constructs val * 10^power
 	 */
 	public Decimal(long val, int power)
 	{
-		sign = (val >= 0);
-		buildFromLong(sign? val : -val);
-		this.power += power;
+		if (val == 0)
+		{
+			buildEmpty();
+		}
+		else
+		{
+			sign = (val >= 0);
+			buildFromLong(sign? val : -val);
+			this.power += power;
+		}
 	}
 	
 	/**
-	 * Uses the default number of digits = 26
 	 * @category constructor
+	 * Uses the default number of digits = 26
 	 */
 	public Decimal(double val)
 	{
@@ -81,15 +125,13 @@ public class Decimal implements Comparable<Object>
 		//long exponent = bits & 0x7ff0000000000000L; // 11 bits (power of 2)
 		//long mantissa = bits & 0x000fffffffffffffL; // 42 bits
 
-		sign = (val >= 0);
 		if (val == 0)
 		{
-			mantissa = EMPTY_CHAR_ARR;
-			power = 0;
-			ePower = 0;
+			buildEmpty();
 		}
 		else
 		{
+			sign = (val >= 0);
 			//int maxprec = 26; // 8 for float, ~26 for double
 			buildFromDouble(sign? val: -val, 26);
 		}
@@ -104,37 +146,26 @@ public class Decimal implements Comparable<Object>
 		{
 			throw new IllegalArgumentException("Decimal maxdigits must be 1 or greater");
 		}
-		sign = (val >= 0);
 		if (val == 0)
 		{
-			mantissa = EMPTY_CHAR_ARR;
-			power = 0;
-			ePower = 0;
+			buildEmpty();
 		}
 		else
 		{
+			sign = (val >= 0);
 			//int maxprec = 26; // 8 for float, ~26 for double
 			buildFromDouble(sign? val: -val, maxdigits);
 		}
 	}
 	
 
+	/** regexp is slow, so it used for testing only */
 	private static final Pattern decimalNumberRX 
 	= Pattern.compile("^(?<sign>\\+|-)?(?<mant1>\\d+)((?:\\.)(?<mant2>\\d*))?((?:e|E)(?<powersign>\\+|-)?(?<power>\\d+))?$");
 	
-	/** 
-	 * Parses the usual 10-based decimal string ("1.2345e-23") into Decimal
-	 * @category constructor
-	 */
-	public Decimal(String from)
+	/** regexp is slow, so it used for testing only */
+	private void buildFromStringRegex(String from)
 	{
-		if (from == null || from.length() == 0) 
-		{
-			this.mantissa = new char[0];
-			return;
-		}
-		
-		/*
 		System.out.println("fromString matching " + from);
 		Matcher m = decimalNumberRX.matcher(from);
 		if (!m.find())
@@ -149,8 +180,23 @@ public class Decimal implements Comparable<Object>
 			}
 		}
 		System.out.println("fromString total groups: " + m.groupCount());
-		*/
-		// full syntax: +1234.456e+123 ; signs are optional
+		// this is unfinished
+	}
+	
+	/** 
+	 * @category constructor
+	 * Parses the usual 10-based decimal string ("1.2345e-23") into Decimal.
+	 * The full syntax: +1234.456e+123 ; signs are optional
+	 */
+	public Decimal(String from)
+	{
+		if (from == null || from.length() == 0) 
+		{
+			buildEmpty();
+			return;
+		}
+		
+		// 
 		char[] valchars = from.toCharArray();
 		char[] mant = new char[valchars.length];
 		char[] powerChars = new char[valchars.length];
@@ -235,6 +281,7 @@ public class Decimal implements Comparable<Object>
 		{
 			this.power -= mantpos - mantpointpos;
 		}
+		this.trimMantissa();
 		this.ePower = this.power + this.mantissa.length - 1;
 	}
 
@@ -306,6 +353,9 @@ public class Decimal implements Comparable<Object>
 		if (this.ePower > other.ePower) return this.sign? 1 : -1;
 		if (this.ePower < other.ePower) return this.sign? -1 : 1;
 		
+		int res = CharMath.compareArrays(this.mantissa, other.mantissa, this.ePower - other.ePower);
+		return this.sign? res : -res;
+		/*
 		int thisPos = this.mantissa.length - 1;
 		int otherPos = other.mantissa.length - 1;
 		while (thisPos >=0 || otherPos >= 0)
@@ -319,6 +369,12 @@ public class Decimal implements Comparable<Object>
 		}
 		
 		return 0;
+		*/
+	}
+	
+	public int compareTest(Decimal to)
+	{
+		return CharMath.compareArrays(this.mantissa, to.mantissa, (this.power) - (to.power));
 	}
 	
 	/**
@@ -359,6 +415,10 @@ public class Decimal implements Comparable<Object>
 
 //==== type cast methods ====
 	
+	/**
+	 * Converts this into a string in the standard (scientific) format 1.2345e10
+	 * @return
+	 */
 	public String toStringE()
 	{
 		StringBuilder sb = new StringBuilder();
@@ -392,6 +452,10 @@ public class Decimal implements Comparable<Object>
 		return sb.toString();
 	}
 	
+	/**
+	 * Converts this into a string in the floating-point format 1234.3456 without the power
+	 * @return
+	 */
 	public String toStringF()
 	{
 		StringBuilder sb = new StringBuilder();
@@ -529,27 +593,39 @@ public class Decimal implements Comparable<Object>
 		}
 		return (this.sign? "+" : "-") + digitsToString(chars);
 	}
+	
 	//==== Arithmetics ====
 	
 	public Decimal minus()
 	{
+		if (isZero()) return this;
+		
 		Decimal res = new Decimal(this);
 		res.sign = !res.sign;
 		return res;
 	}
 	
+	/**
+	 * round() trims the mantissa to the given number of digits with proper rounding,
+	 * ignoring the sign: round(13.45) to 3 digits -> 13.5 and round(-13.45) -> -13.5.
+	 * This is different from the standard Math.round
+	 */
 	public Decimal round(int maxdigits)
 	{
 		if (this.mantissa.length <= maxdigits) return new Decimal(this);
 		
 		Decimal res = new Decimal();
+		res.sign = this.sign;
 		res.power = this.power + mantissa.length - maxdigits;
 		res.mantissa = new char[maxdigits];
 		System.arraycopy(this.mantissa, mantissa.length - maxdigits, res.mantissa, 0, maxdigits);
+		res.ePower = res.power + res.mantissa.length - 1;
 
 		if (this.mantissa[mantissa.length - maxdigits - 1] >= 5) // remember that mantissa is always 10-based
 		{
 			res.mantissa = CharMath.arrAddSmall(res.mantissa, 1, 10);
+			res.trimMantissa();
+			/*
 			// compact now
 			int tail = 0;
 			while (tail < mantissa.length && res.mantissa[tail] == 0) tail++;
@@ -560,11 +636,33 @@ public class Decimal implements Comparable<Object>
 				res.mantissa = res2;
 				res.power += tail;				
 			}
+			*/
 		}
-		res.ePower = res.power + res.mantissa.length - 1;
 		return res;	
 	}
 	
+	
+	/**
+	 * floor() trims the mantissa to the given number of digits without rounding,
+	 * ignoring the sign: round(13.45) to 3 digits -> 13.4 and round(-13.4) -> -13.4.
+	 * This is faster than round() if you don't care about the last digit much
+	 */
+	public Decimal floor(int maxdigits)
+	{
+		if (this.mantissa.length <= maxdigits) return new Decimal(this);
+		
+		Decimal res = new Decimal();
+		res.sign = this.sign;
+		res.power = this.power + mantissa.length - maxdigits;
+		res.mantissa = new char[maxdigits];
+		System.arraycopy(this.mantissa, mantissa.length - maxdigits, res.mantissa, 0, maxdigits);
+		res.ePower = res.power + res.mantissa.length - 1;
+		if (res.mantissa.length > 0 && res.mantissa[0] == 0)
+		{
+			res.trimMantissa();
+		}
+		return res;	
+	}	
 	public Decimal multiplySmall(long val)
 	{
 		if (val == 0) return ZERO;
@@ -590,6 +688,150 @@ public class Decimal implements Comparable<Object>
 		return res;
 	}
 	
+	private void printLongArr(String msg, char[] arr)
+	{
+		System.out.println(msg + " " + digitsToLong(arr, 10));
+	}
+	public Decimal multiply(Decimal val)
+	{
+		int chunkSize = 8;
+		Decimal res = new Decimal();
+		char[] valMantissa = val.mantissa;
+		//System.out.println("mult this=" + digitsToLong(this.mantissa, 10) + ", val=" + digitsToLong(val.mantissa, 10));
+		for (int offset = 0; offset < valMantissa.length; offset += chunkSize)
+		{
+			long chunk = digitsToLong(valMantissa, offset, chunkSize, 10);
+			char[] multChunk = CharMath.arrMultiplySmall(this.mantissa, chunk, 10);
+			//System.out.println("offset=" + offset + ", chunk=" + chunk);
+			//printLongArr("chunk1=",  multChunk);
+			if (offset > 0)
+			{
+				char[] mc2 = new char[multChunk.length + offset];
+				System.arraycopy(multChunk, 0, mc2, offset, multChunk.length);
+				multChunk = mc2;
+				//printLongArr("chunk2=",  multChunk);
+			}
+			res.mantissa = CharMath.arrAdd(res.mantissa, multChunk, 10);
+			//printLongArr("new mantissa=",  res.mantissa);
+		}
+		res.power = this.power + val.power;
+		res.sign = !(this.sign ^ val.sign);
+		res.trimMantissa();
+		
+		return res;
+	}
+	
+	/**
+	 * a simple holding bag to return division results from divide()
+	 * @author Vythe
+	 *
+	 */
+	public static class Division
+	{
+		public Decimal quotient;
+		public Decimal remainder;
+		
+		public Division() {}
+		public Division(Decimal quotient, Decimal remainder)
+		{
+			this.quotient = quotient == null? ZERO : quotient;
+			this.remainder = remainder == null? ZERO : remainder;
+		}
+	}
+	
+	public Division divide(Decimal divisor, int extraDigits)
+	{
+		if (this.isZero()) 
+		{
+			return new Division(ZERO, ZERO);
+		}
+		if (divisor.isZero())
+		{
+			throw new ArithmeticException("Division by zero");
+		}
+		
+		// division is separated into two stages: 
+		// 2) convert this into base * 10^smth, where base is integer
+		// 1) divide two integers 
+		// 2) determine the ePower of the result and convert it into p-power in the end
+		
+		int baseLength = this.mantissa.length > divisor.mantissa.length? this.mantissa.length : divisor.mantissa.length;
+		if (this.power > 0 && baseLength < this.mantissa.length + this.power)
+		{
+			baseLength = this.mantissa.length + this.power;
+		}
+		baseLength += extraDigits;
+		int quotientEPower; // this is the true EPower of the quotient
+		char[] base;
+		if (baseLength == this.mantissa.length)
+		{
+			base = CharMath.copyArray(this.mantissa, baseLength);
+			quotientEPower = this.ePower - divisor.ePower;
+		}
+		else //if (baseLength > this.mantissa.length)
+		{
+			base = CharMath.prependArray(this.mantissa, (char)0, baseLength - this.mantissa.length);
+			// we multiplied the base by 10^extra, so we reduce the ePower by the same extra
+			quotientEPower = this.ePower - divisor.ePower; // - baseLength + this.mantissa.length; 
+		}
+		int resDigits = baseLength - divisor.mantissa.length + 1;
+		/*
+		Decimal div = new Decimal(divisor);
+		div.power -= extraDigits;
+		div.ePower -= extraDigits;
+		/* not sure how to fix this
+		if (this.ePower - divisor.ePower < extraDigits 
+		|| (this.ePower == divisor.ePower + extraDigits && this.mantissa[this.mantissa.length - 1] < divisor.mantissa[divisor.mantissa.length - 1]))
+		{
+			return new Division(ZERO, this);
+		}
+		 */                                    
+		
+		// preflight checks complete, now start dividing
+		
+		//char[] base = CharMath.prependArray(this.mantissa, (char)0, extraDigits);
+		//int resDigits = this.ePower - div.ePower + 1 + trailingZeros;
+		/*
+		if (base.length < divisor.mantissa.length)
+		{
+			//base = CharMath.copyArray(base, divisor.mantissa.length);
+			resDigits += divisor.mantissa.length - base.length;
+			base = CharMath.prependArray(this.mantissa, (char)0, divisor.mantissa.length - base.length);
+		}*/
+		//char[] divMantissa = CharMath.prependArray(divisor.mantissa, (char)0, extraDigits);
+		char[] resMantissa = new char[resDigits];
+		for (int i = resDigits - 1; i >= 0; i--)
+		{
+			char[] divMantissa = CharMath.prependArray(divisor.mantissa, (char)0, i);
+			resMantissa[i] = 0;
+			int cmp;
+			while ((cmp = CharMath.compareArrays(base, divMantissa, 0)) >= 0)
+			{
+				try
+				{
+				base = CharMath.arrSubtract(base, divMantissa, 10);
+				}
+				catch (CharMath.SubtractFailedException x)
+				{
+					break; // this shouldn't happen
+				}
+				resMantissa[i]++;		
+			}
+		}
+		//Decimal quotient = new Decimal(resMantissa, this.ePower - divisor.ePower + trailingZeros - resDigits + 1, !(this.sign ^ divisor.sign));
+		Decimal quotient = new Decimal(resMantissa, quotientEPower - resMantissa.length + 1, !(this.sign ^ divisor.sign));
+		Decimal remainder = new Decimal(base, quotientEPower - resMantissa.length + 1, this.sign);
+		quotient.trimMantissa();
+		remainder.trimMantissa();
+		Division res = new Division(quotient, remainder);
+		
+		return res;
+	}
+	
+	/**
+	 * This method uses the full add() when you substract a too large value,
+	 * i.e. sign(this) != sign(val) and abs(this) < abs(val).
+	 */
 	public Decimal addSmall(long val)
 	{
 		boolean useSubtract = false;
@@ -654,6 +896,7 @@ public class Decimal implements Comparable<Object>
 			resPositive = true;
 		}
 		
+		/*
 		int resPower = 0;
 		while (resPower < resChars.length && resChars[resPower] == 0) 
 			resPower++;
@@ -666,7 +909,9 @@ public class Decimal implements Comparable<Object>
 		System.arraycopy(resChars, resPower, res.mantissa, 0, res.mantissa.length);
 		res.power = resPower;
 		res.sign = resPositive;
-		
+		*/
+		Decimal res = new Decimal(resChars, 0, resPositive);
+		res.trimMantissa();
 		return res;	
 	}
 	
@@ -733,7 +978,9 @@ public class Decimal implements Comparable<Object>
 			resChars = CharMath.arrAdd(chars, valChars, 10);
 			resPositive = true;
 		}
-		
+		Decimal res = new Decimal(resChars, this.power - thisPOffset, resPositive);
+		res.trimMantissa();
+		/*
 		int resPower = 0;
 		while (resPower < resChars.length && resChars[resPower] == 0) 
 			resPower++;
@@ -746,7 +993,7 @@ public class Decimal implements Comparable<Object>
 		System.arraycopy(resChars, resPower, res.mantissa, 0, res.mantissa.length);
 		res.power = resPower + this.power - thisPOffset;
 		res.sign = resPositive;
-		
+		*/
 		return res;	
 	}
 	
@@ -938,6 +1185,24 @@ public class Decimal implements Comparable<Object>
 		}
 		return res;
 	}	
+	
+	/** 
+	 * converts part of the char array to a long (to help with multiplication
+	 */
+	private static long digitsToLong(char[] digits, int offset, int len, int radix)
+	{
+		long res = 0;
+		if (offset + len > digits.length)
+		{
+			len = digits.length - offset;
+		}
+		for (int i = offset + len - 1; i >= offset; i--)
+		{
+			res = res * radix + digits[i];
+		}
+		return res;
+	}	
+
 	/** parses a long value into an array of digits in the math order */
 	public static char[] digitsFromLong(long val, int radix)
 	{

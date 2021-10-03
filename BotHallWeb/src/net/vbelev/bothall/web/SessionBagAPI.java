@@ -27,7 +27,7 @@ public class SessionBagAPI
 			)
 	{
 		String res = "";
-		if (!BHUser.isValidUserKey(userKey))
+		if (!BHUser.defaultUser.isValidUserKey(userKey))
 		{
 			res = "";
 		}

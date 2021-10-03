@@ -6,12 +6,13 @@ import net.vbelev.utils.*;
 public class BHUser
 {
 
-	private static String userKey = Utils.randomString(8);
-	private static String prevUserKey = Utils.randomString(8);
-	private static long userKeyTS = new Date().getTime();
+	private String userKey = Utils.randomString(8);
+	private String prevUserKey = Utils.randomString(8);
+	private long userKeyTS = new Date().getTime();
 
+	public String userName;
 
-	public static String getUserKey()
+	public String getUserKey()
 	{
 		if (userKeyTS + 3 * 60 * 60 * 1000 < new Date().getTime())
 		{
@@ -24,9 +25,10 @@ public class BHUser
 	
 	/** for now, keep user validation here. It is for protections from robots only. 
 	 */
-	public static boolean isValidUserKey(String key)
+	public boolean isValidUserKey(String key)
 	{
 		return key != null && (key.equals(userKey) || key.equals(prevUserKey));
 	}
-	
+
+	public static final BHUser defaultUser = new BHUser();
 }

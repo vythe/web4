@@ -69,6 +69,7 @@ public class BHSession extends BHBoard
 	public static final Object lock = new Object();
 	
 	private int sessionID;
+	private String sessionDescription;
 	private String sessionKey;
 
 	//protected BHBoard engine;
@@ -353,6 +354,8 @@ public class BHSession extends BHBoard
 	
 	public String getSessionKey() { return sessionKey; }
 	
+	public String getDescription() { return Utils.NVL(sessionDescription, "Session #" + sessionID); }
+	
 	public BHBoard getEngine() { return this; }
 	
 	/**
@@ -388,7 +391,7 @@ public class BHSession extends BHBoard
 			
 			boolean success = true;
 			
-			if (!BHUser.isValidUserKey(userKey))
+			if (!BHUser.defaultUser.isValidUserKey(userKey))
 			{
 				success = false;
 				res = new BHClient.Error(0, "Invalid  user key");
@@ -487,6 +490,7 @@ public class BHSession extends BHBoard
 						agent = s.createAgent();
 						agent.atomID = atomID;
 						agent.userKey = userKey;
+						agent.userName = "User #" + userKey;
 						resCommand.stringArgs[0] = agent.clientKey;
 					}			
 				}				

@@ -28,7 +28,7 @@ public class BHClientRegistration
 	//public OutputStream pushStream = null;
 	
 	public String userKey;
-	
+	public String userName;	
 	private static final ArrayList<BHClientRegistration> agentList = new ArrayList<BHClientRegistration>();
 	
 	public static final Object lock = new Object();

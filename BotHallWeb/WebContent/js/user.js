@@ -26,6 +26,26 @@ function BHUser(bhUserArgs)
 		apiURL = (bhUserArgs || "/") + "";
 	}
 	
+	var fetchJson = function (response) {
+		if (!response) {
+			return new Promise((resolve, reject) => { resolve(""); });
+		}
+		
+		return response
+		.text()
+		.then(function(respText) {
+			//console.log("fetchJson text: ");
+			//console.dir(respText);
+			var retObj;
+			if (!respText) 
+				retObj = "";
+			else 
+				retObj = JSON.parse(respText);
+			return new Promise((resolve, reject) => { resolve(retObj); });
+		});
+	}
+	
+	
 	/**
 	 * A simple wrapper over fetch()
 	 */

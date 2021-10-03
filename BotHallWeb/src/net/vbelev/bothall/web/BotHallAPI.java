@@ -69,7 +69,7 @@ public class BotHallAPI
 	@Produces(MediaType.APPLICATION_JSON)	
 	public String getUserKey()
 	{
-		return Utils.encodeJSON(BHUser.getUserKey());
+		return Utils.encodeJSON(BHUser.defaultUser.getUserKey());
 	}
 	
 	/**

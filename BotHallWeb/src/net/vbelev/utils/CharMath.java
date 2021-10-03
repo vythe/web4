@@ -11,7 +11,11 @@ public class CharMath
 	{
 		private static final long serialVersionUID = -9174289750449147728L;
 	}
-	
+
+	/**
+	 * Adds one element to the array's start and sets it to val.
+	 * In Decimal, this is equivalent to multiplying the mantissa array by 10.
+	 */
 public static char[] prependArray(char[] arr, char val)
 {
 	char[] res;
@@ -23,6 +27,39 @@ public static char[] prependArray(char[] arr, char val)
 		System.arraycopy(arr, 0, res, 1, arr.length);
 	}
 	res[0] = val;
+	return res;		
+}
+
+/**
+ * Adds numDigits elements to the array's start and sets them all to val.
+ * In Decimal, this is equivalent to multiplying the mantissa array by 10^numDigits.
+ * If numDigits <= 0, truncates the array by numDigits elements, 
+ * which is equivalent in Decimal to integer division by 10^abs(numDigits). 
+ */
+public static char[] prependArray(char[] arr, char val, int numDigits)
+{
+	if (numDigits < 0 && arr.length <= -numDigits)
+	{
+		return new char[0];
+	}
+	else if (numDigits <= 0)
+	{
+		return copyArray(arr, arr.length + numDigits);
+	}
+	
+	char[] res;
+	if (arr == null || arr.length == 0) 
+		res = new char[numDigits];
+	else
+	{
+		res = new char[arr.length + numDigits];
+		System.arraycopy(arr, 0, res, numDigits, arr.length);
+	}
+	if (val != 0)
+	{
+		for (int i = 0; i < numDigits; i++)
+			res[i] = val;
+	}
 	return res;		
 }
 
@@ -59,6 +96,40 @@ public static char[] reverseArray(char[] from)
 		res[j--] = from[i];
 	
 	return res;
+}
+
+/**
+ * compares two mantissas with the given offset (offset is a.power - b.power);
+ * returns 1 if a > b;
+ * returns -1 if a < b; 
+ * return 0 if a == b; 
+ * 
+ * Offset is the difference between decimal point positions, needed to compare mantissas of different length, 
+ */
+public static int compareArrays(char[] a, char[] b, int offset)
+{
+	//int bShift = b.length - a.length + offset; // 
+	int startPos = a.length - 1; // > b.length? a.length - 1 : b.length - 1;
+	int bShift = offset;
+	
+	//if (a.length - 1 > startPos) return 1;
+	if (b.length - 1 < startPos + bShift) return 1;
+	if (b.length - 1 > startPos + bShift) return -1;
+	
+	int i = startPos;
+	for (; i >= 0 && i >= -bShift; i--)
+	{
+		if (a[i] > b[i + bShift]) return 1;
+		if (a[i] < b[i + bShift]) return -1;
+	}
+	if (i >= 0) return 1;
+	// a = 1.2345 , offset 0, 
+	// a mantissa 54321  e=0 
+	// b = 1.23, 
+	// b mantissa 321    e=0
+	// bshift = -2
+	if (bShift > 0) return -1;
+	return 0;
 }
 
 public static char[] arrMultiplySmall(char[] val, long factor, int radix)
