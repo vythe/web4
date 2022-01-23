@@ -562,7 +562,7 @@ public class DryCereal
 		flush(12);
 		Decimal d = new Decimal(val, 6);
 		buff.append(CerealType.FLOAT.typeCode);
-		buff.append(d.getMantissa(6, 16));
+		buff.append(d.printMantissa(6, 16));
 		buff.append(Decimal.longToString(d.getPower(), 3, 16));
 	}
 
@@ -571,7 +571,7 @@ public class DryCereal
 		flush(26);
 		Decimal d = new Decimal(val, 16);
 		buff.append(CerealType.DOUBLE.typeCode);
-		buff.append(d.getMantissa(16, 16));
+		buff.append(d.printMantissa(16, 16));
 		buff.append(Decimal.longToString(d.getPower(), 8, 16));
 	}
 

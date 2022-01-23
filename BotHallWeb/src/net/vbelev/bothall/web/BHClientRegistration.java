@@ -21,7 +21,8 @@ public class BHClientRegistration
 	
 	public int sessionID;
 	public int atomID = 0;
-	public int timecode;
+	/** The latest timecode used to get the session update */
+	public long timecode;
 	public int subscriptionID;
 	
 	/** If it's a push client, this stream will receive updates */
@@ -29,6 +30,15 @@ public class BHClientRegistration
 	
 	public String userKey;
 	public String userName;	
+	
+	public long lastActiveTime = 0;
+	/**
+	 * Web clients will always be flagges as connected, because we cannot know,
+	 * but socket clients know their status. Also, agents created in advance (without drivers) 
+	 * start as not connected.
+	 */
+	public boolean isConnected = false;
+	
 	private static final ArrayList<BHClientRegistration> agentList = new ArrayList<BHClientRegistration>();
 	
 	public static final Object lock = new Object();

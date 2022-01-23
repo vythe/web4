@@ -2,12 +2,20 @@ package net.vbelev.bothall.client;
 
 import net.vbelev.utils.*;
 
+/**
+ * This is a pacman bot entity.
+ * 1) It is stateful (in theory), and may even have some async activity, so we want to keep a reference to StreamClient;
+ * 2) it issues commands to the server, so we need a reference to the StreamClient, not just the collection;
+ * 3) it is okay to issue commands asynchronously, not from onUpdate(), as long as the bot
+ * 		deals with the non-thread-safe StreamClient.
+ */
 public class PacmanShambler
 {
-	private StreamClient client = null;
+	private StreamClient<PacmanClient> client = null;
+	
 	public String clientKey;
 	
-	public void setClient(StreamClient c)
+	public void setClient(StreamClient<PacmanClient> c)
 	{
 		if (client != null)
 		{
@@ -22,6 +30,13 @@ public class PacmanShambler
 				@Override
 				public void onUpdate()
 				{
+					//System.out.println("Shambler onUpdate for " + this.toString());
+					PacmanClient.PacmanStatus status = (PacmanClient.PacmanStatus)client.collection.getStatus();
+					if (status != null && BHClient.Status.SessionStatus.DEAD.equals(status.sessionStatus))
+					{
+						stop();
+						return;
+					}
 					shamble();
 				}
 			});
@@ -72,6 +87,20 @@ public class PacmanShambler
 	
 	
 	private BHClient.Cell currentPos = null;
+	
+	public void stop()
+	{
+		PacmanClient.PacmanStatus status = (PacmanClient.PacmanStatus)client.collection.getStatus();
+		System.out.println("Stopping pac client " + this.toString() + " for #" + status.controlledMobileID);
+		try
+		{
+			client.writeCommand("CLOSE", null, null);
+		}
+		catch (Exception x)
+		{
+		}
+		client.stop();
+	}
 	/**
 	 * Choose a valid direction at random
 	 */
@@ -85,12 +114,14 @@ public class PacmanShambler
 				System.out.println("Shambling: null client");
 				return;
 			}
-			if (this.client.collection.status == null)
+			PacmanClient.PacmanStatus status = (PacmanClient.PacmanStatus)client.collection.getStatus();
+			
+			if (status == null)
 			{
 				System.out.println("Shambling: null status");
-				this.client.collection.status = new BHClient.Status();
+				status = new PacmanClient.PacmanStatus();
 			}
-			int myMobileID = this.client.collection.status.controlledMobileID;
+			int myMobileID = status.controlledMobileID;
 			//System.out.println("I am shambling with the key " + this.clientKey + ", controlled ID=" + myMobileID);
 			BHClient.Mobile me = null;
 			for (BHClient.Mobile m : this.client.collection.mobiles.values())
@@ -152,9 +183,16 @@ public class PacmanShambler
 			if (cnt == 0) return; // no good options
 			int selectedDir = goodDirs[Utils.random.nextInt(cnt)];
 			
+			if (me.dir > 0 && me.dir == selectedDir)
+			{
+				//System.out.println("shamler selected dir "+ selectedDir + ", already moving that way");				
+			}
+			else
+			{
 			currentPos = closest[0];
 			this.client.writeCommand("move", new int[] {selectedDir}, null);
-			System.out.println("Shambling! pos=" + me.toString() + ", moved to " + selectedDir);
+			}
+			//System.out.println("Shambling! pos=" + me.toString() + ", moved to " + selectedDir);
 		//this.client.
 //		System.out.println("I am shambling! timecode=" + 
 //				client.collection.status.timecode

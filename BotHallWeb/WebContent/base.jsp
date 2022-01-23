@@ -11,16 +11,20 @@
 <body>
 <h2>Hello, world</h2>
 <%
-	//DryCereal.testInt(139);
-//DryCereal.testFloat(0.000323517);
-BHWebContext app = BHWebContext.getApplication(request.getServletContext());
+// this is a legacy page, it doesn't work anymore
+//BHWebContext app = BHWebContext.getApplication(request.getServletContext());
+
 /*if (app.engine.stage == BHEngine.CycleStageEnum.IDLE) {
 app.engine.startCycling();
 } else {
 	app.engine.stopCycling();
 }*/
+//String res = app.engine.engineInstance + " - " + app.engine.stage;
+WebAPI.WebSessionPack pack = WebAPI.getWebSessionPack(request);
 
-String res = app.engine.engineInstance + " - " + app.engine.stage;
+PacmanSession s = Utils.FirstOrDefault(PacmanSession.sessionList(), null, null);
+String res = s.status();
+
 %>
 Engine: <%=res%>
 <div style="border:1px;" id="fetchres"></div>

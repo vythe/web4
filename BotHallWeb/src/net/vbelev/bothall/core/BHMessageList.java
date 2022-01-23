@@ -53,6 +53,11 @@ public class BHMessageList
 		@Override
 		public int compare(Message arg0, Message arg1)
 		{
+			if (arg0 == null || arg1 == null)
+			{
+				System.out.println("but how?");
+				return arg0 == null? -1 : 1;
+			}
 			if (arg0.ID < arg1.ID) return -1;
 			if (arg0.ID > arg1.ID) return 1;
 			return 0;

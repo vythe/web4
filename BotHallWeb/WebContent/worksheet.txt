@@ -21,3 +21,90 @@ page three: the field
  cookies or no cookies? no cookies means no jsp. Is there a reason for no cookies?
  
  let's do it cookies + iframes (no spa's) because we can
+ 
+ to start the session:
+  	* the engine runs always; if it is stopped, any activity should start it;
+  	* we need a starter global buff that works the same as the pause;
+ the pause buff:
+ 	* the engine runs as usual
+ 	* commands check for this buff individually (some commands will work);
+ 	* the pause buff checks all buffs in the system and restores their timeouts to initial values;
+ 	*  
+  	 
+ to end the session:
+ 	* we need the number of lives left;
+ 	* (we need to generate the cherry, but it can come later);
+ 	* dead session is a buff that cancels all other buffs at every tick;
+ 	* 
+ 
+ 
+ 
+counterSplit, maxCounter = 100, v2.1
+counter split 6367415506067116157
+17/10/2021 13:10:44 / 01/01/1970 10:00:00
+ep=1, limit=10, elapsed=00:00:00.018
+found 29, counterPos=10, tests=10, elapsed=00:00:00.019
+17/10/2021 13:10:44 / 01/01/1970 10:00:00
+ep=2, limit=10, elapsed=00:00:00.021
+17/10/2021 13:10:44 / 01/01/1970 10:00:00
+ep=3, limit=10, elapsed=00:00:00.033
+found 2473, counterPos=100, tests=366, elapsed=00:00:00.042
+found 5741, counterPos=100, tests=755, elapsed=00:00:00.053
+17/10/2021 13:10:45 / 01/01/1970 10:00:00
+ep=4, limit=10, elapsed=00:00:00.070
+17/10/2021 13:10:45 / 01/01/1970 10:00:00
+ep=5, limit=10, elapsed=00:00:00.216
+17/10/2021 13:10:45 / 01/01/1970 10:00:00
+ep=6, limit=10, elapsed=00:00:00.908
+17/10/2021 13:10:52 / 01/01/1970 10:00:07
+ep=7, limit=10, elapsed=00:00:07.816
+found 14197493, counterPos=100, tests=1252443, elapsed=00:00:10.663
+17/10/2021 13:11:52 / 01/01/1970 10:01:07
+ep=8, limit=10, elapsed=00:01:07.546
+found 533280289, counterPos=100, tests=47484464, elapsed=00:05:55.351
+17/10/2021 13:21:51 / 01/01/1970 10:11:06
+ep=9, limit=10, elapsed=00:11:06.865
+total tests 886952697 , last v=10000000000
+end at 17/10/2021 14:57:03
+total elapsed=01:46:18.614
+
+counterSplit, maxCounter = 10, v2
+counter split 6367415506067116157
+ep=1, limit=10, time=15/10/2021 21:59:52
+found 29, counterPos=10
+ep=2, limit=10, time=15/10/2021 21:59:52
+ep=3, limit=10, time=15/10/2021 21:59:52
+found 2473, counterPos=10
+found 5741, counterPos=10
+ep=4, limit=10, time=15/10/2021 21:59:52
+ep=5, limit=10, time=15/10/2021 21:59:53
+ep=6, limit=10, time=15/10/2021 21:59:54
+ep=7, limit=10, time=15/10/2021 22:00:05
+found 14197493, counterPos=10
+ep=8, limit=10, time=15/10/2021 22:01:57
+
+
+
+
+
+(what's 14197493 ? = 2473 * 5741)
+
+bruteSplit:
+split 6367415506067116157
+ep=1, limit=10, time=16/10/2021 14:13:41
+found 29
+ep=2, limit=10, time=16/10/2021 14:13:41
+found 841
+ep=3, limit=10, time=16/10/2021 14:13:41
+found 2473
+found 5741
+ep=4, limit=10, time=16/10/2021 14:13:41
+found 71717
+ep=5, limit=10, time=16/10/2021 14:13:42
+found 166489
+ep=6, limit=10, time=16/10/2021 14:13:50
+found 2079793
+found 4828181
+ep=7, limit=10, time=16/10/2021 14:14:58
+found 14197493
+ep=8, limit=10, time=16/10/2021 14:26:01

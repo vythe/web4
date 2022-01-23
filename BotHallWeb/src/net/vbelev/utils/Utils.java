@@ -3,6 +3,7 @@ package net.vbelev.utils;
 
 import java.lang.annotation.*;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 //import java.nio.charset.Charset;
 
@@ -234,6 +235,47 @@ public class Utils
 		return String.format("%td/%tm/%tY %tH:%tM:%tS", d, d, d, d, d, d);		
 	}
 	
+	public static String formatTime(Date d)
+	{
+		if (d == null) return "";
+		return String.format("%tH:%tM:%tS", d, d, d);		
+	}
+	
+	public static String formatMilliseconds(long ms)
+	{
+		String res = "";
+		
+		/*
+		Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+		c.setTime(d);
+		int year = c.get(Calendar.YEAR) - 1970;
+		int month = c.get(Calendar.MONTH);
+		int day = c.get(Calendar.DATE) - 1;
+		int hour = c.get(Calendar.HOUR_OF_DAY);
+		int minute = c.get(Calendar.MINUTE);
+		int second = c.get(Calendar.SECOND);
+		int msec = c.get(Calendar.MILLISECOND);
+		
+		if (year > 0) res += year + " years ";
+		if (month > 0) res += month + " months ";
+		if (day > 0) res += day + " days ";
+		//if (hour > 0) res += hour + ":";
+		//if (hour > 0 || minute > 0) res += minute + ":";
+		res = String.format("%s%02d:%02d:%02d.%03d", res, hour, minute, second, msec);
+*/
+		long ts = ms;
+		long msec_in_hour = 60 * 60 * 1000;
+		long msec_in_minute = 60 * 1000;
+		long msec_in_second = 1000;
+		int hour = (int)(ts / msec_in_hour);
+		ts = ts % msec_in_hour;
+		int minute = (int)(ts / msec_in_minute);
+		ts = ts % msec_in_minute;
+		int second = (int)(ts / msec_in_second);
+		ts = ts % msec_in_second;
+		return String.format("%02d:%02d:%02d.%03d",hour, minute, second, ts);
+	}
+	
 	private final static char[] randomStringLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".toCharArray();	
 	public static String randomString(int length)
 	{
@@ -316,7 +358,8 @@ public class Utils
 
 	public static <T>T FirstOrDefault(Iterable<T> elems, Predicate<T> condition, T defaultValue)
 	{
-		if (elems == null || condition == null) return defaultValue;
+		if (elems == null) return defaultValue;
+
 		/*
 		return elems.stream()
 				.filter(condition)
@@ -324,12 +367,11 @@ public class Utils
 				.orElse(defaultValue)
 				;
 		*/
-		java.lang.reflect.Array a;
 		Iterator<T> it = elems.iterator();
 		while (it.hasNext())
 		{
 			T item = it.next();
-			if (condition.test(item)) return item;
+			if (condition == null || condition.test(item)) return item;
 		}
 		return defaultValue;
 	}
@@ -413,6 +455,97 @@ public class Utils
 			Iterator<T> fromIterator = from == null? null : from.iterator();
 			
 			return new StringIterator<T>(fromIterator); 
+		}
+	}
+	
+	/**
+	 * The class it not thread-safe!
+	 */
+	public static class StopWatch
+	{
+		private long startTime = 0;
+		private long stopTime = 0;
+		private boolean running = false;
+		private long totalElapsed = 0;
+		private long startMark = 0;
+
+		@Override
+		public String toString()
+		{
+			return Utils.formatMilliseconds(getElapsedNano() / 1000000);
+		}
+		public void reset()
+		{
+			startTime = 0;
+			stopTime = 0;
+			running = false;
+			totalElapsed = 0;
+		}
+
+		/**
+		 * Starts of continues the stopwatch. If it is already running, then
+		 * does nothing.
+		 */
+		public void start()
+		{
+			if (!running)
+			{
+				this.startMark = System.nanoTime();
+				if (this.startTime == 0)
+					this.startTime = System.currentTimeMillis();
+				this.running = true;
+			}
+		}
+
+		public void stop()
+		{
+			if (running)
+			{
+				this.totalElapsed += System.nanoTime() - this.startMark;
+				this.running = false;
+				this.stopTime = System.currentTimeMillis();
+			}
+		}
+
+		public Date getStartTime()
+		{
+			return new Date(this.startTime);
+		}
+
+		public Date getStopTime()
+		{
+			return new Date(this.stopTime);
+		}
+
+		public boolean isRunning()
+		{
+			return running;
+		}
+
+		public long getElapsedNano()
+		{
+			if (running)
+			{
+				return totalElapsed + System.nanoTime() - this.startMark;
+			}
+			else
+			{
+				return this.totalElapsed;
+			}
+		}
+
+		public java.util.Date getElapsedTime()
+		{
+			long elp;
+			if (running)
+			{
+				elp = totalElapsed + System.nanoTime() - this.startMark;
+			}
+			else
+			{
+				elp = totalElapsed;
+			}
+			return new Date(elp / 1000000);
 		}
 	}
 }

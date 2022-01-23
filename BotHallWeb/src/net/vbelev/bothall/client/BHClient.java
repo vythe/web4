@@ -7,14 +7,18 @@ import net.vbelev.utils.DryCereal;
 import net.vbelev.utils.Utils;
 
 /**
- * This will be a client-side mirror of the engine - terrain, items, mobs.
+ * This class is a static collection of data classes used for serialization.
+ *  
+ * This will be a client-side mirror of the BHBoard engine - terrain, items, mobs.
  * The server will send in serialized versions of these structs.
  *
+ * These classes are also used by StreamHost on the server side to send updates out.
+ *  
  * Why not use the standard java serialization: 
- * it needs to work with javascript and generally export plain text lines.
- * Why not json? too much chaff and we don't need
+ * it needs to work with javascript and generally to export plain text lines.
+ * Why not json? too much chaff and we don't need the dynamic identification of fields.
  * 
- *  This class is a static collection of session data classes.
+ * 
  */
 public class BHClient
 {
@@ -512,7 +516,7 @@ public class BHClient
 		{
 		}
 		
-		public Error(int timecode, String message)
+		public Error(long timecode, String message)
 		{
 			this.timecode = timecode;
 			this.message = message;
@@ -543,12 +547,14 @@ public class BHClient
 
 	public static class Status implements IElement
 	{
+		/** A mirror of BHSession.PS_STATUS */
 		public static class SessionStatus
 		{
 			public static final String NONE = "";
 			public static final String NEW = "NEW";
 			public static final String ACTIVE = "ACTIVE";
-			public static final String STOPPED = "STOPPED";
+			public static final String PAUSE = "PAUSE";
+			public static final String COMPLETE = "COMPLETE";
 			public static final String DEAD = "DEAD";
 		}
 		
@@ -735,6 +741,13 @@ public class BHClient
 		protected final Map<Integer, CacheElem> itemCerealMap = Collections.synchronizedMap(new TreeMap<Integer, CacheElem>());
 		protected final Map<Integer, CacheElem> mobileCerealMap = Collections.synchronizedMap(new TreeMap<Integer, CacheElem>());
 		
+		public void reset()
+		{
+			cellCerealMap.clear();
+			itemCerealMap.clear();
+			mobileCerealMap.clear();
+		}
+		
 		public String getCellCereal(int id, long timecode)
 		{
 			CacheElem el = cellCerealMap.get(id);
@@ -814,7 +827,7 @@ public class BHClient
 	/** the Client collection is not thread-safe, because it's supposed to serve one client only */
 	public static class Client
 	{
-		public Status status;
+		private Status _status = null;
 		public Map<Integer, Cell> cells;
 		public TreeSet<Cell> orderedCells;
 		
@@ -842,6 +855,12 @@ public class BHClient
 			//		return 0;
 			//	}
 			//});
+		}
+		
+		public Status getStatus()
+		{
+			if (_status == null) _status = new Status();
+			return _status;
 		}
 		
 		public Cell getCell(int id)
@@ -937,5 +956,5 @@ public class BHClient
 			return Arrays.copyOf(res, cnt);
 		}
 	}
-	
+
 }

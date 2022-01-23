@@ -14,6 +14,7 @@
 <meta charset="UTF-8">
 <title>${(empty title) ? "BH Page" : title}</title>
 	<script src="js/jquery-3.5.1.js"></script>
+	<script src="js/utils.js"></script>
 	<script src="js/bhclient.js"></script>
 	<jsp:invoke fragment="header"/>
 </head>

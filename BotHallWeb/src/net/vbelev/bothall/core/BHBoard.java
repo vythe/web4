@@ -1,6 +1,7 @@
 package net.vbelev.bothall.core;
 
 import java.io.*;
+import java.util.*;
 import net.vbelev.utils.*;
 
 /**
@@ -12,7 +13,7 @@ import net.vbelev.utils.*;
  */
 public class BHBoard extends BHEngine
 {
-	public interface IClientCallback
+	public interface IClientCallback_depr
 	{
 		void onPublish(long timecode);
 		void processAction(Action action);
@@ -20,7 +21,7 @@ public class BHBoard extends BHEngine
 		boolean processBuff(Buff buff);
 	}
 
-	public static final class ACTION
+	public static class ACTION
 	{
 		public static final String MOVE = "MOVE".intern();
 		/**
@@ -33,19 +34,31 @@ public class BHBoard extends BHEngine
 		public static final String STOPCYCLING = "STOPCYCLING".intern();
 	}
 
-	public static final class BUFF
+	public static class BUFF
 	{
 		public static final String MOVE = "MOVE".intern();
 	}
 	
 	private BHLandscape landscape = null;
 	private BHCollection items = null;
-
+	
 	public BHBoard() {
+		_reset();
+	}
+	
+	private void _reset() 
+	{
 		this.landscape = new BHLandscape();
-		this.items = new BHCollection();
+		this.items = new BHCollection();		
 	}
 
+	@Override
+	public void reset() 
+	{
+		super.reset();
+		_reset();
+	}
+	
 	public BHLandscape getLandscape()
 	{
 		return landscape;
@@ -87,6 +100,7 @@ public class BHBoard extends BHEngine
 		return res;
 	}
 
+	@Deprecated
 	public BHBoard loadFileEngine(String fileName)
 	{
 		BHBoard res = this; // new BHBoard();
@@ -264,7 +278,7 @@ public class BHBoard extends BHEngine
 		return res;
 	}
 
-	public IClientCallback clientCallback = null;
+	//public IClientCallback clientCallback = null;
 
 	@Override
 	public long publish()
@@ -277,10 +291,10 @@ public class BHBoard extends BHEngine
 		this.landscape = this.landscape.publish(newTimecode);
 		this.items = items.publish(newTimecode);
 
-		if (clientCallback != null)
-		{
-			clientCallback.onPublish(newTimecode);
-		}
+		//if (clientCallback != null)
+		//{
+		//	clientCallback.onPublish(newTimecode);
+		//}
 
 		return newTimecode;
 	}
@@ -307,7 +321,7 @@ public class BHBoard extends BHEngine
 		}
 		if (action.actionType == ACTION.MOVE)
 		{
-			processActionMove(me, action);
+			actionMove(me, action);
 		}
 		else if (action.actionType == ACTION.JUMP)
 		{
@@ -318,9 +332,13 @@ public class BHBoard extends BHEngine
 			// this should be overridden in the bhsession class
 			this.stopCycling();
 		}
-		else if (clientCallback != null)
+		//else if (clientCallback != null)
+		//{
+		//	clientCallback.processAction(action);
+		//}
+		else
 		{
-			clientCallback.processAction(action);
+			super.processAction(action);
 		}
 		// System.out.println("Action processed by queueProcessor " + instanceID
 		// + ": #" + action.ID + " " + action.message);
@@ -329,13 +347,21 @@ public class BHBoard extends BHEngine
 	@Override
 	public boolean processBuff(BHEngine.Buff buff)
 	{
-		if (buff.action.actionType == BUFF.MOVE)
+		if (buff.action.actionType == ACTION.MOVE)
 		{
-			return processBuffMove(buff);
+			return buffMove(buff);
 		}
-		else if (clientCallback != null)
+		else if (buff.action.actionType == ACTION.JUMP)
 		{
-			return clientCallback.processBuff(buff);
+			return buffJump(buff);
+		}
+		//else if (clientCallback != null)
+		//{
+		//	return clientCallback.processBuff(buff);
+		//}
+		else
+		{
+			super.processBuff(buff);
 		}
 		return false;
 	}
@@ -343,10 +369,11 @@ public class BHBoard extends BHEngine
 	@Override
 	public void processTriggers()
 	{
-		if (clientCallback != null)
-		{
-			clientCallback.processTriggers();
-		}
+		//if (clientCallback != null)
+		//{
+		//	clientCallback.processTriggers();
+		//}
+		super.processTriggers();
 	}
 
 	public void doStop(BHCollection.Atom me, boolean hardStop)
@@ -365,7 +392,7 @@ public class BHBoard extends BHEngine
 		}
 	}
 
-	public void processActionMove(BHCollection.Atom me, BHEngine.Action action)
+	public void actionMove(BHCollection.Atom me, BHEngine.Action action)
 	{
 		BHBoard engine = this;
 
@@ -415,7 +442,7 @@ public class BHBoard extends BHEngine
 			{
 				BHEngine.Buff moveBuff = new BHEngine.Buff();
 				BHEngine.Action moveAction = new BHEngine.Action(
-						BUFF.MOVE, me.getID(), 0, 0);
+						ACTION.MOVE, me.getID(), 0, 0);
 				// moveBuff.actionType = BHOperations.BUFF_MOVE;
 				// moveBuff.actorID = me.getID();
 				// moveBuff.actorType = BHCollection.EntityTypeEnum.ITEM;
@@ -511,8 +538,7 @@ public class BHBoard extends BHEngine
 		// System.out.println("actionJump, id=" + me.getID() + ", dir=" +
 		// direction + ", new pos=" + newPos.toString());
 		me.setCoords(newPos);
-		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,
-				me.getID(), "I moved to " + direction);
+		//engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM, me.getID(), "I moved to " + direction);
 
 		boolean shallRepeat = false;
 		if (repeatFlag > 0)
@@ -552,6 +578,7 @@ public class BHBoard extends BHEngine
 
 			// System.out.println("actionJump shall repeat to dir=" + direction
 			// + ", delay=" + delay);
+			System.out.println("jump posted action: " + jump.toString());
 			engine.postAction(jump, delay);
 		}
 		else
@@ -567,10 +594,10 @@ public class BHBoard extends BHEngine
 		}
 	}
 
-	public boolean processBuffMove(BHEngine.Buff buff)
+	public boolean buffMove(BHEngine.Buff buff)
 	{
 		BHBoard engine = this;
-		
+		//System.out.println("process buffMove, ts=" + engine.timecode);
 		if (buff.isCancelled || buff.action.actorID <= 0) 
 		{
 			System.out.println("buffMove: buff is cancelled, stopping");
@@ -579,13 +606,18 @@ public class BHBoard extends BHEngine
 		
 		BHCollection.Atom me = engine.getCollection().getItem(buff.action.actorID);
 
-		if (me == null || me.getID() == BHCollection.Atom.ITEM_STATUS.DELETE)
+		if (me == null || me.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE)
 		{
 			System.out.println("buffMove: atom not found stopping");
 			buff.isCancelled = true;
 			return false;
 		}
 	
+		if (((net.vbelev.bothall.web.PacmanSession)this).sessionStatus == net.vbelev.bothall.web.BHSession.PS_STATUS.PAUSE)
+		{
+			System.out.println("buffMove got activated");
+		}
+		
 		int actionTimecode = buff.action.intProps[0];
 		int direction = buff.action.intProps[1];
 		int repeatFlag = buff.action.intProps[2];
@@ -596,7 +628,7 @@ public class BHBoard extends BHEngine
 		
 		if (baseTimecode != 0 && direction == baseDirection)
 		{
-			System.out.println("buffMove: baseTimecode=" + baseTimecode + ", direction=" + direction + " already moving there, stopping buff");
+			//System.out.println("buffMove: baseTimecode=" + baseTimecode + ", direction=" + direction + " already moving there, stopping buff");
 			buff.isCancelled = true;
 			return false;			
 		}
@@ -640,4 +672,31 @@ public class BHBoard extends BHEngine
 		return true;
 	}
 
+	/**
+	 * Jumps would normally be handled by a timer, not jump (i.e. a non-interruptible delayed action),
+	 * but just in case (specifically, in case of a pause) we support a jump on a buff.
+	 * It calls actionJump() only once, when ticks == 1, and cancels the buff.
+	 * @return
+	 */
+	public boolean buffJump(BHEngine.Buff buff)
+	{
+		BHBoard engine = this;
+		//System.out.println("process buffMove, ts=" + engine.timecode);
+		if (buff.isCancelled || buff.action.actorID <= 0) 
+		{
+			System.out.println("buffJump: buff is cancelled, stopping");
+			return false;
+		}		
+		if (buff.ticks == 1)
+		{
+			BHCollection.Atom me = getCollection().getItem(buff.action.actorID);
+			if (me == null || me.getStatus() == BHCollection.Atom.ITEM_STATUS.DELETE)
+			{
+				return false;
+			}
+			actionJump(me, buff.action);
+			return false;
+		}
+		return true;
+	}
 }

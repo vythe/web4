@@ -7,25 +7,35 @@ import java.net.*;
 import net.vbelev.utils.*;
 /**
  * This is the client ("browser") side of the connection. 
- * It maintains a BHClient.Collection by reading from a stream (a pipe)
+ * It maintains a BHClient.Client collection by reading from a stream (a pipe)
  * and sends commands out through the other pipe.
  * 
  * It does not have any business logic and invokes its onUpdate method once every update cycle.
- *
+ * 
+ * Note that the client depends on the provided socket (in and out streams). 
+ * Once the connection is terminated, the client cannot be reconnected again - 
+ * you'll need to create a new StreamClient instance with the new connection.
  */
-public class StreamClient
+public class StreamClient<BHC extends BHClient.Client>
 {
+	/** We keep onUpdate() as a delegate
+	 * to decouple the client creation, which is a networking operation, 
+	 * from the consumer logic.
+	 * We do not need a multi-consumer event here, at least not yet. 
+	 */
 	public interface OnUpdate
 	{
 		void onUpdate();
 	}
-	
-
-	public final BHClient.Client collection = new BHClient.Client();
-	public final Queue<BHClient.IElement> elementQueue = new java.util.concurrent.ConcurrentLinkedQueue<BHClient.IElement>();
 	/* updateEvent is triggered after a successful update from the server. It runs synchronously 
 	public final EventBox.Event<EventBox.EventArgs> updateEvent = new EventBox.Event<EventBox.EventArgs>(false);	
 	 */
+	
+	public final BHC collection; // = new BHClient.Client();
+	/** This is a queue of elements that were received by readUp() 
+	 * but were not used to update the collection. This includes Message and Error elements.
+	 */
+	public final Queue<BHClient.IElement> elementQueue = new java.util.concurrent.ConcurrentLinkedQueue<BHClient.IElement>();
 	
 	//private final BufferedReader reader;
 	//private final BufferedWriter writer;
@@ -35,21 +45,22 @@ public class StreamClient
 	private OnUpdate onUpdate = null;
 	
 	private final Socket s;
-	public StreamClient(InputStream in, OutputStream out)
+	public StreamClient(InputStream in, OutputStream out, BHC collection)
 	{
 		//reader = new BufferedReader(new InputStreamReader(in));
 		//writer = new BufferedWriter(new OutputStreamWriter(out));
 		dryReader = new DryCereal.Reader(in);
 		dryWriter = new DryCereal(out);
 		s = null;
+		this.collection = collection;
 	}
 	
-	public StreamClient(Socket socket) throws IOException
+	public StreamClient(Socket socket, BHC collection) throws IOException
 	{
 		s = socket;
 		dryReader = new DryCereal.Reader(s.getInputStream());
 		dryWriter = new DryCereal(s.getOutputStream());
-		
+		this.collection = collection;
 	}
 	
 	public void setOnUpdate(OnUpdate o)
@@ -135,9 +146,9 @@ public class StreamClient
 			else if (typeCode == BHClient.ElementCode.STATUS)
 			{
 				try {
-				BHClient.Status s = new BHClient.Status();
+				BHClient.Status s = collection.getStatus();
 				s.fromCereal(dryReader);
-				collection.status = s;
+
 				//return dryReader.hasNext();
 				isUpdateBin = false;
 				//System.out.println("StreamClient got status");
@@ -172,7 +183,7 @@ public class StreamClient
 				msg.fromCereal(dryReader);
 				gotIt = msg;
 				elementQueue.add(msg);
-				System.out.println("SC: Message" + msg.toString());
+				//System.out.println("SC: Message" + msg.toString());
 				//collection.items.put(i.id, i);
 				}
 				catch (Throwable r)
@@ -221,11 +232,15 @@ public class StreamClient
 		return false;
 	}
 
+	/** Send a command to the server (the listener on the server side will know who is sending)*/
 	public void writeCommand(BHClient.Command cmd) throws IOException
 	{
+		synchronized (dryWriter)
+		{
 		dryWriter.addByte(BHClient.ElementCode.COMMAND);
 		cmd.toCereal(dryWriter);
 		dryWriter.flush();
+		}
 	}
 
 	public void writeCommand(String cmd, int[] intArgs, String[] stringArgs) throws IOException
@@ -237,29 +252,36 @@ public class StreamClient
 		sendCmd.stringArgs = stringArgs;
 		sendCmd.command = cmd;
 		
+		synchronized (dryWriter)
+		{
 		dryWriter.addByte(BHClient.ElementCode.COMMAND);
 		sendCmd.toCereal(dryWriter);
 		dryWriter.flush();
+		}
 	}
 
 	public void writeMessage(BHClient.Message msg) throws IOException
 	{
+		synchronized (dryWriter)
+		{
 		msg.toCereal(dryWriter);
 		dryWriter.flush();
+		}
 	}
 	
 	public void start()
 	{
+		System.out.println("StreamClient starting: " + this.toString());
 		if (runningThread != null && runningThread.isAlive())
 		{
 			return; // we are already running 
 		}
-		new Thread(new Runnable()
+		runningThread = new Thread(new Runnable()
 		{
 			@Override
 			public void run()
 			{
-				runningThread = Thread.currentThread();
+				//runningThread = Thread.currentThread();
 				while (runningThread != null && !Thread.interrupted())
 				{
 					if (s != null && s.isClosed()) break;
@@ -296,17 +318,26 @@ public class StreamClient
 						if (onUpdate != null) onUpdate.onUpdate();
 						//stop();
 					}
-				}										
+				}	
+				System.out.println("StreamClient stopped: " + this.toString());
+				
 			}
-		}).start();		
+		});
+		Thread t = runningThread;
+		if (t != null)
+		{	
+			t.start();
+		}
 	}
 	
 	public void stop()
 	{
-		if (runningThread != null)
+		Thread t = runningThread;
+		
+		if (t != null)
 		{
-			runningThread.interrupt();
+			runningThread = null;
+			t.interrupt();
 		}
-		runningThread = null;
 	}
 }

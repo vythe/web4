@@ -28,6 +28,17 @@ public class BHStorage
 	{
 	}
 	
+	public void reset()
+	{
+		itemCereals.clear();
+		itemExports.clear();
+		mobileCereals.clear();
+		mobileExports.clear();
+		heroCereals.clear();
+		heroExports.clear();		
+		
+		cache.reset();
+	}
 	
 	public static BHClient.Item bhAtomToItem(BHCollection.Atom atom)
 	{
@@ -151,12 +162,18 @@ public class BHStorage
 		}
 	}	
 	
-	
-	/** returns an update set from the given timecode until now */
-	public BHClient.UpdateBin getUpdate(BHBoard engine, int timecode, int subscriptionID, int mobileID)
+	public BHClient.UpdateBin getUpdate(BHBoard engine, long timecode, int subscriptionID, int mobileID)
 	{
 		BHClient.UpdateBin res = new BHClient.UpdateBin();
-		
+		res.status = new BHClient.Status();
+	
+		return getUpdate(res, engine, timecode, subscriptionID, mobileID);
+	}	
+	
+	/** returns an update set from the given timecode until now */
+	protected BHClient.UpdateBin getUpdate(BHClient.UpdateBin res, BHBoard engine, long timecode, int subscriptionID, int mobileID)
+	{
+	
 		for(BHCollection.Atom a : engine.getCollection().allByTimecode(timecode + 1))
 		{
 			if (a.getGrade() == BHCollection.Atom.GRADE.ITEM)
@@ -197,14 +214,14 @@ public class BHStorage
 			}
 		}
 		
-		res.status = new BHClient.Status();
 		res.status.cycleLoad = engine.cycleLoad;
 		res.status.cycleMsec = (int)engine.CYCLE_MSEC;
 		//res.status.sessionID = this.sessionID;
 		//res.status.controlledMobileID = 0; // we don't know the controlled id here. maybe it should be moved
 		res.status.controlledMobileID = mobileID;
 		res.status.timecode = engine.timecode;
-		res.status.sessionStatus = engine.isRunning? BHClient.Status.SessionStatus.ACTIVE : BHClient.Status.SessionStatus.STOPPED;
+		// sessionStatus should be set in the calling procedure - they know it better
+		res.status.sessionStatus = engine.isRunning? BHClient.Status.SessionStatus.ACTIVE : BHClient.Status.SessionStatus.DEAD;
 		//res.status.updateTS = engine.pub
 		
 		// everything is visible for now

@@ -8,8 +8,11 @@
 <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
  -->
 <script src="js/jquery-3.5.1.js"></script>
+<script src="js/utils.js"></script>
 <script src="js/bhclient.js"></script>
+<!-- 
 <script src="js/pacmonster.js"></script>
+-->
 <script src="js/bhfield.js"></script>
 
 <script type="text/javascript">
@@ -21,23 +24,45 @@ var fullApiURL = new URL(apiURL, window.location.href);
 button.movebutton {
 	width: 5em;
 }
+
+.statuscell {
+	white-space: nowrap;
+	display: inline-block;
+	width: 150px;
+}
+
 </style>
 </head>
 <body>
 <h1>Session <span id="sessionid"></span></h1>
 <div style="width: 60%; display: inline-block;">
-<svg id="templateSVG" width="100" height="100" style="display: none;">
-<image id="templateTile" x="0" y="0" height="30" width="30" xlink:href="#"/>
-</svg>
+	<svg id="templateSVG" width="100" height="100" style="display: none;">
+		<image id="templateTile" x="0" y="0" height="30" width="30" xlink:href="#"/>
+	</svg>
 
-<svg id="mainSVG" style="width: 700px; height: 700px;"></svg>
+	<svg id="mainSVG" style="width: 700px; height: 700px;"></svg>
 </div>
-<div style="width: 30%; display: inline-block; vertical-align: top;">
 
-	<button id="btnRefresh">Refresh</button>
+<div style="width: 30%; display: inline-block; vertical-align: top;">
+<fieldset style="width: 100%;">
+<legend>Status</legend>
+	<div class="statuscell">Stage: <span id="statusStage"></span></div>
+	<div class="statuscell">Lives: <span id="statusLives"></span></div>
+	<div class="statuscell">Score: <span id="sessionScore"></span></div>
+	<div class="statuscell">Time: <span id="sessionTime"></span></div>
+</fieldset>
+<fieldset style="width: 100%;">
+<legend>Controls</legend>
+
+	<button id="btnRefresh">Refresh (R)</button>
+	<!-- 
 	<button id="btnStartSession">Start Session</button>
 	<button id="btnLeaveSession">Leave Session</button>
 	<button id="btnEndSession" disabled="disabled">End Session</button>
+	 -->
+	<button id="btnPause">Pause / Resume (P)</button>
+	<button id="btnEndSession">Finish</button>
+	<button id="btnKillSession" disabled="disabled">Terminate?</button>
 	<br/>
 	<table>
 		<tr>
@@ -52,8 +77,9 @@ button.movebutton {
 			<td></td><td><button class="movebutton" bh_direction="3">Down</button></td><td></td>
 		</tr>
 	</table>
+</fieldset>
 
-	<fieldset>
+	<fieldset style="width: 100%;">
 	<legend>Debug</legend>
 		<button id="btnStartBHCycling">Start BH Cycling</button> 
 		<button id="btnBHCycleOnce">BH Cycle Once</button> 
@@ -62,22 +88,25 @@ button.movebutton {
 		<button id="btnStartCycling">Start Cycling</button> 
 		<button id="btnCycleOnce">Cycle Once</button> 
 		<button id="btnStopCycling">Stop Cycling</button><br/>
-		<button id="btnUpdateFull">Update Full</button><br/>
+		
+		<button id="btnUpdateFull">Update Full</button>
+		<button id="btnDie">Die</button>
+		<button id="btnPacman">Pacman</button><br/>
+		
 	</fieldset>
 
-<!--<fieldset>
-<legend>Me</legend>
-<div id="meData"></div>
-</fieldset>-->
-	<button id="btnDie">Die</button><br/>
-	<button id="btnPacman">Pacman</button><br/>
+
 	<a href="list.html">To List</a>
 	<hr/>
-	<div id="meMessages" style="height: 100px; width: 90%; display: block; overflow: auto; white-space: nowrap; border: 1px;"></div>
-	<div id="meBuffs" style="width: 90%; display: block;">
+	<fieldset style="height: 100px; width: 100%;">
+	<legend>Messages</legend>
+	<div id="meMessages" style="height: 100%; width: 100%; display: block; overflow: auto; white-space: nowrap; border: 0;"></div>
+	</fieldset>
+	<fieldset id="meBuffs" style="width: 100%; display: block;">
+	<legend>Buffs</legend>
 		<ul id="meBuffsList">
 		</ul>
-	</div>
+	</fieldset>
 </div>
 <hr style="clear: both;"/>
 
@@ -110,7 +139,8 @@ mybh.logger = function(message, messageLevel){ // the logger function, it will b
 	if (messageLevel != "INFO") {
 		console.log("MyBH " + messageLevel + ": " + message);
 		if (messageLevel == "ERROR") {
-			throw message;
+			//throw message;
+			addMessage("ERROR: " + message);
 		}
 	}
 };
@@ -175,7 +205,7 @@ function onBHUpdate(obj, elementType, elementData) {
 		// BH: update status: {"controlledMobileID":167,"cycleLoad":0,"cycleMsec":2000,"sessionID":1,"sessionStatus":"ACTIVE","timecode":60,"updateTS":0}
 		mybh.controlledMobileID = elementData.controlledMobileID;
 		var lastLoadTime = new Date().getTime();
-		$("#lastPollTime").text(formatDateTime(new Date(lastLoadTime)));
+		$("#lastPollTime").text(formatTime(new Date(lastLoadTime)));
 		$("#serverTimecode").text(elementData.timecode);
 		$("#sessionId").text(elementData.sessionId);
 		$("#controlledID").text(elementData.controlledMobileID);
@@ -183,6 +213,8 @@ function onBHUpdate(obj, elementType, elementData) {
 		$("#clientLoad").text(mybh.loopLoad);
 		$("#serverMsec").text(elementData.cycleMsec);
 		$("#clientMsec").text(mybh.loopMilliseconds);
+		
+		$("#statusStage").text(elementData.pacmanStage || "no stage?");
 	}
 	else if (elementType == "CELL") {
 		//setTerrain(elementData.x, elementData.y, elementData.terrain);
@@ -245,6 +277,17 @@ $(document).ready(function() {
 		}
 	});
 	
+	$("#btnPause").click(function(evt) {
+		evt.preventDefault();
+		//if (mybh.sessionID && mybh.clientKey) {
+		if (mybh.clientKey) {
+			mybh.command("pause");
+			addMessage("field pause");
+		} else {
+			addMessage("cannot pause the field: no client key");
+		}
+	});
+	
 	
 	$("#btnLeaveSession").click(function(evt) {
 		evt.preventDefault();
@@ -267,7 +310,7 @@ $(document).ready(function() {
 			alert("No session key!");
 			return;
 		}
-		mybh.command("start", [], [mybh.sessionKey], function(res) {
+		mybh.command("START", [], [mybh.sessionKey], function(res) {
 			//alert("my apiUrl is " + this.url + ", join res=" + res);
 			if (res) {
 				console.log("start error: " + res, "INFO");
@@ -410,7 +453,7 @@ $(document).ready(function() {
 bhItemStatusDelete = 1;
 
 function updateItem(dataItem) {
-	console.log("updateItem: " + JSON.stringify(dataItem));
+	//console.log("updateItem: " + JSON.stringify(dataItem));
 	//console.log("updateItem: " + JSON.stringify(dataItem) + ", tile=" +  spriteTiles[dataItem.itemtype || dataItem.mobiletype]);
 	//console.log("updateItem, ID=" + dataItem.id + ", svg=" + JSON.stringify(itemTiles[dataItem.id]));
 	if (dataItem.id == mybh.controlledMobileID) {
@@ -455,7 +498,7 @@ function updateItem(dataItem) {
 			} else {
 				var forwardX = +(closest[dataItem.dir].x); // * cellWidth;
 				var forwardY = +(closest[dataItem.dir].y); // * cellHeight;
-				console.log("svg found, forward from " + currX + "," + currY + " to " + forwardX + "," + forwardY);
+				//console.log("svg found, forward from " + currX + "," + currY + " to " + forwardX + "," + forwardY);
 				bhfield.glideItem(dataItem.id, 
 						forwardX, forwardY,
 						new Date().getTime() + mybh.serverLoopMsec * 4
@@ -490,11 +533,18 @@ function updateItem(dataItem) {
 		
 function addMessage(msg) {
 	var line = "";
-	if (typeof(msg) == "string") {
+	if (!msg) {
+		return;		
+	} else if (typeof(msg) == "string") {
 		line = msg;
+	} else if (msg.targetType == "RECEIPT") {
+		// ignore receipts
+		return;
 	} else {
-		line = (msg.target || "") + ":" + msg.targetID + ": " + msg.message;
+		line = (msg.targetType || "") + ":" + msg.targetID + ": " + msg.message;
 	}
+	//console.log("message: ");
+	//console.dir(msg);
 	var pLine = $("<p/>");
 	pLine.text(line);
 	$("#meMessages").append(pLine);

@@ -9,9 +9,11 @@ import net.vbelev.utils.*;
 import net.vbelev.bothall.client.*;
 
 /**
- * The base class for BH object
- * @author Vythe
- *
+ * Collection of various items (atoms) over which the engine runs.
+ * The basic engine doesn't need it; this is a part of BHBoard extracted to a separate class.
+ * Maybe it should be called BHBoardCollection.
+ * 
+ *  NB: the class implements caching of cereals, but it is not used.
  */
 public class BHCollection
 {
@@ -259,6 +261,10 @@ public class BHCollection
 		public boolean setX(int val) { return setIntProp(INT_PROPS.X, val); }
 		public boolean setY(int val) { return setIntProp(INT_PROPS.Y, val); }
 		public boolean setZ(int val) { return setIntProp(INT_PROPS.Z, val); }
+		public boolean setCoords(int x, int y, int z)
+		{
+			return  setIntProp(INT_PROPS.X, x) & setIntProp(INT_PROPS.Y, y) & setIntProp(INT_PROPS.Z, z);
+		}
 		public boolean setCoords(BHLandscape.Coords c)
 		{
 			return  setIntProp(INT_PROPS.X, c.getX()) & setIntProp(INT_PROPS.Y, c.getY()) & setIntProp(INT_PROPS.Z, c.getZ());

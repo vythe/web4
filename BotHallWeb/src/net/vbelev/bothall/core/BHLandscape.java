@@ -4,10 +4,8 @@ import java.util.*;
 import net.vbelev.utils.Utils;
 //import net.vbelev.utils.Utils.EnumElement;
 /**
- * The landscape for now will be an array of cells, forming a (hopefully) 
- * contiguous field of travel.
- * @author Vythe
- *
+ * A part of the BHBoard's supporting data collection, alongside BHCollection.
+ * This class implements a 3D grid for the interaction board in BHBoard.
  */
 public class BHLandscape
 {

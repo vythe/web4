@@ -3,6 +3,9 @@ package net.vbelev.utils;
 import java.util.*;
 import java.util.regex.*;
 
+/**
+ * This class is supposed to be immutable
+ */
 public class Decimal implements Comparable<Object>
 {
 	/** this is the sign , true = positive */
@@ -14,6 +17,11 @@ public class Decimal implements Comparable<Object>
 	 * the order is now reversed to math: 105469 -> [9, 6, 4, 5, 0, 1]
 	 */
 	private char[] mantissa;
+	
+	/**
+	 * Let us not rely on mantissa.length (in case we use a bigger array there)
+	 */
+	private int mantissaLength;
 	/** power is the number of zeroes after the mantissa:
 	 * 6.06573e10 -> 60657300000 -> 606573p5
 	 */
@@ -21,10 +29,23 @@ public class Decimal implements Comparable<Object>
 	/** the engineering power, as 8  in 1.2345e8. Equals to mantissa.length - 1 + power */ 
 	private int ePower;
 	
-	private static final char[] digitSymbols = new char[]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+	private static final char[] digitSymbols = new char[]{
+		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 
+		'A', 'B', 'C', 'D', 'E', 'F', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*',
+		'*', '*', '*', '*', '*', '*', '*', '*', '*', '*'
+	};
 	private static char[] EMPTY_CHAR_ARR = new char[0];
 	
 	public final static Decimal ZERO = new Decimal();
+	
+	public final static Decimal ONE = new Decimal(1);
 //==== Constructors ====
 	
 	private void buildEmpty()
@@ -32,6 +53,7 @@ public class Decimal implements Comparable<Object>
 		mantissa = EMPTY_CHAR_ARR;
 		power = 0;
 		ePower = 0;
+		mantissaLength = 0;
 		sign = true;
 	}
 	/**
@@ -43,9 +65,13 @@ public class Decimal implements Comparable<Object>
 		buildEmpty();
 	}
 	
-	private Decimal(char[] mantissa, int power, boolean sign)
+	/**
+	 * Note that this constructor make the object mutable, as it exposes the mantissa
+	 */
+	public Decimal(char[] mantissa, int power, boolean sign)
 	{
 		this.mantissa = mantissa;
+		mantissaLength = mantissa.length;
 		this.power = power;
 		this.ePower = power + mantissa.length - 1;
 		this.sign = sign;
@@ -56,15 +82,27 @@ public class Decimal implements Comparable<Object>
 		int resPower = 0;
 		while (resPower < mantissa.length && mantissa[resPower] == 0) 
 			resPower++;
+		if (resPower >= mantissa.length) // it's all empty!
+		{
+			this.mantissa = new char[0];
+			this.mantissaLength = 0;
+			this.power = 0;
+			this.ePower = 0;
+			this.sign = true;
+			return;
+		}
 		int tail = 0;
 		while (tail < mantissa.length && mantissa[mantissa.length - tail - 1] == 0) 
 			tail++;
-		if (resPower == 0 && tail == 0) return;
-		
-		char[] newMantissa = new char[mantissa.length - resPower - tail];
-		System.arraycopy(mantissa, resPower, newMantissa, 0, newMantissa.length);
-		this.mantissa = newMantissa;
-		this.power += resPower;
+		if (resPower != 0 || tail != 0)
+		{		
+			char[] newMantissa = new char[mantissa.length - resPower - tail];
+			System.arraycopy(mantissa, resPower, newMantissa, 0, newMantissa.length);
+			this.mantissa = newMantissa;
+			this.mantissaLength = newMantissa.length;
+			this.power += resPower;
+		}
+		this.ePower = this.power + this.mantissa.length - 1;
 	}
 	
 	/**
@@ -73,6 +111,7 @@ public class Decimal implements Comparable<Object>
 	public Decimal(Decimal from)
 	{
 		mantissa = Arrays.copyOf(from.mantissa, from.mantissa.length);
+		mantissaLength = mantissa.length;
 		power = from.power;
 		ePower = from.ePower;
 		sign = from.sign;
@@ -158,7 +197,18 @@ public class Decimal implements Comparable<Object>
 		}
 	}
 	
-
+	public static Decimal random(int digits, int ePower)
+	{
+		if (digits <= 0) return ZERO;
+		
+		char[] mantissa = new char[digits];
+		for (int i = 0; i < digits - 1; i++)
+			mantissa[i] = (char)Utils.random.nextInt(10);
+		mantissa[digits - 1] = (char)(1 + Utils.random.nextInt(9));
+		
+		return new Decimal(mantissa, ePower - mantissa.length + 1, true);
+	}
+	
 	/** regexp is slow, so it used for testing only */
 	private static final Pattern decimalNumberRX 
 	= Pattern.compile("^(?<sign>\\+|-)?(?<mant1>\\d+)((?:\\.)(?<mant2>\\d*))?((?:e|E)(?<powersign>\\+|-)?(?<power>\\d+))?$");
@@ -281,8 +331,9 @@ public class Decimal implements Comparable<Object>
 		{
 			this.power -= mantpos - mantpointpos;
 		}
-		this.trimMantissa();
 		this.ePower = this.power + this.mantissa.length - 1;
+		this.mantissaLength = this.mantissa.length;
+		this.trimMantissa();
 	}
 
 	/**
@@ -339,12 +390,24 @@ public class Decimal implements Comparable<Object>
 	}
 	
 //==== Object methods ====
+	@Override
+	public boolean equals(Object arg0)
+	{
+		return this.compareTo(arg0) == 0;
+	}
 	
 	@Override
 	public int compareTo(Object arg0)
 	{
 		// return negative is this < arg0
 		Decimal other = Decimal.fromObject(arg0);
+		
+		if (this.isZero())
+		{
+			if (other.isZero()) return 0;
+			if (!other.sign) return 1;
+			if (other.sign) return -1;
+		}
 		
 		if (this.sign && !other.sign) return 1;
 		if (!this.sign && other.sign) return -1;
@@ -353,7 +416,7 @@ public class Decimal implements Comparable<Object>
 		if (this.ePower > other.ePower) return this.sign? 1 : -1;
 		if (this.ePower < other.ePower) return this.sign? -1 : 1;
 		
-		int res = CharMath.compareArrays(this.mantissa, other.mantissa, this.ePower - other.ePower);
+		int res = CharMath.compareArrays(this.mantissa, other.mantissa, this.power - other.power);
 		return this.sign? res : -res;
 		/*
 		int thisPos = this.mantissa.length - 1;
@@ -388,6 +451,13 @@ public class Decimal implements Comparable<Object>
 	@Override
 	public String toString()
 	{
+		return this.isInteger()? toStringF() : toStringE();
+	}
+	
+	//==== type cast methods ====
+	
+	public String toStringP()
+	{
 		StringBuilder sb = new StringBuilder();
 		//sb.append(mantissa);
 		if (!sign)
@@ -413,8 +483,6 @@ public class Decimal implements Comparable<Object>
 		return sb.toString();
 	}
 
-//==== type cast methods ====
-	
 	/**
 	 * Converts this into a string in the standard (scientific) format 1.2345e10
 	 * @return
@@ -560,6 +628,11 @@ public class Decimal implements Comparable<Object>
 		return sign || mantissa.length == 0;
 	}
 	
+	public boolean isInteger()
+	{
+		return this.power >= 0;
+	}
+	
 	public int getPrecision()
 	{
 		return this.mantissa.length;
@@ -576,7 +649,7 @@ public class Decimal implements Comparable<Object>
 		return this.power;
 	}
 	
-	public String getMantissa(int mindigits, int radix)
+	public String printMantissa(int mindigits, int radix)
 	{
 		char[] chars;
 		if (radix == 10)
@@ -594,6 +667,10 @@ public class Decimal implements Comparable<Object>
 		return (this.sign? "+" : "-") + digitsToString(chars);
 	}
 	
+	public char[] getMantissa()
+	{
+		return CharMath.copyArray(mantissa, mantissa.length);
+	}
 	//==== Arithmetics ====
 	
 	public Decimal minus()
@@ -716,6 +793,7 @@ public class Decimal implements Comparable<Object>
 		}
 		res.power = this.power + val.power;
 		res.sign = !(this.sign ^ val.sign);
+		res.ePower = res.power + res.mantissa.length - 1;
 		res.trimMantissa();
 		
 		return res;
@@ -738,7 +816,111 @@ public class Decimal implements Comparable<Object>
 			this.remainder = remainder == null? ZERO : remainder;
 		}
 	}
-	
+
+	/**
+	 * @deprecated Not worth it and not tested yet
+	 */
+	@Deprecated
+	public Division divideWithCache(Decimal divisor, int extraDigits)
+	{
+		if (this.isZero()) 
+		{
+			return new Division(ZERO, ZERO);
+		}
+		if (divisor.isZero())
+		{
+			throw new ArithmeticException("Division by zero");
+		}
+		
+		// division is separated into two stages: 
+		// 2) convert this into base * 10^smth, where base is integer
+		// 1) divide two integers 
+		// 2) determine the ePower of the result and convert it into p-power in the end
+		
+		// 1. We know how many digits we need
+		int resDigits = this.ePower - divisor.ePower + 1 + extraDigits;
+		int quotientEPower = this.ePower - divisor.ePower;// this is the true EPower of the quotient
+		
+		// 2. to get that many digits we need either this
+		//int baseLength = this.mantissa.length + divisor.mantissa.length + extraDigits;
+		int baseLength = resDigits + divisor.mantissa.length;
+		int baseDivisorLength = divisor.mantissa.length;
+		
+		CharMathCached cache = new CharMathCached(baseLength, 10);
+		char[] base;
+		int baseOffset = baseLength - this.mantissa.length;
+		if (baseLength == this.mantissa.length)
+		{
+			baseOffset = 0;
+			base = cache.copyArray(this.mantissa, this.mantissa.length, baseLength);
+		}
+		else if (baseOffset > 0)
+		{
+			base = cache.prependArray(this.mantissa, this.mantissa.length, (char)0, baseOffset);
+		}
+		else // baseOffset < 0
+		{
+			base = cache.copyArray(this.mantissa, this.mantissa.length, baseLength - baseOffset);
+			baseLength = baseLength - baseOffset;
+		}
+
+		char[] baseDivisor;
+		if (baseDivisorLength == divisor.mantissa.length)
+		{
+			baseDivisor = divisor.mantissa; //CharMath.copyArray(divisor.mantissa, baseDivisorLength);
+		}
+		else
+		{
+			baseDivisor = CharMath.prependArray(divisor.mantissa, (char)0, baseDivisorLength - divisor.mantissa.length);
+			baseDivisorLength = baseDivisorLength - divisor.mantissa.length;
+		}
+		
+		char[] resMantissa;
+		if (resDigits < 0)
+		{
+			resMantissa = new char[0];
+		}
+		else
+		{
+			
+			resMantissa = new char[resDigits];
+			int divOffset = baseLength - baseDivisorLength;
+			for (int i = resDigits - 1; i >= 0; i--, divOffset--)
+			{
+				//char[] divMantissa = CharMath.prependArray(baseDivisor, (char)0, divOffset);
+				char[] divMantissa = cache.prependArray(baseDivisor, baseDivisorLength, (char)0, divOffset);
+				resMantissa[i] = 0;
+				int cmp;
+				//while ((cmp = CharMath.compareArrays(base, divMantissa, 0)) >= 0)
+				while ((cmp = cache.compareArrays0(base, baseLength, divMantissa, baseDivisorLength + divOffset)) >= 0)
+				{
+					try
+					{
+						char[] base1 = cache.arrSubtract(base, baseLength, divMantissa, baseDivisorLength + divOffset, 10);
+						cache.stash(base);
+						base = base1;
+					}
+					catch (CharMath.SubtractFailedException x)
+					{// this shouldn't happen
+						throw new ArithmeticException("CharMath.arrSubtract failed");
+						//break; 
+					}
+					resMantissa[i]++;		
+				}
+				cache.stash(divMantissa);
+			}
+		}
+		//Decimal quotient = new Decimal(resMantissa, this.ePower - divisor.ePower + trailingZeros - resDigits + 1, !(this.sign ^ divisor.sign));
+		Decimal quotient = new Decimal(resMantissa, quotientEPower - resMantissa.length + 1, !(this.sign ^ divisor.sign));
+		Decimal remainder = new Decimal(base, baseOffset > 0? this.power - baseOffset : this.power, this.sign);
+		//Decimal remainder = new Decimal(base, quotientEPower - resMantissa.length + 1, this.sign);
+		quotient.trimMantissa();
+		remainder.trimMantissa();
+		Division res = new Division(quotient, remainder);
+		
+		return res;
+	}
+
 	public Division divide(Decimal divisor, int extraDigits)
 	{
 		if (this.isZero()) 
@@ -755,12 +937,117 @@ public class Decimal implements Comparable<Object>
 		// 1) divide two integers 
 		// 2) determine the ePower of the result and convert it into p-power in the end
 		
-		int baseLength = this.mantissa.length > divisor.mantissa.length? this.mantissa.length : divisor.mantissa.length;
-		if (this.power > 0 && baseLength < this.mantissa.length + this.power)
+		// 1. We know how many digits we need
+		int resDigits = this.ePower - divisor.ePower + 1 + extraDigits;
+		
+		// 2. to get that many digits we need either this
+		//int baseLength = this.mantissa.length + divisor.mantissa.length + extraDigits;
+		int baseLength = resDigits + divisor.mantissa.length;
+		int baseDivisorLength = divisor.mantissa.length;
+		
+		int quotientEPower = this.ePower - divisor.ePower;// this is the true EPower of the quotient
+		char[] base;
+		int baseOffset = baseLength - this.mantissa.length;
+		if (baseLength == this.mantissa.length)
 		{
-			baseLength = this.mantissa.length + this.power;
+			baseOffset = 0;
+			base = CharMath.copyArray(this.mantissa, baseLength);
 		}
+		else if (baseOffset > 0)
+		{
+		base = CharMath.prependArray(this.mantissa, (char)0, baseOffset);
+		}
+		else // baseOffset < 0
+		{
+			base = CharMath.copyArray(this.mantissa, baseLength - baseOffset);
+		}
+
+		char[] baseDivisor;
+		if (baseDivisorLength == divisor.mantissa.length)
+		{
+			baseDivisor = divisor.mantissa; //CharMath.copyArray(divisor.mantissa, baseDivisorLength);
+		}
+		else
+		{
+			baseDivisor = CharMath.prependArray(divisor.mantissa, (char)0, baseDivisorLength - divisor.mantissa.length);
+		}
+		
+		char[] resMantissa;
+		if (resDigits < 0)
+		{
+			resMantissa = new char[0];
+		}
+		else
+		{
+			resMantissa = new char[resDigits];
+			int divOffset = base.length - baseDivisor.length;
+			for (int i = resDigits - 1; i >= 0; i--, divOffset--)
+			{
+				//char[] divMantissa = CharMath.prependArray(baseDivisor, (char)0, i);
+				char[] divMantissa = CharMath.prependArray(baseDivisor, (char)0, divOffset);
+				resMantissa[i] = 0;
+				int cmp;
+				//while ((cmp = CharMath.compareArrays(base, divMantissa, 0)) >= 0)
+				while ((cmp = CharMath.compareArrays0(base, divMantissa)) >= 0)
+				{
+					try
+					{
+						base = CharMath.arrSubtract(base, divMantissa, 10);
+					}
+					catch (CharMath.SubtractFailedException x)
+					{// this shouldn't happen
+						throw new ArithmeticException("CharMath.arrSubtract failed");
+						//break; 
+					}
+					resMantissa[i]++;		
+				}
+			}
+		}
+		//Decimal quotient = new Decimal(resMantissa, this.ePower - divisor.ePower + trailingZeros - resDigits + 1, !(this.sign ^ divisor.sign));
+		Decimal quotient = new Decimal(resMantissa, quotientEPower - resMantissa.length + 1, !(this.sign ^ divisor.sign));
+		Decimal remainder = new Decimal(base, baseOffset > 0? this.power - baseOffset : this.power, this.sign);
+		//Decimal remainder = new Decimal(base, quotientEPower - resMantissa.length + 1, this.sign);
+		quotient.trimMantissa();
+		remainder.trimMantissa();
+		Division res = new Division(quotient, remainder);
+		
+		return res;
+	}
+	
+	public Division divideOld(Decimal divisor, int extraDigits)
+	{
+		if (this.isZero()) 
+		{
+			return new Division(ZERO, ZERO);
+		}
+		if (divisor.isZero())
+		{
+			throw new ArithmeticException("Division by zero");
+		}
+		
+		// division is separated into two stages: 
+		// 2) convert this into base * 10^smth, where base is integer
+		// 1) divide two integers 
+		// 2) determine the ePower of the result and convert it into p-power in the end
+		
+		int reduction = (this.power <= 0 || divisor.power <= 0)? 0
+			: this.power > divisor.power? divisor.power
+			: this.power
+		;
+				
+		int baseLength = this.mantissa.length;
+		if (this.power > 0)
+		{
+			baseLength += this.power - reduction;
+		}
+		int baseDivisorLength = divisor.mantissa.length;
+		if (divisor.power > 0)
+		{
+			baseDivisorLength += divisor.power - reduction;
+		}
+		
 		baseLength += extraDigits;
+		
 		int quotientEPower; // this is the true EPower of the quotient
 		char[] base;
 		if (baseLength == this.mantissa.length)
@@ -774,18 +1061,17 @@ public class Decimal implements Comparable<Object>
 			// we multiplied the base by 10^extra, so we reduce the ePower by the same extra
 			quotientEPower = this.ePower - divisor.ePower; // - baseLength + this.mantissa.length; 
 		}
-		int resDigits = baseLength - divisor.mantissa.length + 1;
-		/*
-		Decimal div = new Decimal(divisor);
-		div.power -= extraDigits;
-		div.ePower -= extraDigits;
-		/* not sure how to fix this
-		if (this.ePower - divisor.ePower < extraDigits 
-		|| (this.ePower == divisor.ePower + extraDigits && this.mantissa[this.mantissa.length - 1] < divisor.mantissa[divisor.mantissa.length - 1]))
+		char[] baseDivisor;
+		if (baseDivisorLength == divisor.mantissa.length)
 		{
-			return new Division(ZERO, this);
+			baseDivisor = CharMath.copyArray(divisor.mantissa, baseDivisorLength);
 		}
-		 */                                    
+		else
+		{
+			baseDivisor = CharMath.prependArray(divisor.mantissa, (char)0, baseDivisorLength - divisor.mantissa.length);
+		}
+		//int resDigits = base.length - baseDivisor.length + 1; //baseLength - divisor.mantissa.length - divisor.power + 1;
+		int resDigits = this.ePower - divisor.ePower + 1 + extraDigits;
 		
 		// preflight checks complete, now start dividing
 		
@@ -799,23 +1085,32 @@ public class Decimal implements Comparable<Object>
 			base = CharMath.prependArray(this.mantissa, (char)0, divisor.mantissa.length - base.length);
 		}*/
 		//char[] divMantissa = CharMath.prependArray(divisor.mantissa, (char)0, extraDigits);
-		char[] resMantissa = new char[resDigits];
-		for (int i = resDigits - 1; i >= 0; i--)
+		
+		char[] resMantissa;
+		if (resDigits < 0)
 		{
-			char[] divMantissa = CharMath.prependArray(divisor.mantissa, (char)0, i);
-			resMantissa[i] = 0;
-			int cmp;
-			while ((cmp = CharMath.compareArrays(base, divMantissa, 0)) >= 0)
+			resMantissa = new char[0];
+		}
+		else
+		{
+			resMantissa = new char[resDigits];
+			for (int i = resDigits - 1; i >= 0; i--)
 			{
-				try
+				char[] divMantissa = CharMath.prependArray(baseDivisor, (char)0, i);
+				resMantissa[i] = 0;
+				int cmp;
+				while ((cmp = CharMath.compareArrays(base, divMantissa, 0)) >= 0)
 				{
-				base = CharMath.arrSubtract(base, divMantissa, 10);
+					try
+					{
+					base = CharMath.arrSubtract(base, divMantissa, 10);
+					}
+					catch (CharMath.SubtractFailedException x)
+					{
+						break; // this shouldn't happen
+					}
+					resMantissa[i]++;		
 				}
-				catch (CharMath.SubtractFailedException x)
-				{
-					break; // this shouldn't happen
-				}
-				resMantissa[i]++;		
 			}
 		}
 		//Decimal quotient = new Decimal(resMantissa, this.ePower - divisor.ePower + trailingZeros - resDigits + 1, !(this.sign ^ divisor.sign));
@@ -826,6 +1121,23 @@ public class Decimal implements Comparable<Object>
 		Division res = new Division(quotient, remainder);
 		
 		return res;
+	}
+	
+	/**
+	 * A shortcut to return this+1, ignoring the sign
+	 * @return
+	 */
+	public Decimal addOne()
+	{
+		char[] chars = new char[this.mantissa.length + this.power];
+		System.arraycopy(this.mantissa, 0, chars, this.power, this.mantissa.length);
+		char[] resChars = CharMath.arrAddOne(chars, 10);
+		Decimal res = new Decimal(resChars, 0, this.sign);
+		if (res.mantissa[0] == 0)
+		{
+			res.trimMantissa();
+		}
+		return res;			
 	}
 	
 	/**
@@ -955,6 +1267,27 @@ public class Decimal implements Comparable<Object>
 		
 		if (useSubtract)
 		{
+			boolean useReverse = chars.length < valChars.length
+					|| (chars.length == valChars.length &&  CharMath.compareArrays(chars, valChars, 0) < 0)
+			;
+			try
+			{
+				if (!useReverse)
+				{
+					resChars = CharMath.arrSubtract(chars, valChars, 10);
+					resPositive = true;
+				}
+				else
+				{
+					resChars = CharMath.arrSubtract(valChars, chars, 10);
+					resPositive = false;				
+				}
+			}
+			catch (CharMath.SubtractFailedException x2)
+			{
+				throw new IllegalArgumentException("Failed to subtract " + digitsToString(chars) + " and " + digitsToString(valChars));
+			}
+				/*
 			try
 			{
 				resChars = CharMath.arrSubtract(chars, valChars, 10);
@@ -972,6 +1305,7 @@ public class Decimal implements Comparable<Object>
 				}
 				resPositive = false;				
 			}
+			*/
 		}
 		else
 		{
@@ -1024,6 +1358,7 @@ public class Decimal implements Comparable<Object>
 			mantissa[i] = b1[power + i];
 		}
 		ePower = power + mantissa.length - 1;
+		this.mantissaLength = mantissa.length;
 	}
 		
 	private void buildFromDouble(double val, int maxprec)
@@ -1081,6 +1416,7 @@ public class Decimal implements Comparable<Object>
 		*/
 		len++; // it was not a length, but an index
 		this.mantissa = new char[len];
+		this.mantissaLength = mantissa.length;
 		for (int i = 0; i <len; i++)
 		{
 			this.mantissa[i] = b1[len - i - 1];
@@ -1097,6 +1433,19 @@ public class Decimal implements Comparable<Object>
 		if (digits != null && digits.length > 0)
 		{
 			for (int i = digits.length - 1; i >= 0; i--)
+			{
+				sb.append(digitSymbols[digits[i]]);
+			}
+		}
+		return sb.toString();
+	}
+	
+	public static String digitsToString(char[] digits, int length)
+	{
+		StringBuilder sb = new StringBuilder();
+		if (digits != null && length > 0)
+		{
+			for (int i = length - 1; i >= 0; i--)
 			{
 				sb.append(digitSymbols[digits[i]]);
 			}

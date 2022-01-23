@@ -10,6 +10,10 @@ import net.vbelev.utils.Utils;
 import net.vbelev.bothall.client.*;
 import net.vbelev.bothall.core.*;
 
+/**
+ * The API class (Jersey) to support HTTP clients.
+ * The two main methods are command() and getUpdate().
+ */
 @Path("/")
 public class BotHallAPI
 {
@@ -98,7 +102,7 @@ public class BotHallAPI
 		SessionInfo item = new SessionInfo();
 		item.sessionId = s.getID();
 		item.sessionKey = s.getSessionKey();
-		item.status = s.getEngine().isRunning? "Running" : "Idle";
+		item.status = BHSession.PS_STATUS.toString(s.sessionStatus); //s.getEngine().isRunning? "Running" : "Idle";
 		item.createdDate = Utils.formatDateTime(s.createdDate);
 		item.description = "Session #" + s.getID();
 		item.isProtected = s.isProtected? "Y": "";
@@ -202,6 +206,9 @@ public class BotHallAPI
 		return list;
 	}
 	
+	/**
+	 * The method to start/stop the session's engine.
+	 */
 	@Path("/cycle")
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
@@ -225,7 +232,7 @@ public class BotHallAPI
 	 * Protected sessions will require the session key; 
 	 * if atomID is empty, it will create an observer client;
 	 * if the session key is provided and the mode is not empty, 
-	 * it will start a server-side client in the given mode 
+	 * it will start a server-side client(a robot) in the given mode 
 	 */
 	@Path("/join")
 	@GET
@@ -285,13 +292,12 @@ public class BotHallAPI
 			agent = createAgent(s);
 			agent.atomID = aID;
 			agent.userKey = "Somebody"; // we'll need to add the user key to this method.
-			
+			agent.isConnected = true;
 		}
 		//request.getSession().setAttribute(BOTHALL_AGENT_ID_ATTR, agent.getID());
 		return Utils.encodeJSON(agent.clientKey);				
 	}	
 
-	
 	/**
 	 * Release the client and return the session ID. If the client does not exist, return "".
 	 */
@@ -336,7 +342,11 @@ public class BotHallAPI
 		BHClientRegistration agent = BHClientRegistration.getClient(null, clientKey);
 		if (agent == null)
 		{
-			throw new IllegalArgumentException("Client not found");
+			//throw new IllegalArgumentException("Client not found");
+			BHClient.UpdateBin dummy = new BHClient.UpdateBin();
+			dummy.status = new BHClient.Status();
+			dummy.status.sessionStatus = BHSession.PS_STATUS.toString(BHSession.PS_STATUS.DEAD); // BHClient.Status.SessionStatus.DEAD;
+			return dummy;			
 		}
 		
 		PacmanSession s = PacmanSession.getSession(agent.sessionID);
@@ -345,22 +355,22 @@ public class BotHallAPI
 		{
 			BHClient.UpdateBin dummy = new BHClient.UpdateBin();
 			dummy.status = new BHClient.Status();
-			dummy.status.sessionStatus = BHClient.Status.SessionStatus.NONE;
+			dummy.status.sessionStatus = BHSession.PS_STATUS.toString(BHSession.PS_STATUS.NEW);
 			return dummy;
 		}
 		
-		int timecode = ("Y".equals(full)? 0 : agent.timecode);
+		long timecode = ("Y".equals(full)? 0 : agent.timecode);
 		if (!s.getEngine().isRunning && timecode > 0)
 		{
 			BHClient.UpdateBin dummy = new BHClient.UpdateBin();
 			dummy.status = new BHClient.Status();
-			dummy.status.sessionStatus = BHClient.Status.SessionStatus.STOPPED;
+			dummy.status.sessionStatus = BHSession.PS_STATUS.toString(s.sessionStatus); // BHClient.Status.SessionStatus.DEAD;
 			return dummy;
 		}
 		
-		BHClient.UpdateBin res = s.storage.getUpdate(s.getEngine(), timecode, agent.subscriptionID, agent.atomID);
-		agent.timecode = s.getEngine().timecode;
-		res.status.controlledMobileID = agent.atomID;
+		BHClient.UpdateBin res = s.getUpdate(timecode, agent.subscriptionID, agent.atomID);
+		agent.timecode = res.status.timecode; // s.getEngine().timecode;
+		
 		return res;
 	}
 	

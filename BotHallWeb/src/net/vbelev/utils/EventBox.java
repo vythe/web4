@@ -31,14 +31,13 @@ public class EventBox
 		//private boolean m_cloneArgs = true;
 		private boolean m_triggerAsync = true;
 		
-		//private int[] r = new int[0];
 		@SuppressWarnings("unchecked")
 		private EventHandler<? extends T>[] subscribers = new EventHandler[0];
 		private final Queue<EventHandler<? extends T>> inQueue = new ConcurrentLinkedQueue<EventHandler<? extends T>>();
 		private final Queue<EventHandler<? extends T>> outQueue = new ConcurrentLinkedQueue<EventHandler<? extends T>>();
 		private final List<Thread> threads = Collections.synchronizedList(new ArrayList<Thread>());
 		/* In this version, EventArgs.clone() returns itself without any extra work.
-		 * Of you want the args to be safely cloned, you need to implement your own clone().
+		 * If you want the args to be safely cloned, you need to implement your own clone().
 		public Event<T> setCloneArgs(boolean clone)
 		{
 			synchronized (m_lock)
@@ -64,7 +63,7 @@ public class EventBox
 		{
 			if (!flush()) return;
 			//System.out.println("trigger called, subscribers=" + subscribers.length);
-			Thread t = new Thread(new Runnable() 
+			Runnable r = new Runnable() 
 			{
 				@SuppressWarnings("unchecked")
 				@Override
@@ -97,24 +96,26 @@ public class EventBox
 								{
 									
 									((EventHandler<T>)s).invoke((T)e);
-									threads.remove(Thread.currentThread());
+									//threads.remove(Thread.currentThread());
 								}
 							});
-							threads.add(subT);
+							//threads.add(subT);
 							subT.start();
 						}
 					}									
-					threads.remove(Thread.currentThread());
+					//threads.remove(Thread.currentThread());
+					//System.out.println("trigger called, threads=" + threads.size());
 				}
-			});
+			};
 			if (m_triggerAsync)
 			{
-				threads.add(t);
+				Thread t = new Thread(r);
+				//threads.add(t);
 				t.start();
 			} 
 			else
 			{
-				t.run();
+				r.run();
 			}
 		}
 		
@@ -205,6 +206,10 @@ public class EventBox
 			{
 				outQueue.add(handler);
 				flush();
+			}
+			if (inQueue.size() > 0)
+			{
+				inQueue.remove(handler);
 			}
 		}
 	}

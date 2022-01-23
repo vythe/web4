@@ -37,60 +37,264 @@ class DecimalTest
 		Assertions.assertEquals(Math.round(val2 * 1e8), Math.round(t2.toDouble() * 1e8), "toDouble failed");		
 	}
 	
+	
 	//@Test
-	void testMultiply()
+	void testMultiplySmall()
 	{
 		Decimal t1 = new Decimal(-1788);
 		int factor = 357;
 		Decimal r1 = t1.multiplySmall(factor);
-		System.out.println("testMultiply small: " + t1.toString() + " * " + factor + " = " + r1.toString());
+		System.out.println("testMultiplySmall: " + t1.toString() + " * " + factor + " = " + r1.toString());
 		Assertions.assertEquals(t1.toLong() * factor, r1.toLong());
 
 		Decimal t2 = new Decimal(-1788e-3, 6);
 		int factor2 = 357;
 		Decimal r2 = t2.multiplySmall(factor2);
-		System.out.println("testMultiply small: " + t2.toStringE() + " * " + factor + " = " + r2.toStringE());
+		System.out.println("testMultiplySmall: " + t2.toStringE() + " * " + factor + " = " + r2.toStringE());
 		Assertions.assertEquals(t2.toDouble() * factor2, r2.toDouble());
 		
-		
-		Decimal t3 = new Decimal("171.34"); //Utils.random.nextInt());
-		Decimal f3 = new Decimal("-21602"); //Utils.random.nextInt());
-		Decimal r3 = t3.multiply(f3);
-		
-		System.out.println("testMultiply large: " + t3.toStringF() + " * " + f3.toStringF() + " = " + r3.toStringF());
-		System.out.println("true=" + (t3.toDouble() * f3.toDouble()));
-		Assertions.assertEquals(t3.toDouble() * f3.toDouble(), r3.toDouble());
-		
-		/*
-		Decimal t4 = new Decimal(17000);
-		int add4 = -55;
-		Decimal r4 = t4.addSmall(add4);
-		
-		System.out.println("testMultiply/addSmall: " + t4.toString() + " + " + add4 + " = " + r4.toString());
-		Assertions.assertEquals(t4.toLong() + add4, r4.toLong());
-		*/
 	}
 	
-	@Test
+	//@Test
+	void testMultiply()
+	{
+		String[][] testPairs = new String[][]{
+			{"0.0673323", "1"}
+			, {"0.0673323833453713938013152", "1"}
+			,{"2.687782381712442436594301e-1", "1"}
+			, {"0.268", "1", "0"}
+			, {"3.35", "1.6", "0"}
+			, {"24000", "17", "0"}
+			, {"24000", "17", "3"}
+			, {"65", "17", "0"}
+			//, {"12.345", "1.23"}
+			//, {"12.3", "1.2345"}
+			//, {"1.2345", "12.3"}
+			//, {"1.23", "12.345"}
+		};
+		
+		for (int i = 0; i < testPairs.length; i++)
+		{
+			Decimal d1 = new Decimal(testPairs[i][0]);
+			Decimal d2 = new Decimal(testPairs[i][1]);
+			
+			System.out.println("multiply d1=" + d1.toStringF() + ", d2=" + d2.toStringF());
+			Decimal r1 = d1.multiply(d2);
+			System.out.println("res=" + r1.toStringF());
+			double tru = d1.toDouble() * d2.toDouble();
+			System.out.println("tru=" + tru);
+			Assertions.assertTrue(r1.toDouble() == tru,
+					"multiply d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", res=" + r1.toStringF() + ", true=" + tru
+			);
+		}
+		System.out.println("testMultiply done");
+	}
+	
+	private static final Decimal DECIMAL_TWO = new Decimal(2);
+	private static final Decimal DECIMAL_M_ONE = new Decimal(-1);
+
+	//@Test
+	void testDivide2()
+	{
+		Decimal val = new Decimal("1.0673323833453713938013152");
+		Decimal s1 = val.add(DECIMAL_M_ONE);
+		s1 = new Decimal("0.0673323833453713938013152");
+		Decimal fac = DECIMAL_M_ONE;		
+		Decimal res = Decimal.ZERO;
+		int i = 1;
+		int numDigits = 3;
+		fac = fac.minus().multiply(s1);
+		Decimal.Division div = fac.divide(new Decimal("1"), numDigits);
+		Decimal fac1 = new Decimal("0.0673323833453713938013152");
+		Decimal fac2 = Decimal.ONE.multiply(s1);
+		Decimal fac3 = s1.multiply(Decimal.ONE);
+		Decimal.Division div1 = fac1.divide(new Decimal("1"), numDigits);
+		
+		res = res.add(div.quotient);
+		
+		System.out.println("res=" + res.toStringF());
+	}
+	
+	//@Test
+	void testDivide1()
+	{
+		Decimal d1 = new Decimal("63674155060671161576367415506067116157");
+		//double dd1 = 1.87e-1; //6386900052318118525818e-1;
+		//String ds1 = String.format("%e", dd1);
+		//Decimal d1_1 = new Decimal(ds1); // this is broken!
+		//Decimal d1 = new Decimal(dd1, 3);
+		Decimal d2 = new Decimal("11");
+		int extraDigits = 3;
+		
+		System.out.println("divide d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", extra=" + extraDigits);
+		
+		Decimal.Division div = d1.divide(d2, extraDigits);
+
+		Decimal rev1 = div.quotient.multiply(d2).add(div.remainder);	
+		System.out.println("res quotient=" + div.quotient.toStringF() + ", remainder=" + div.remainder.toStringF() + ", rev=" + rev1.toStringF());
+
+		double rev = div.quotient.toDouble() * d2.toDouble() + div.remainder.toDouble();
+		Assertions.assertTrue(rev1.equals(d1), 
+				"divide d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", extra=" + extraDigits + ", rev=" + rev1.toStringF()
+		);
+	}
+	//@Test
 	void testDivide()
 	{
+		String[][] testPairs = new String[][]{
+			{"2.687782381712442436594301e-1", "1", "20"}
+			, {"0.268", "1", "0"}
+			, {"3.35", "1.6", "0"}
+			, {"24000", "17", "0"}
+			, {"24000", "17", "3"}
+			, {"65", "17", "0"}
+			//, {"12.345", "1.23"}
+			//, {"12.3", "1.2345"}
+			//, {"1.2345", "12.3"}
+			//, {"1.23", "12.345"}
+		};
+		
+		for (int i = 0; i < testPairs.length; i++)
+		{
+			Decimal d1 = new Decimal(testPairs[i][0]);
+			Decimal d2 = new Decimal(testPairs[i][1]);
+			int extraDigits = Utils.tryParseInt(testPairs[i][2]);
+			
+			//System.out.println("divide d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", extra=" + extraDigits);
+			
+			Decimal.Division div = d1.divide(d2, extraDigits);
+			//double rev = div.quotient.toDouble() * d2.toDouble() + div.remainder.toDouble();
+			Decimal rev1 = div.quotient.multiply(d2).add(div.remainder);
+			Assertions.assertTrue(rev1.equals(d1), 
+					"divide d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", extra=" + extraDigits + ", rev=" + rev1.toStringF()
+			);
+			/*
+			System.out.println("res quotient=" + div.quotient.toStringF() + ", remainder=" + div.remainder.toStringF() + ", rev=" + rev1.toStringF());
+			//long rem = d1.toLong() % d2.toLong();
+			long quot = (long)(d1.toDouble() / d2.toDouble());
+			double rem = d1.toDouble() - quot * d2.toDouble();
+			//System.out.println("tru quotient=" + quot + ", remainder=" + rem);
+			 */
+		}
+		System.out.println("testDivide done");
+		/*		
+		
 		//Decimal d1 = new Decimal("" + (int)(17 * 1.25));
-		Decimal d1 = new Decimal("2100"); // + (int)(2100));
-		Decimal d2 = new Decimal("17");
+		//Decimal d1 = new Decimal("2122439587"); // + (int)(2100));
+		//Decimal d2 = new Decimal("83588090123");
+		//Decimal d1 = new Decimal("3.35"); // + (int)(2100));
+		//Decimal d2 = new Decimal("1.6");
 		//Decimal d1 = new Decimal("986707205");
 		//Decimal d2 = new Decimal("982118665");
+		Decimal d1 = new Decimal("24000");
+		Decimal d2 = new Decimal("170");
 		//Decimal d1 = new Decimal(Utils.random.nextInt());
 		//Decimal d2 = new Decimal(Utils.random.nextInt());
 		System.out.println("d1=" + d1.toStringF() + ", d2=" + d2.toStringF());
-		Decimal.Division div = d1.divide(d2, 2);
+		Decimal.Division div = d1.divide(d2, 0);
 		long quot = (long)(d1.toDouble() / d2.toDouble());
+		double rev = div.quotient.toDouble() * d2.toDouble() + div.remainder.toDouble();
 		//long rem = d1.toLong() % d2.toLong();
-		long rem = (long)d1.toDouble() - quot * (long)d2.toDouble();
+		double rem = d1.toDouble() - quot * d2.toDouble();
 		System.out.println("res quotient=" + div.quotient.toStringF() + ", remainder=" + div.remainder.toStringF());
+		System.out.println("rev=" + rev);
 		System.out.println("tru quotient=" + quot + ", remainder=" + rem);
+		*/
 		
 		
 	}
+	
+	//@Test
+	void testLog1()
+	{
+		/*
+		long val1 = 634976223169905016l; // Utils.random.nextLong();
+		double d1 = Math.log10(val1);
+		double d2 = Math.log10(val1 + 100000);
+		double r1 = d2 - d1;
+		System.out.println("val1=" + val1 + ", r1=" + r1);
+		*/
+		double s1 = 0.5;
+		double fac = -1;
+		double ln1 = 0;
+		for (int i = 1; i <= 1000000; i++) 
+		{
+			fac = -fac * (s1 - 1);
+			ln1 += fac / i;
+		}
+		System.out.println("ln1=" + ln1 + ", exp=" + Math.exp(ln1));
+		System.out.println("tru=" + Math.log(s1) + ", exp=" + Math.exp(ln1));
+		
+		Decimal ln2 = DecimalLg.naturalSmall(new Decimal(s1 + ""), 10);
+		System.out.println("ln2=" + ln2.toStringF()+ ", exp2=" + Math.exp(ln2.toDouble()));
+	}
+	
+	//@Test
+	void testLog2()
+	{
+		double val = 2.1;
+		DecimalLg lg = new DecimalLg(300);
+		lg.getE();
+		Decimal v1 = new Decimal(val + "");
+		Decimal r1 = lg.natural(v1);
+		
+		System.out.println("natural for val=" + val);
+		System.out.println("res=" + r1.toStringF());
+		System.out.println("tru=" + Math.log(val));
+		/*
+		Decimal big2 = Decimal.ONE;
+		for (int j = 0; j < 1024; j++)
+		{
+			big2 = big2.multiplySmall(2);
+		}
+		*/
+		double val2 = 12;
+		Decimal v2 = new Decimal(val2 + "");
+		Decimal r2 = lg.log10(v2);
+		System.out.println("r2=" + r2.toStringE());
+		System.out.println("t2=" + Math.log10(val2));
+		
+		for (int i = 0; i < 100; i++)
+		{
+			double v = Utils.random.nextDouble() * 100;
+			Decimal vd = new Decimal(v + "");
+			Decimal r = lg.log10(vd);
+			double rn = Utils.round(r.toDouble(), 15);
+			double t = Utils.round(Math.log10(v),15);
+			if (t != rn)
+			{
+				System.out.println("*** v=" + v);
+				System.out.println("r=" + r.toStringF());
+				System.out.println("t=" + t);
+			}
+		}
+		System.out.println("testLog2 done");
+	}
+	
+	//@Test
+	void testLog()
+	{
+		Decimal d1 = new Decimal("0.4978706837");
+		double val1 = d1.toDouble();
+		Decimal tVal1 = DecimalLg.naturalSmall(d1, 10);
+		double rVal1 = Math.log(d1.toDouble());
+		double diff1 = tVal1.toDouble() - rVal1;
+		System.out.println("diff1=" + diff1);
+		/*
+		for (int i = 0; i < 10; i++)
+		{
+			double val = 1.5 - Utils.random.nextDouble(); // + 1.;
+			System.out.println("**test " + val);
+			Decimal tVal = DecimalLg.naturalSmall(new Decimal(val), 200);
+			double rVal = Math.log(val);
+			double diff = Math.abs(tVal.toDouble() - rVal);
+			System.out.println("calc=" + tVal.toStringF());
+			System.out.println("true=" + rVal + ", diff=" + Utils.round(diff / rVal, 24));
+		}
+		*/
+	}
+	
+	
 	//@Test
 	void testCast()
 	{
@@ -114,6 +318,10 @@ class DecimalTest
 	void testCompare()
 	{
 		String[][] testPairs = new String[][]{
+			{"1746874230", 
+			 "1425535767"},
+			{"-987445270", "-954607249"},
+			{"0", "1e-100"},
 			{"1.2345", "1.23"},
 			{"1.23", "1.2345"},
 			{"12.345", "1.23"},
@@ -148,6 +356,10 @@ class DecimalTest
 			int r2 = d1.compareTo(d2);
 			int truth = Double.compare(d1.toDouble(), d2.toDouble());
 			//System.out.println("res=" + r1 + ", truth=" + truth);
+			if (r2 != truth)
+			{
+				System.out.println("FAIL: " + "compare d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", res=" + r2 + ", truth=" + truth);
+			}
 			Assertions.assertEquals(r2, truth, "compare d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", res=" + r2 + ", truth=" + truth);
 		}
 	}
@@ -271,6 +483,38 @@ class DecimalTest
 	//@Test
 	void testAdd()
 	{
+		String[][] testPairs = new String[][]{
+			{"5", "-10"}
+			, {"5", "10"}
+			, {"1.7", "3.14"}
+			, {"0.0673323833453713938013152", "1"}
+			,{"2.687782381712442436594301e-1", "1"}
+			, {"0.268", "1"}
+			, {"3.35", "1.6"}
+			, {"24000", "17"}
+			, {"65", "-17"}
+			//, {"12.345", "1.23"}
+			//, {"12.3", "1.2345"}
+			//, {"1.2345", "12.3"}
+			//, {"1.23", "12.345"}
+		};
+		
+		for (int i = 0; i < testPairs.length; i++)
+		{
+			Decimal d1 = new Decimal(testPairs[i][0]);
+			Decimal d2 = new Decimal(testPairs[i][1]);
+			
+			//System.out.println("add d1=" + d1.toStringF() + ", d2=" + d2.toStringF());
+			Decimal r1 = d1.add(d2);
+			//System.out.println("res=" + r1.toStringF());
+			double tru = d1.toDouble() + d2.toDouble();
+			//System.out.println("tru=" + tru);
+			Assertions.assertTrue(r1.toDouble() == tru,
+					"add d1=" + d1.toStringF() + ", d2=" + d2.toStringF() + ", res=" + r1.toStringF() + ", true=" + tru
+			);
+		}
+		System.out.println("testAdd done");
+		/*
 		Decimal d1 = new Decimal("1.70");
 		Decimal v1 = new Decimal("-3.1400");
 		Decimal r1 = d1.add(v1);
@@ -297,7 +541,7 @@ class DecimalTest
 		Decimal r4 = d4.addSmall(v4);
 		System.out.println("testAdd, d4=" + d4 + " add " + v4 + " = " + r4.toString());
 		Assertions.assertEquals(-128 + v4, r4.toDouble());
-		
+	*/	
 	}
 	
 	//@Test
@@ -328,19 +572,30 @@ class DecimalTest
 		System.out.println("test stress final=" + d1.floor(18).toStringE());
 	}
 
+	String randomLong(int len)
+	{
+		char[] arr = new char[len];
+		for (int i = 0; i < len; i++) arr[i] = (char)Utils.random.nextInt(10);
+
+		return Decimal.digitsToString(arr);
+	}
 	//@Test
 	void testStressMult()
 	{
 		int tt = 99999999;
-		Decimal d1 = new Decimal(Utils.random.nextInt());
+		//Decimal d1 = new Decimal(Utils.random.nextInt());
+		String longLong = randomLong(200); // 1e7 divs with this long is 485 sec
+		Decimal d1 = new Decimal(longLong);
 		Decimal d2 = new Decimal(Utils.random.nextInt());
 		System.out.println("repeat mult: " + d1.toStringF() + " * " + d2.toStringF() + " = " + d1.multiply(d2).toStringF());
-		for (int i = 0; i < 1e8; i++) // for 2e8 this is 129 sec
+		for (int i = 0; i < 1e6; i++) // for 2e8 this is 129 sec
 		{
 			//long v1 = Utils.random.nextInt();
-			//long v2 = Utils.random.nextInt();
+			long v2 = Utils.random.nextInt();
 			//Decimal res = new Decimal(v1).multiply(new Decimal(v2));
-			Decimal res = d1.multiply(d2);
+			Decimal res = d1.multiply(new Decimal(v2));
+			
+			//Decimal res = d1.multiply(d2);
 			//if (res.toLong() != v1 * v2)
 			//{
 			//	System.out.println("stressMult failed for v1=" + v1 + " v2=" + v2 + ", res=" + res.toStringF());
@@ -361,6 +616,266 @@ class DecimalTest
 		}
 		System.out.println("test stress final=" + d1.floor(18).toStringE());
 		*/
+	}
+
+	//@Test
+	void testE()
+	{
+		String internetE = "2.7182818284590452353602874713526624977572470936999595749669676277240766303535475945713821785251664274274663919320030599218174135966290435729003342952605956307381323286279434907632338298807531952510190115738341879307021540891499348841675092447614606680822648001684774118537423454424371075390777449920695517027618386062613313845830007520449338265602976067371132007093287091274437470472306969772093101416928368190255151086574637721112523897844250569536967707854499699679468644549059879316368892300987931277361782154249992295763514822082698951936680331825288693984964651058209392398294887933203625094431173012381970684161403970198376793206832823764648042953118023287825098194558153017567173613320698112509961818815930416903515988885193458072738667385894228792284998920868058257492796104841984443634632449684875602336248270419786232090021609902353043699418491463140934317381436405462531520961836908887070167683964243781405927145635490613031072085103837505101157477041718986106873969655212671546889570350354";
+		Decimal e = DecimalLg.calculateE(1000);
+		Assertions.assertEquals(e.toStringF(), internetE);
+		System.out.println("E is good");
+	}
+	//@Test
+	void testStressDiv()
+	{
+		int len = 20;
+		//Decimal d1 = Decimal.random(len, len - 1);
+		Decimal d1 = new Decimal("14929505174280975716");
+		System.out.println("repeat div: " + d1.toStringF()); 
+		// stress 1e7 over *20 = 4.8 - 4.9 sec
+		//System.out.println("repeat mult: " + d1.toStringF() + " * " + d2.toStringF() + " = " + d1.multiply(d2).toStringF());
+		for (int i = 0; i < 1e7; i++) // for 1e7 over decimal*300 this is 50 - 80 sec; 1e7 over decimal*100 is 30 - 36 sec sec
+		{
+			//long v2 = Utils.random.nextInt();
+			//if (v2 == 0) continue;
+			//Decimal d2 = new Decimal(v2)
+			Decimal d2 = Decimal.random(len, len - 1);
+			if (d2.isZero()) continue;
+			try
+			{
+				//Decimal.Division res = new Decimal(v1).divide(new Decimal(v2), 0);
+				Decimal.Division res = d1.divide(d2, 0);
+				/* to test or not to test...*/
+				Decimal mult = res.quotient.multiply(d2).add(res.remainder);
+				if (mult.compareTo(d1) != 0)
+				{
+					System.out.println("failed for d2=" + d2.toStringF());
+				}
+				/**/
+			}
+			catch (Exception x)
+			{
+				//System.out.println("error on v1=" + v1 + ", v2=" + v2);
+				System.out.println(x);
+				break;
+			}
+		}
+		System.out.println("stressDiv done");
+		/*
+		Decimal d1 = new Decimal(1);
+		Decimal d2 = new Decimal(1);
+		for (int i = 0; i < 1e6; i++) // for 1e6 this was 895 seconds
+		{
+			d1 = d1.add(d1);
+			Decimal d3 = d1.round(3);
+		}
+		System.out.println("test stress final=" + d1.floor(18).toStringE());
+		*/
+	}
+
+	//@Test
+	void testStressLog()
+	{
+		DecimalLg lg = new DecimalLg(300);
+		for (int i = 0; i < 10000; i++) // for 1e4 cycles over decimal*300, it was 2831 sec
+		{
+			Decimal d2 = Decimal.random(300, 300);
+			if (d2.isZero()) continue;
+			try
+			{
+			//Decimal.Division res = new Decimal(v1).divide(new Decimal(v2), 0);
+			Decimal res = lg.log10(d2);
+			}
+			catch (Exception x)
+			{
+				//System.out.println("error on v1=" + v1 + ", v2=" + v2);
+				System.out.println(x);
+				break;
+			}
+		}
+		System.out.println("stressLog done");
+		/*
+		Decimal d1 = new Decimal(1);
+		Decimal d2 = new Decimal(1);
+		for (int i = 0; i < 1e6; i++) // for 1e6 this was 895 seconds
+		{
+			d1 = d1.add(d1);
+			Decimal d3 = d1.round(3);
+		}
+		System.out.println("test stress final=" + d1.floor(18).toStringE());
+		*/
+	}
+
+	//@Test
+	void testEFull()
+	{
+//2.7182818284 5904523536 0287471352 6624977572 4709369995 9574966967 6277240766 3035354759 4571382178 5251664274 
+//  2746639193 2003059921 8174135966 2904357290 0334295260 5956307381 3232862794 3490763233 8298807531 9525101901 
+//  1573834187 9307021540 8914993488 4167509244 7614606680 8226480016 8477411853 7423454424 3710753907 7744992069 
+//  5517027618 3860626133 1384583000 7520449338 2656029760 6737113200 7093287091 2744374704 7230696977 2093101416
+//  9283681902 5515108657 4637721112 5238978442 5056953696 7707854499 6996794686 4454905987 9316368892 3009879312 
+//  7736178215 4249992295 7635148220 8269895193 6680331825 2886939849 6465105820 9392398294 8879332036 2509443117 
+//  3012381970 6841614039 7019837679 3206832823 7646480429 5311802328 7825098194 5581530175 6717361332 0698112509
+//  9618188159 3041690351 5988885193 4580727386 6738589422 8792284998 9208680582 5749279610 4841984443 6346324496 
+//  8487560233 6248270419 7862320900 2160990235 3043699418 4914631409 3431738143 6405462531 5209618369 0888707016 
+//  7683964243 7814059271 4563549061 3031072085 1038375051 0115747704 1718986106 8739696552 1267154688 9570350354 019952038
+// internet:
+//2,7182818284 5904523536 0287471352 6624977572 4709369995 9574966967 6277240766 3035354759 4571382178 5251664274 
+//  2746639193 2003059921 8174135966 2904357290 0334295260 5956307381 3232862794 3490763233 8298807531 9525101901 
+//  1573834187 9307021540 8914993488 4167509244 7614606680 8226480016 8477411853 7423454424 3710753907 7744992069 
+//  5517027618 3860626133 1384583000 7520449338 2656029760 6737113200 7093287091 2744374704 7230696977 2093101416 
+//  9283681902 5515108657 4637721112 5238978442 5056953696 7707854499 6996794686 4454905987 9316368892 3009879312 
+//  7736178215 4249992295 7635148220 8269895193 6680331825 2886939849 6465105820 9392398294 8879332036 2509443117 
+//  3012381970 6841614039 7019837679 3206832823 7646480429 5311802328 7825098194 5581530175 6717361332 0698112509 
+//  9618188159 3041690351 5988885193 4580727386 6738589422 8792284998 9208680582 5749279610 4841984443 6346324496 
+//  8487560233 6248270419 7862320900 2160990235 3043699418 4914631409 3431738143 6405462531 5209618369 0888707016 
+//  7683964243 7814059271 4563549061 3031072085 1038375051 0115747704 1718986106 8739696552 1267154688 9570350354 
+		
+		// e = sum(1 + 1 / n!)
+		int numDigits = 1000;
+		Decimal add = new Decimal(1);
+		Decimal e = new Decimal(2);
+		Decimal stop = new Decimal(new char[]{1}, -numDigits, true);
+		int n = 1;
+		Decimal fact = new Decimal(1);
+		Decimal one = new Decimal(1);
+		//while(n < 100) //add.compareTo(stop) > 0)
+		while(add.compareTo(stop) > 0)
+		{
+			n++;
+			//add = add.divide(new Decimal(n), numDigits).quotient;
+			//e = e.add(add);
+			fact = fact.multiplySmall(n);
+			//Decimal.Division add1 = one.divide(fact, numDigits + 10);
+			add = one.divide(fact, numDigits + 10).quotient;
+			e = e.add(add);
+			//System.out.println(n + ": " + add.toStringE() );
+//			System.out.println(n + ": " + fact.toStringF() + ", e=" + e.toStringF());
+//			System.out.println(n + ": " + fact.toStringF() + ", add=" + add.toStringF() + ", rem=" + add1.remainder.toStringF());
+//			System.out.println(n + ":  e=" + e.toStringF());
+		}
+		System.out.println("n=" + n);
+		System.out.println("add=" + add.toStringE());
+		System.out.println("stop=" + stop.toStringE());
+		//System.out.println("compare=" + add.compareTo(stop));
+		e = e.floor(numDigits + 1);
+		System.out.println("e=" + e.toStringF());
+	}
+	
+	Decimal bruteSplit(Decimal d)
+	{
+		System.out.println("split " + d.toStringF());
+		Decimal v = new Decimal(2);
+		int limit = d.getEPower() / 2 + 1;
+		int ep = 0;
+		int prevEp = 0;
+		while ((ep = v.getEPower()) < limit)
+		{
+			if (prevEp != ep)
+			{
+				System.out.println("ep=" + ep + ", limit=" + limit + ", time=" + Utils.formatDateTime(new java.util.Date()));
+				prevEp = ep;
+			}
+			Decimal.Division test = d.divide(v, 0);
+			if (test.remainder.isZero())
+			{
+				System.out.println("found " + v.toStringF());
+			}
+			v = v.addSmall(1);
+		}
+		return v;
+	}
+
+	Decimal counterSplit(Decimal d)
+	{
+		System.out.println("counter split " + d.toStringF());
+		int maxCounter = 100;
+		int counterPos = 0;
+		long[] counterBins = new long[maxCounter];
+		long[] counterVals = new long[maxCounter]; 
+		
+		Decimal v = new Decimal(2);
+		int limit = d.getEPower() / 2 + 1;
+		int ep = 0;
+		int prevEp = 0;
+		int countTest = 0;
+		boolean skipIt = false;
+		long counterB = 0;
+		//Decimal.Division test;
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
+		while ((ep = v.getEPower()) < limit)
+		{
+			if (prevEp != ep)
+			{
+				java.util.Date swd = sw.getElapsedTime();
+				System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
+				System.out.println("ep=" + ep + ", limit=" + limit + ", elapsed=" + sw);
+				prevEp = ep;
+			}
+			// advance counters
+			skipIt = false;
+			for (int c = 0; c < counterPos; c++)
+			{
+				if (++counterBins[c] >= counterVals[c]) 
+				{
+					counterBins[c] = 0;
+					skipIt = true;
+				}
+			}
+			if (skipIt) 
+			{
+			}
+			else
+			{
+				if (counterPos < maxCounter)
+				{
+					counterVals[counterPos++] = v.toLong();
+				}
+				countTest++;
+				//System.out.println("test " + countTest + " for " + v.toLong());
+				Decimal.Division test = d.divide(v, 0);
+				if (test.remainder.isZero())
+				{
+					System.out.println("found " + v.toStringF() + ", counterPos=" + counterPos + ", tests=" + countTest + ", elapsed=" + sw);
+				}
+			}
+			//v = v.addSmall(1);
+			v = v.addOne();
+		}
+		sw.stop();
+		System.out.println("total tests " + countTest + " , last v=" + v.toStringF());
+		System.out.println("end at " + Utils.formatDateTime(sw.getStopTime()));
+		System.out.println("total elapsed=" + sw);
+		return v;
+	}
+	
+	//@Test
+	void testSplit()
+	{
+		//bruteSplit(new Decimal("6367415506067116157")); //Utils.random.nextLong()));
+		//counterSplit(new Decimal("6367415506067116157"));
+		counterSplit(new Decimal("63674155060671161576367415506067116157"));
+		
+		//counterSplit(new Decimal(Utils.random.nextLong()));
+		//counterSplit(new Decimal((593987) + ""));
+		// 397971290 : 2, 5, 67
+		
+		
+		// test 2565438975860849476 (2e18) - not finished
+		// next try 308363006597831213 (3e17) - completed in 5900 sec (1h 40 min)
+	}
+	
+	//@Test
+	void testAddOne()
+	{
+		Decimal v = Decimal.ZERO;
+		for (int i = 1; i <= 1000; i++)
+		{
+			v = v.addOne();
+			System.out.println(i + ": " + v.toStringF() + ", " + v.toLong());
+		}
 	}
 	
 	//@Test

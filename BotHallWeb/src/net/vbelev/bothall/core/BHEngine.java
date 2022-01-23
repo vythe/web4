@@ -50,11 +50,13 @@ public class BHEngine
 		
 		public String toString()
 		{
-			return "[BHA:" + actionType + ", actorID=" + actorID + ", props=" + Arrays.toString(intProps) + "]"; 
+			return "[BHA " + this.ID + ":" + actionType + ", actorID=" + actorID + ", props=" + Arrays.toString(intProps) + "]"; 
 		}
 		
 		public Action() 
 		{
+			intProps = emptyIntProps;
+			stringProps = emptyStringProps;
 		}
 		
 		public Action(String type, int id, int intPropCount, int strPropCount)
@@ -100,6 +102,12 @@ public class BHEngine
 		public boolean isCancelled = false;
 		/** If the buff is visible, it is reported to the clients*/
 		public boolean isVisible = true;
+		
+		@Override
+		public String toString()
+		{
+			return "[B ticks=" + ticks + " " + (action==null? "(no action)" : action.toString()) + "]"; 
+		}
 	}
 		
 	//public static final long CYCLE_MSEC = 2500;
@@ -109,14 +117,14 @@ public class BHEngine
 	
 	//private ConcurrentLinkedDeque<BHOperations.BHAction> actionQueue = new ConcurrentLinkedDeque<BHOperations.BHAction>();
 	//private ConcurrentLinkedDeque<BHOperations.BHAction> actionQueueNext = new ConcurrentLinkedDeque<BHOperations.BHAction>();
-	private QueueHelper.QueueHolder<Action> actionQueueHolder = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
-	private QueueHelper.QueueHolder<Action> actionQueueHolderNext = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
-	private PriorityBlockingQueue<Timer> timers = new PriorityBlockingQueue<Timer>();
+	private QueueHelper.QueueHolder<Action> actionQueueHolder; // = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
+	private QueueHelper.QueueHolder<Action> actionQueueHolderNext; // = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
+	private PriorityBlockingQueue<Timer> timers; // = new PriorityBlockingQueue<Timer>();
 	/** Buffs should become immutable, but the list needs to be visible */
-	public List<Buff> buffs = Collections.synchronizedList(new ArrayList<Buff>());
-	private List<Buff> buffsNext = Collections.synchronizedList(new ArrayList<Buff>());
+	public List<Buff> buffs; // = Collections.synchronizedList(new ArrayList<Buff>());
+	private List<Buff> buffsNext; // = Collections.synchronizedList(new ArrayList<Buff>());
 	
-	private BHMessageList messages = new BHMessageList();
+	private BHMessageList messages; // = new BHMessageList();
 
 	public int timecode = 0;
 	public long CYCLE_MSEC = 100;
@@ -126,8 +134,26 @@ public class BHEngine
 	
 	public BHEngine()
 	{
+		_reset();
 	}
 	
+	private void _reset()
+	{
+		isRunning = false;
+	
+		actionQueueHolder = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
+		actionQueueHolderNext = new QueueHelper.QueueHolder<Action>(new ConcurrentLinkedQueue<Action>());
+		timers = new PriorityBlockingQueue<Timer>();
+		buffs = Collections.synchronizedList(new ArrayList<Buff>());
+		buffsNext = Collections.synchronizedList(new ArrayList<Buff>());	
+		
+		messages = new BHMessageList();
+	}
+	
+	public void reset()
+	{
+		_reset();
+	}
 	/** Landscape property cannot be made final, because of re-publishing it,
 	 * but it should be protected from damage.
 	 */
@@ -159,6 +185,7 @@ public class BHEngine
 			newBuffs.addAll(this.buffsNext);
 			this.buffs = Collections.unmodifiableList(newBuffs);
 			this.buffsNext = Collections.synchronizedList(new ArrayList<Buff>());
+//			System.out.println("moved buffs, buff count=" + buffs.size() + ", ts=" + this.timecode);
 		}
 		
 		return timecode;
@@ -517,9 +544,8 @@ public class BHEngine
 		if (buff != null)
 		{
 			buff.timecode = this.timecode;
-			System.out.println("postBuff called for " + buff + ", engine instance=" + this.engineInstance);
-			buffsNext.add(buff);
-			
+			//System.out.println("postBuff called for " + buff + ", engine instance=" + this.engineInstance);
+			buffsNext.add(buff);			
 		}
 	}
 	

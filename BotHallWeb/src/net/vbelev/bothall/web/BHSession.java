@@ -20,6 +20,21 @@ public class BHSession extends BHBoard
 		public static final int ACTIVE = 1;
 		public static final int PAUSE = 2;
 		public static final int COMPLETE = 3;
+		/** The DEAD status flags the session for removal: everybody disconnects and shuts down */
+		public static final int DEAD = 4;
+		
+		public static String toString(int v)
+		{
+			switch (v)
+			{
+				case NEW: return "New";
+				case ACTIVE: return "Active";
+				case PAUSE: return "Pause";
+				case COMPLETE: return "Complete";
+				case DEAD: return "Dead";
+				default: return "" + v;
+			}
+		}
 	}
 
 	/**
@@ -32,13 +47,15 @@ public class BHSession extends BHBoard
 		 * and not passed to BHSession for processing at all
 		 */
 		public static final String JOINCLIENT = "JOINCLIENT".intern();
+		/** Release the agent and close the connection (does not stop the session itself */
+		public static final String CLOSE = "CLOSE".intern();
 		public static final String JOIN = "JOIN".intern(); //inrArgs: [direction]
 		public static final String CREATE = "CREATE".intern();
 		public static final String CYCLE = "CYCLE".intern();
 		//public static final String DIE = "die".intern();
 		//public static final String ROBOT = "robot".intern(); // stringArgs: [clientKey, robotType], where clientKey may be null
 		
-		private COMMAND() {}
+		protected COMMAND() {}
 	}
 	/** Note that the update bin is not serialized, so as to support json clients.
 	 *  */
@@ -85,7 +102,7 @@ public class BHSession extends BHBoard
 
 	
 	public final EventBox.Event<PublishEventArgs> publishEvent = new EventBox.Event<PublishEventArgs>();
-	public final BHStorage storage = new BHStorage();
+	private BHStorage storage; // = new BHStorage();
 	
 	/** values from PS_STATUS */
 	public int sessionStatus = PS_STATUS.NEW;
@@ -213,15 +230,43 @@ public class BHSession extends BHBoard
 		agent.detach();
 	}
 	
+	private void _reset()
+	{
+		itemCereals.clear();
+		itemExports.clear();
+		mobileCereals.clear();
+		mobileExports.clear();
+	}
+	
 	protected BHSession()
 	{
 		itemCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
 		itemExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Item>());
 		mobileCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
 		mobileExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Mobile>());
-		
+		storage = new BHStorage();
+
 		registerSession(this);
 	}
+	
+	protected BHSession(BHStorage storage)
+	{
+		itemCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
+		itemExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Item>());
+		mobileCereals = Collections.synchronizedMap(new TreeMap<Integer, String>());
+		mobileExports = Collections.synchronizedMap(new TreeMap<Integer, BHClient.Mobile>());
+
+		this.storage = storage;
+		
+		registerSession(this);		
+	}
+	
+	@Override
+	public void reset()
+	{
+		_reset();
+	}
+	
 	/*
 	private BHSession(BHBoard e)
 	{		
@@ -297,7 +342,7 @@ public class BHSession extends BHBoard
 	}
 	
 	
-	public class EngineCallback implements BHBoard.IClientCallback
+	public class EngineCallback_depr //implements BHBoard.IClientCallback
 	{
 		public void onPublish(long timecode)
 		{
@@ -358,6 +403,12 @@ public class BHSession extends BHBoard
 	
 	public BHBoard getEngine() { return this; }
 	
+	public BHStorage getStorage() {return storage; }
+	
+	public BHClient.UpdateBin getUpdate(long timecode, int subscriptionID, int mobileID)
+	{
+		return storage.getUpdate(this, timecode, subscriptionID, mobileID);
+	}
 	/**
 	 * Takes a client command wrapped in BHClient.Command and returns 
 	 * a commands' execution result, wrapped in BHClient.Command, or an Error
@@ -666,7 +717,7 @@ public class BHSession extends BHBoard
 		res.status.sessionID = this.sessionID;
 		res.status.controlledMobileID = 0; // we don't know the controlled id here. maybe it should be moved
 		res.status.timecode = this.timecode;
-		res.status.sessionStatus = this.isRunning? BHClient.Status.SessionStatus.ACTIVE : BHClient.Status.SessionStatus.STOPPED;
+		res.status.sessionStatus = BHSession.PS_STATUS.toString(this.sessionStatus); //this.isRunning? BHClient.Status.SessionStatus.ACTIVE : BHClient.Status.SessionStatus.STOPPED;
 		//res.status.updateTS = engine.pub
 		
 		// everything is visible for now

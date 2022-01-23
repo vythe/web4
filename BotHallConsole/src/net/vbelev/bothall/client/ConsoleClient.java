@@ -4,6 +4,8 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.*;
+
+//import net.vbelev.bothall.client.BHClient.IElement;
 import net.vbelev.utils.*;
 
 public class ConsoleClient
@@ -42,7 +44,7 @@ public class ConsoleClient
 						{
 							// TODO Auto-generated method stub
 							// TODO Auto-generated method stub
-							BHClient.Element queuedElem = null;
+							BHClient.IElement queuedElem = null;
 							while ((queuedElem = cc.client.elementQueue.poll()) != null)
 							{
 								System.out.println("queue: " + queuedElem.toString());

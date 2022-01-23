@@ -123,10 +123,14 @@ function BHClient(url) {
 		// onUpdate is called from the update loop; you do not need to call it directly
 		onUpdate: function(elementType, elementData) {
 
+			try {
 			this.trigger("update", elementType, elementData);
 			
 			if (elementType == "STATUS") {
 				this.trigger("status", elementData);
+			}
+			} catch (x) {
+				this.log("onUpdate failed: " + x, "ERROR");
 			}
 		},
 				
@@ -338,7 +342,12 @@ function mainLoop(bhclient) {
 	bhclient.loopTimecode++;
 	
 	var mainLoopTimer = setInterval(function() {
+		//console.log("mainLoop func: runLoop=" + bhclient.runLoop);
 		ts0 = new Date().getTime();
+		if (!bhclient.runLoop) {
+			clearInterval(mainLoopTimer);
+			return;
+		}
 		getUpdate(bhclient, function() {
 			var ts2 = new Date().getTime();
 			//var sleepTime = ts1 > ts2? ts1 - ts2: 1;
@@ -551,7 +560,7 @@ function getUpdateEx(bhclient, full, callback, arg1, arg2, arg3)
 		}
 		
 	}).catch(function(error) {
-	    bhclient.log(error,"ERROR");
+	    bhclient.log("catch in getUpdateEx: " + error,"ERROR");
 	    bhclient.runLoop = false;	    
 	});
 }
@@ -926,19 +935,6 @@ function getBag(bhclient, bag, callback) {
 }
 
 // == general purpose javascript helpers ==
-
-function formatDateTime(dt) {
-    var m = dt || new Date();
-    var dateString =
-    ("0" + m.getDate()).slice(-2) + "/" +
-    ("0" + (m.getMonth()+1)).slice(-2) + "/" +
-    m.getFullYear() + " " +
-    ("0" + m.getHours()).slice(-2) + ":" +
-    ("0" + m.getMinutes()).slice(-2) + ":" +
-    ("0" + m.getSeconds()).slice(-2)
-    ;
-    return dateString;
-}
 
 
 function buildQuery(url, args) {
