@@ -2,6 +2,9 @@ package net.vbelev.bothall.web;
 
 import java.io.IOException;
 import java.util.*;
+
+import org.apache.tomcat.jni.File;
+
 import net.vbelev.utils.*;
 import net.vbelev.utils.DryCereal.Reader;
 import net.vbelev.bothall.client.*;
@@ -253,4 +256,34 @@ public class BHStorage
 		return res;
 	}
 
+	String readMyFile() //throws java.io.FileNotFoundException
+	{
+		
+		try
+		{
+		java.io.File f = new java.io.File("test");
+		java.io.InputStream is = new java.io.FileInputStream(f);
+		Math.sqrt(-1);
+		String s = null;
+		s.toLowerCase();
+		
+		}
+		catch (NullPointerException x)
+		{
+		System.out.println("your string is null");	
+		}
+		catch (java.io.FileNotFoundException x)
+		{
+			return "No File!";
+		}
+		
+		return "";
+	}
+	
+	void test()
+	{
+		double d = Double.parseDouble("test");
+		
+		
+	}
 }

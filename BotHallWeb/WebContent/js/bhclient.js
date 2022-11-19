@@ -560,7 +560,7 @@ function getUpdateEx(bhclient, full, callback, arg1, arg2, arg3)
 		}
 		
 	}).catch(function(error) {
-	    bhclient.log("catch in getUpdateEx: " + error,"ERROR");
+	    bhclient.log("catch in getUpdateEx: " + error + ", url=" + url,"ERROR");
 	    bhclient.runLoop = false;	    
 	});
 }
@@ -671,7 +671,9 @@ function getuserkey(bhclient, callback) {
 	},
 	function (err) {
 		bhclient.log("getuserkey: " + err, "ERROR");
-		callback(null);
+		if (typeof(callback) == "function") {
+			callback(null);
+		}
 	});
 }
 
@@ -689,7 +691,9 @@ function create(bhclient, isProtected, callback) {
 	},
 	function (err) {
 		bhclient.log("create: " + err, "ERROR");
-		callback(null);
+		if (typeof(callback) == "function") {
+			callback(null);
+		}
 	});
 }
 
@@ -706,7 +710,9 @@ function destroy(bhclient, sessionKey, callback) {
 	},
 	function (err) {
 		bhclient.log("destroy: " + err, "ERROR");
-		callback(null);
+		if (typeof(callback) == "function") {
+			callback(null);
+		}
 	});
 }
 
@@ -722,7 +728,9 @@ function list(bhclient, callback) {
 	},
 	function (err) {
 		bhclient.log("list: " + err, "ERROR");
-		callback(null);
+		if (typeof(callback) == "function") {
+			callback(null);
+		}
 	});
 }
 
@@ -790,7 +798,9 @@ function leave(bhclient, callback) {
 	},
 	function (err) {
 		bhclient.log("leave: " + err, "ERROR");
-		callback(null);
+		if (typeof(callback) == "function") {
+			callback(null);
+		}
 	});
 }
 
@@ -829,7 +839,9 @@ function command(bhclient, cmd, intArgs, stringArgs, callback) {
 	},
 	function (err) {
 		bhclient.log("command: " + err, "ERROR");
-		callback(null);
+		if (typeof(callback) == "function") {
+			callback(null);
+		}
 	});
 }
 

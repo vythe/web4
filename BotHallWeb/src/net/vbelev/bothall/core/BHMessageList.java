@@ -18,19 +18,19 @@ public class BHMessageList
 		public static int instanceCounter = 0;
 		public final int ID; 
 
-		public final BHCollection.EntityTypeEnum target;
+		public final BHCollection.MessageTargetEnum target;
 		public final int targetID;
 		public final String message;
 		
 		private Message(int testID) 
 		{
 			this.ID = testID;
-			this.target = BHCollection.EntityTypeEnum.GLOBAL;
+			this.target = BHCollection.MessageTargetEnum.GLOBAL;
 			this.targetID = 0;
 			this.message = "";
 		}
 		
-		public Message(BHCollection.EntityTypeEnum target, int targetID, String message)
+		public Message(BHCollection.MessageTargetEnum target, int targetID, String message)
 		{
 			this.ID = ++instanceCounter;
 			this.target = target;
@@ -72,7 +72,7 @@ public class BHMessageList
 		newMessages.add(msg);
 	}
 	
-	public Message addMessage(BHCollection.EntityTypeEnum target, int targetID, String message)
+	public Message addMessage(BHCollection.MessageTargetEnum target, int targetID, String message)
 	{
 		Message msg = new Message(target, targetID, message);
 		newMessages.add(msg);
@@ -80,7 +80,7 @@ public class BHMessageList
 	}
 	
 	/** returns the number of deleted new messages */
-	public int resetMessages(BHCollection.EntityTypeEnum target, int targetID)
+	public int resetMessages(BHCollection.MessageTargetEnum target, int targetID)
 	{
 		ArrayList<Message> toDelete = new ArrayList<Message>();
 		int count = 0;

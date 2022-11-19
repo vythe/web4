@@ -44,40 +44,42 @@ button.movebutton {
 </div>
 
 <div style="width: 30%; display: inline-block; vertical-align: top;">
-<fieldset style="width: 100%;">
-<legend>Status</legend>
-	<div class="statuscell">Stage: <span id="statusStage"></span></div>
-	<div class="statuscell">Lives: <span id="statusLives"></span></div>
-	<div class="statuscell">Score: <span id="sessionScore"></span></div>
-	<div class="statuscell">Time: <span id="sessionTime"></span></div>
-</fieldset>
-<fieldset style="width: 100%;">
-<legend>Controls</legend>
+	<fieldset style="width: 100%;">
+	<legend>Status</legend>
+		<div class="statuscell">Stage: <span id="statusStage"></span></div>
+		<div class="statuscell">Lives: <span id="sessionLives"></span></div>
+		<div class="statuscell">Score: <span id="sessionScore"></span></div>
+		<div class="statuscell">Time: <span id="sessionTime"></span></div>
+	</fieldset>
 
-	<button id="btnRefresh">Refresh (R)</button>
-	<!-- 
-	<button id="btnStartSession">Start Session</button>
-	<button id="btnLeaveSession">Leave Session</button>
-	<button id="btnEndSession" disabled="disabled">End Session</button>
-	 -->
-	<button id="btnPause">Pause / Resume (P)</button>
-	<button id="btnEndSession">Finish</button>
-	<button id="btnKillSession" disabled="disabled">Terminate?</button>
-	<br/>
-	<table>
-		<tr>
-			<td></td><td><button class="movebutton" bh_direction="6">Up</button></td><td></td>
-		</tr>
-		<tr>
-			<td><button class="movebutton" bh_direction="2">Left</button></td>
-			<td><button class="movebutton" bh_direction="0">Stop</button></td>
-			<td><button class="movebutton" bh_direction="1">Right</button></td>
-		</tr>
-		<tr>
-			<td></td><td><button class="movebutton" bh_direction="3">Down</button></td><td></td>
-		</tr>
-	</table>
-</fieldset>
+	<fieldset style="width: 100%;">
+	<legend>Controls</legend>
+	
+		<button id="btnRefresh">Refresh (R)</button>
+		<!-- 
+		<button id="btnStartSession">Start Session</button>
+		<button id="btnLeaveSession">Leave Session</button>
+		<button id="btnEndSession" disabled="disabled">End Session</button>
+		 -->
+		<button id="btnPause">Pause / Resume (P)</button>
+		<button id="btnStage">Stage</button>
+		<button id="btnEndSession">Finish</button>
+		<button id="btnKillSession" disabled="disabled">Terminate?</button>
+		<br/>
+		<table>
+			<tr>
+				<td></td><td><button class="movebutton" bh_direction="6">Up</button></td><td></td>
+			</tr>
+			<tr>
+				<td><button class="movebutton" bh_direction="2">Left</button></td>
+				<td><button class="movebutton" bh_direction="0">Stop</button></td>
+				<td><button class="movebutton" bh_direction="1">Right</button></td>
+			</tr>
+			<tr>
+				<td></td><td><button class="movebutton" bh_direction="3">Down</button></td><td></td>
+			</tr>
+		</table>
+	</fieldset>
 
 	<fieldset style="width: 100%;">
 	<legend>Debug</legend>
@@ -91,50 +93,69 @@ button.movebutton {
 		
 		<button id="btnUpdateFull">Update Full</button>
 		<button id="btnDie">Die</button>
-		<button id="btnPacman">Pacman</button><br/>
-		
+		<button id="btnPacman">Pacman</button><br/>	
 	</fieldset>
 
 
-	<a href="list.html">To List</a>
+	<a href="home.jsp">To Session List</a>
 	<hr/>
 	<fieldset style="height: 100px; width: 100%;">
 	<legend>Messages</legend>
-	<div id="meMessages" style="height: 100%; width: 100%; display: block; overflow: auto; white-space: nowrap; border: 0;"></div>
+		<div id="meMessages" style="height: 100%; width: 100%; display: block; overflow: auto; white-space: nowrap; border: 0;"></div>
 	</fieldset>
 	<fieldset id="meBuffs" style="width: 100%; display: block;">
 	<legend>Buffs</legend>
 		<ul id="meBuffsList">
 		</ul>
 	</fieldset>
+	<fieldset>
+	<legend>Diagnostics</legend>
+	<table border="1">
+		<tr>
+			<td>Session ID:</td><td id="sessionId"></td>
+			<td>Status:</td><td id="sessionStatus"></td>
+		</tr>
+		<tr>
+			<td>Server Tick:</td><td id="serverMsec"></td>
+			<td>Client Tick:</td><td id="clientMsec"></td>
+		</tr>
+		<tr>
+			<td>Server Load%::</td><td id="serverLoad"></td>
+			<td>Client Load%:</td><td id="clientLoad"></td>
+		</tr>
+		<tr>
+			<td>Last Poll:</td><td id="lastPollTime"></td>
+			<td>Tick msec:</td><td id="serverTick"></td>
+		</tr>
+		<tr>
+			<td>Pos X:</td><td id="position_x"></td>
+			<td>Pos Y:</td><td id="position_y"></td>
+		</tr>
+		<tr>
+			<td>Timecode:</td><td id="serverTimecode"></td>
+			<td>controlled ID:</td><td id="controlledID"></td>
+		</tr>
+		<tr>
+			<td>Key pressed:</td><td id="keyPressSpan"></td>
+		</tr>
+		<tr>
+		<td colspan="4">Info:</td>
+		</tr>
+		<tr><td id="infoString" colspan="4"></td></tr>
+	</table>
+	</fieldset>
 </div>
 <hr style="clear: both;"/>
-
-<table>
-<tr>
-	<td>Last Poll:</td><td id="lastPollTime"></td>
-	<td>Session ID:</td><td id="sessionId"></td>
-	<td>Load%::</td><td id="serverLoad"></td>
-	<td>Client Load%:</td><td id="clientLoad"></td>
-	<td>Tick msec:</td><td id="serverTick"></td>
-	<td>Status:</td><td id="sessionStatus"></td>
-	<td>Pos X:</td><td id="position_x"></td>
-</tr>
-<tr>
-	<td>Timecode:</td><td id="serverTimecode"></td>
-	<td>controlled ID:</td><td id="controlledID"></td>
-	<td>Server Tick:</td><td id="serverMsec"></td>
-	<td>Client Tick:</td><td id="clientMsec"></td>
-	<td>Key pressed:</td><td id="keyPressSpan"></td>
-	<td></td><td></td>	
-	<td>Pos Y:</td><td id="position_y"></td>
-</tr>
-<tr><td>Info:</td><td id="infoString" colspan="10"></td></tr>
-</table>
+<!--  end of the page body -->
 
 <script type="text/javascript">
 
+// useful functions
+
+
+//initialize here
 var mybh = BHClient(fullApiURL.href);
+
 mybh.logger = function(message, messageLevel){ // the logger function, it will be called as logger(message, messageLevel);
 	if (messageLevel != "INFO") {
 		console.log("MyBH " + messageLevel + ": " + message);
@@ -147,57 +168,26 @@ mybh.logger = function(message, messageLevel){ // the logger function, it will b
 
 mybh.subscribe("update",  onBHUpdate);
 
-// initialize here
-//var viewbagKey = getCookie("viewbag");
-var viewbagKey = getQueryParam("bag");
-
 var bhfield = BHField({
 	target: "#mainSVG",
 	templateTile: "#templateTile"
 });
-
-//if (!viewbagKey) {
-//	getViewbagValue("", function(key) {
-//		window.location.href="?bag=" + key;
-//	});		
-//}
 	
+var urlClient = getQueryParam("client");
+var urlSid = getQueryParam("sid");
+var urlSession = getQueryParam("session");
 
-function restoreSessionKeys() {
-	var urlClient = getQueryParam("client");
-	var urlSid = getQueryParam("sid");
-	var urlSession = getQueryParam("session");
+if (urlClient) {
+	mybh.clientKey = urlClient;
+	mybh.sessionId = urlSid || "";
+	mybh.sessionKey = urlSession || "";
 	
-	if (urlClient) {
-		mybh.clientKey = urlClient;
-		mybh.sessionId = urlSid || "";
-		mybh.sessionKey = urlSession || "";
-		
-	} else if (viewbagKey) {
-
-		mybh.getBagValue(viewbagKey, "clientkey,sessionid", function(key) {
-			if (!key || key.length < 2) {
-				mybh.log("No active session", "ERROR");
-			} else {
-				mybh.clientKey = key[0];
-				mybh.sessionId = key[1];
-				//mybh.sessionKey = key[2];
-				if (mybh.sessionId && mybh.clientKey) {
-					//mybh.cycle(true);
-					mybh.getBagValue(viewbagKey, "sessionkey_" + mybh.sessionId, function(key) {
-						if (!key || key.length < 1) {
-							return;
-						} else {
-							mybh.sessionKey = key[0];
-						}
-					});	
-				}
-			}
-		});	
-	}
+} else {
+	mybh.log("No client key", "ERROR");
+	addMessage("ERROR: No client key");
 }
 	
-
+/** This function is called from bhclient on update */
 function onBHUpdate(obj, elementType, elementData) {
 	//console.log("subscribed update called, elementType=" + elementType);
 	if (elementType == "STATUS") {
@@ -215,6 +205,8 @@ function onBHUpdate(obj, elementType, elementData) {
 		$("#clientMsec").text(mybh.loopMilliseconds);
 		
 		$("#statusStage").text(elementData.pacmanStage || "no stage?");
+		$("#sessionScore").text(elementData.sessionScore);
+		$("#sessionLives").text(elementData.sessionLives);
 	}
 	else if (elementType == "CELL") {
 		//setTerrain(elementData.x, elementData.y, elementData.terrain);
@@ -257,7 +249,7 @@ var itemTiles = {};
 
 $(document).ready(function() {
 
-	restoreSessionKeys();
+	//restoreSessionKeys();
 	
 	$(".movebutton").click(function(evt) {
 		evt.preventDefault();
@@ -279,13 +271,12 @@ $(document).ready(function() {
 	
 	$("#btnPause").click(function(evt) {
 		evt.preventDefault();
-		//if (mybh.sessionID && mybh.clientKey) {
-		if (mybh.clientKey) {
-			mybh.command("pause");
-			addMessage("field pause");
-		} else {
-			addMessage("cannot pause the field: no client key");
-		}
+		doPause();
+	});
+	
+	$("#btnStage").click(function(evt) {
+		evt.preventDefault();
+		doStage();
 	});
 	
 	
@@ -320,10 +311,7 @@ $(document).ready(function() {
 		});
 		
 	});
-	
-	
-	
-	
+		
 	$("#btnStartCycling").click(function(evt) {
 		evt.preventDefault();
 		if (mybh.clientKey) {
@@ -444,13 +432,45 @@ $(document).ready(function() {
 			moveIt(6);
 		} else if (evt.keyCode == 40 || evt.keyCode == 83 || evt.keyCode == 98) { // down (83 = s)
 			moveIt(3);
-		} else if (evt.keyCode == 32 || evt.keyCode == 101) { // stop (32 = space)
+		} else if (evt.keyCode == 88 || evt.keyCode == 101) { // stop (88 = x)
 			moveIt(0);
-		} 
+		} else if (evt.KeyCode == 32) { // 32 = space
+			doPause();
+		}
 	});
+	
+	// initialize
+	if (mybh.clientKey) {
+		mybh.cycle(true);
+		addMessage("start cycling");
+	} else {
+		addMessage("cannot start cycling: no client key");
+	}
+
 });
 
 bhItemStatusDelete = 1;
+
+function doPause() {
+	//if (mybh.sessionID && mybh.clientKey) {
+	if (mybh.clientKey) {
+		mybh.command("pause");
+		addMessage("field pause");
+	} else {
+		addMessage("cannot pause the field: no client key");
+	}
+}
+
+function doStage() {
+	//if (mybh.sessionID && mybh.clientKey) {
+		console.log("doStage called");
+	if (mybh.clientKey) {
+		mybh.command("stage");
+		addMessage("next stage");
+	} else {
+		addMessage("cannot stage the field: no client key");
+	}
+}
 
 function updateItem(dataItem) {
 	//console.log("updateItem: " + JSON.stringify(dataItem));

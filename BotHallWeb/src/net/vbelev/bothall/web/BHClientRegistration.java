@@ -29,7 +29,12 @@ public class BHClientRegistration
 	//public OutputStream pushStream = null;
 	
 	public String userKey;
+	
+	/** a helper field to show the agent's name in messages */
 	public String userName;	
+	
+	/** a helper field to let the session differentiate agents */
+	public String agentType; 
 	
 	public long lastActiveTime = 0;
 	/**
@@ -121,6 +126,22 @@ public class BHClientRegistration
 			agentList.add(agent);
 		}
 		return agent;
+	}
+	
+	/** In case we'll want to use subtyped agents in a session */
+	public static BHClientRegistration registerAgent(BHClientRegistration agent)
+	{
+		if (agent == null)
+			throw new IllegalArgumentException();
+		
+		agent.agentID = ++agentInstanceSeq;
+		synchronized(lock)
+		{
+			agent.clientKey = generateClientKey(6);
+			agentList.add(agent);
+		}
+		return agent;
+		
 	}
 
 	public static String generateClientKey(int length) 

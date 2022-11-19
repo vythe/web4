@@ -41,7 +41,7 @@ public class BHBoard extends BHEngine
 	
 	private BHLandscape landscape = null;
 	private BHCollection items = null;
-	
+	private Object boardMutex = new Integer(0);
 	public BHBoard() {
 		_reset();
 	}
@@ -58,7 +58,14 @@ public class BHBoard extends BHEngine
 		super.reset();
 		_reset();
 	}
-	
+
+	/**
+	 * The mutex used to synchronize access to the collection and landscape (for stage loading)
+	 */
+	public Object getMutex()
+	{
+		return boardMutex;
+	}
 	public BHLandscape getLandscape()
 	{
 		return landscape;
@@ -309,7 +316,7 @@ public class BHBoard extends BHEngine
 		BHCollection.Atom me = getCollection().getItem(action.actorID);
 		if (me == null)
 		{
-			getMessages().addMessage(BHCollection.EntityTypeEnum.GLOBAL, 0,
+			getMessages().addMessage(BHCollection.MessageTargetEnum.GLOBAL, 0,
 					"ActorID not found: " + action.actorID);
 			// return "No atom id" + session.myID;
 		}
@@ -434,7 +441,7 @@ public class BHBoard extends BHEngine
 									// starting a buff
 			{
 				engine.getMessages().addMessage(
-						BHCollection.EntityTypeEnum.ITEM, me.getID(), "BOMM!");
+						BHCollection.MessageTargetEnum.ITEM, me.getID(), "BOMM!");
 				doStop(me, false);
 				System.out.println("BOMM");
 			}
@@ -452,7 +459,7 @@ public class BHBoard extends BHEngine
 				moveBuff.ticks = 0;
 				engine.postBuff(moveBuff);
 				engine.getMessages().addMessage(
-						BHCollection.EntityTypeEnum.ITEM, me.getID(),
+						BHCollection.MessageTargetEnum.ITEM, me.getID(),
 						"Posted buff to move to " + direction);
 				System.out.println("Posted buff move, delay=" + delay);
 			}
@@ -474,7 +481,7 @@ public class BHBoard extends BHEngine
 		me.setIntProp(BHCollection.Atom.INT_PROPS.MOVE_DIR, direction);
 
 		engine.postAction(jump, delay - 1); // 1 tick is already spent on doMove
-		engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,
+		engine.getMessages().addMessage(BHCollection.MessageTargetEnum.ITEM,
 				me.getID(),
 				"I am moving to " + targetCell + " (" + direction + ")");
 		System.out.println("Posted jump action-1 for id=" + jump.actorID
@@ -516,7 +523,7 @@ public class BHBoard extends BHEngine
 		BHLandscape.Cell targetCell = engine.getLandscape().getCell(newPos);
 		if (targetCell.getTerrain() != BHLandscape.TerrainEnum.LAND)
 		{
-			engine.getMessages().addMessage(BHCollection.EntityTypeEnum.ITEM,
+			engine.getMessages().addMessage(BHCollection.MessageTargetEnum.ITEM,
 					me.getID(), "BOMM-M!");
 			doStop(me, false);
 			// System.out.println("Hit the wall, escape, target=" + targetCell);

@@ -2,10 +2,14 @@ package net.vbelev.utils;
 
 
 import java.lang.annotation.*;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 //import java.nio.charset.Charset;
+
+//import com.sun.jmx.snmp.internal.SnmpSecuritySubSystem;
 
 //import com.sun.media.jfxmedia.track.Track.Encoding;
 
@@ -222,6 +226,39 @@ public class Utils
 	    
 	    return out.toString();
 	}
+	
+	private static java.util.Base64.Encoder encodeBytes64Encoder = null;    
+	
+	public static String encodeBytes64(byte[] bytes)
+	{
+		if (bytes == null || bytes.length == 0) return "";
+		
+		if (encodeBytes64Encoder == null)
+		{
+			encodeBytes64Encoder = java.util.Base64.getEncoder();
+		}
+		
+		byte[] bytes64 = encodeBytes64Encoder.encode(bytes);
+		return new String(bytes64, StandardCharsets.UTF_8);
+	}
+
+	private static java.util.Base64.Decoder decodeBytes64Decoder = null;
+
+	public static byte[] decodeBytes64(String str)
+	{
+		if (str == null || str.length() == 0) return new byte[0];
+		
+		if (decodeBytes64Decoder == null)
+		{
+			decodeBytes64Decoder = java.util.Base64.getDecoder();
+		}
+		
+		byte[] bytes64 = str.getBytes(StandardCharsets.UTF_8);
+		byte[] bytes = decodeBytes64Decoder.decode(bytes64);
+		return bytes;
+	}
+	
+	
 	
 	public static String formatDate(Date d)
 	{

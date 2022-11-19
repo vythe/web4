@@ -578,7 +578,8 @@ public class BHEngine
 		{
 			for (Buff b : this.buffs)
 			{
-				if (b.action.actorID != entityID) continue;
+				if (b.isCancelled) continue;
+				if (entityID > 0 && b.action.actorID != entityID) continue;
 				if (actionType == null || actionType == b.action.actionType)
 				{
 					res = b;

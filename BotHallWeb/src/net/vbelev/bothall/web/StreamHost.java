@@ -4,7 +4,7 @@ import java.io.*;
 import java.net.*;
 
 import net.vbelev.bothall.client.*;
-import net.vbelev.bothall.core.BHCollection.EntityTypeEnum;
+import net.vbelev.bothall.core.BHCollection.MessageTargetEnum;
 import net.vbelev.utils.*;
 
 /**
@@ -361,7 +361,7 @@ public class Worker
 			dryWriter.addByte(BHClient.ElementCode.ERROR);
 			err.toCereal(dryWriter);
 			*/
-			BHSession.postMessage(this.clientKey, EntityTypeEnum.ERROR, 0, "No response for " + cmd.toString());
+			BHSession.postMessage(this.clientKey, MessageTargetEnum.ERROR, 0, "No response for " + cmd.toString());
 		}
 		else
 		{
@@ -376,7 +376,7 @@ public class Worker
 				System.out.println("failed toCereal: " + x.getMessage());
 			}
 			*/
-			BHSession.postMessage(this.clientKey, EntityTypeEnum.RECEIPT, 0, cmd.toString());
+			BHSession.postMessage(this.clientKey, MessageTargetEnum.RECEIPT, 0, cmd.toString());
 			
 		}			
 		dryWriter.flush();

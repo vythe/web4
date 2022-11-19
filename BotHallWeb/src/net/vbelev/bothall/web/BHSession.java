@@ -19,7 +19,8 @@ public class BHSession extends BHBoard
 		public static final int NEW = 0;
 		public static final int ACTIVE = 1;
 		public static final int PAUSE = 2;
-		public static final int COMPLETE = 3;
+		/** All commands are rejected except "stage"; all effects are cleared - next stage or end*/
+		public static final int STAGEEND = 3;
 		/** The DEAD status flags the session for removal: everybody disconnects and shuts down */
 		public static final int DEAD = 4;
 		
@@ -30,7 +31,7 @@ public class BHSession extends BHBoard
 				case NEW: return "New";
 				case ACTIVE: return "Active";
 				case PAUSE: return "Pause";
-				case COMPLETE: return "Complete";
+				case STAGEEND: return "Done";
 				case DEAD: return "Dead";
 				default: return "" + v;
 			}
@@ -293,6 +294,8 @@ public class BHSession extends BHBoard
 	public long publish()
 	{
 		//System.out.println("session publish called! tc=" + timecode);
+		synchronized (this.getMutex())
+		{
 		long newTimecode = super.publish();
 		
 		for (BHCollection.Atom a : getCollection().allByTimecode(newTimecode))
@@ -314,6 +317,7 @@ public class BHSession extends BHBoard
 		publishEvent.trigger(new BHSession.PublishEventArgs(timecode));
 		
 		return newTimecode;
+		}
 	}
 	
 	@Override
@@ -568,7 +572,7 @@ public class BHSession extends BHBoard
 		return session.processCommand(agent, cmd);
 	}
 
-	public static boolean postMessage(String clientKey, BHCollection.EntityTypeEnum target, int targetID, String message)
+	public static boolean postMessage(String clientKey, BHCollection.MessageTargetEnum target, int targetID, String message)
 	{
 		BHClientRegistration agent = null;
 		BHSession s = null;

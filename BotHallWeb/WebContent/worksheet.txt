@@ -37,74 +37,107 @@ page three: the field
  	* dead session is a buff that cancels all other buffs at every tick;
  	* 
  
- 
- 
-counterSplit, maxCounter = 100, v2.1
-counter split 6367415506067116157
-17/10/2021 13:10:44 / 01/01/1970 10:00:00
-ep=1, limit=10, elapsed=00:00:00.018
-found 29, counterPos=10, tests=10, elapsed=00:00:00.019
-17/10/2021 13:10:44 / 01/01/1970 10:00:00
-ep=2, limit=10, elapsed=00:00:00.021
-17/10/2021 13:10:44 / 01/01/1970 10:00:00
-ep=3, limit=10, elapsed=00:00:00.033
-found 2473, counterPos=100, tests=366, elapsed=00:00:00.042
-found 5741, counterPos=100, tests=755, elapsed=00:00:00.053
-17/10/2021 13:10:45 / 01/01/1970 10:00:00
-ep=4, limit=10, elapsed=00:00:00.070
-17/10/2021 13:10:45 / 01/01/1970 10:00:00
-ep=5, limit=10, elapsed=00:00:00.216
-17/10/2021 13:10:45 / 01/01/1970 10:00:00
-ep=6, limit=10, elapsed=00:00:00.908
-17/10/2021 13:10:52 / 01/01/1970 10:00:07
-ep=7, limit=10, elapsed=00:00:07.816
-found 14197493, counterPos=100, tests=1252443, elapsed=00:00:10.663
-17/10/2021 13:11:52 / 01/01/1970 10:01:07
-ep=8, limit=10, elapsed=00:01:07.546
-found 533280289, counterPos=100, tests=47484464, elapsed=00:05:55.351
-17/10/2021 13:21:51 / 01/01/1970 10:11:06
-ep=9, limit=10, elapsed=00:11:06.865
-total tests 886952697 , last v=10000000000
-end at 17/10/2021 14:57:03
-total elapsed=01:46:18.614
+counter split 6338314443305765558137 at 12/02/2022 01:14:15
+ep=1, limit=11, elapsed=00:00:00.001
+ep=2, limit=11, elapsed=00:00:00.004
+ep=3, limit=11, elapsed=00:00:00.018
+ep=4, limit=11, elapsed=00:00:00.045
+ep=5, limit=11, elapsed=00:00:00.167
+ep=6, limit=11, elapsed=00:00:00.955
+ep=7, limit=11, elapsed=00:00:08.683
+found 99542969, counterPos=100, tests=8891501, elapsed=00:01:26.141
 
-counterSplit, maxCounter = 10, v2
-counter split 6367415506067116157
-ep=1, limit=10, time=15/10/2021 21:59:52
-found 29, counterPos=10
-ep=2, limit=10, time=15/10/2021 21:59:52
-ep=3, limit=10, time=15/10/2021 21:59:52
-found 2473, counterPos=10
-found 5741, counterPos=10
-ep=4, limit=10, time=15/10/2021 21:59:52
-ep=5, limit=10, time=15/10/2021 21:59:53
-ep=6, limit=10, time=15/10/2021 21:59:54
-ep=7, limit=10, time=15/10/2021 22:00:05
-found 14197493, counterPos=10
-ep=8, limit=10, time=15/10/2021 22:01:57
+counter split2 6338314443305765558137 at 12/02/2022 01:16:49
+ep=1, limit=11, elapsed=00:00:00.001
+ep=2, limit=11, elapsed=00:00:00.002
+ep=3, limit=11, elapsed=00:00:00.015
+ep=4, limit=11, elapsed=00:00:00.053
+ep=5, limit=11, elapsed=00:00:00.172
+ep=6, limit=11, elapsed=00:00:00.922
+ep=7, limit=11, elapsed=00:00:08.297
+found 99542969, counterPos=100, tests=8891501, elapsed=00:01:22.198
+
+earler counter splits -
+found 99542969, counterPos=50, tests=10166831, elapsed=00:01:31.852
+found 99542969, counterPos=70, tests=9504262, elapsed=00:01:24.332
+found 99542969, counterPos=100, tests=8891501, elapsed=00:01:20.891
+found 99542969, counterPos=100, tests=8891501, elapsed=00:01:28.823 -- counter = 100
+found 99542969, counterPos=200, tests=7776635, elapsed=00:01:26.481 -- counter = 200
+found 99542969, counterPos=300, tests=7164782, elapsed=00:01:32.474 -- counter = 300
+found 99542969, counterPos=1000, tests=5790518, elapsed=00:02:29.353 -- counter = 1000
+
+counter split2 430719402857887142733127 at 12/02/2022 02:22:57
+ep=1, limit=12, elapsed=00:00:00.001
+ep=2, limit=12, elapsed=00:00:00.002
+ep=3, limit=12, elapsed=00:00:00.014
+ep=4, limit=12, elapsed=00:00:00.053
+ep=5, limit=12, elapsed=00:00:00.188
+ep=6, limit=12, elapsed=00:00:01.027
+ep=7, limit=12, elapsed=00:00:09.264
+ep=8, limit=12, elapsed=00:01:29.915
+ep=9, limit=12, elapsed=00:14:45.883
+(unfinished)
+
+stepSplitCombo 6338314443305765558137 at 12/02/2022 01:30:08
+ep=1, elapsed=00:00:00.001, steps=8, d2=905473491900823651162
+ep=2, elapsed=00:00:00.003, steps=50, d2=65343447869131603692
+ep=3, elapsed=00:00:00.014, steps=336, d2=6357386603115110890
+ep=4, elapsed=00:00:00.050, steps=2458, d2=635547422370978196
+ep=5, elapsed=00:00:00.215, steps=19184, d2=63388849429506311
+ep=6, elapsed=00:00:01.136, steps=183748, d2=6338333458306140
+ep=7, elapsed=00:00:09.123, steps=1904180, d2=633832014779389
+return=99542969, elapsed=00:01:19.418, steps=19008523
+
+stepSplitCombo:
+return=147226901, elapsed=00:01:54.812, steps=26300503
+counterSplit2:
+found 147226901, counterPos=100, tests=13150252, elapsed=00:02:04.285
+
+stepSplitCombo 430719402857887142733127 at 15/02/2022 23:36:57
+ep=1, elapsed=00:00:00.000, steps=8, d2=61531343265412448961875
+ep=2, elapsed=00:00:00.003, steps=50, d2=4440406215029764358073
+ep=3, elapsed=00:00:00.014, steps=336, d2=432015449205503653694
+ep=4, elapsed=00:00:00.048, steps=2458, d2=43188549369085244433
+ep=5, elapsed=00:00:00.202, steps=19184, d2=4307581710932855384
+ep=6, elapsed=00:00:01.163, steps=168356, d2=430720695019972202
+ep=7, elapsed=00:00:09.647, steps=1755646, d2=43071979050569859
+ep=8, elapsed=00:01:30.597, steps=17864824, d2=4307194157794696
+ep=9, elapsed=00:13:34.856, steps=177810374, d2=430719407595800
+return=6764430599, elapsed=01:24:08.481, steps=1200062025
+
+counter split2 430719402857887142733127 at 16/02/2022 01:02:43
+ep=1, limit=12, elapsed=00:00:00.001
+ep=2, limit=12, elapsed=00:00:00.003
+ep=3, limit=12, elapsed=00:00:00.012
+ep=4, limit=12, elapsed=00:00:00.044
+ep=5, limit=12, elapsed=00:00:00.195
+ep=6, limit=12, elapsed=00:00:01.026
+ep=7, limit=12, elapsed=00:00:09.775
+ep=8, limit=12, elapsed=00:01:33.768
+ep=9, limit=12, elapsed=00:15:20.661
+found 6764430599, counterPos=100, tests=600031013, elapsed=01:42:02.180
+
+
+brute split 6338314443305765558137 at 10/02/2022 01:39:55
+ep=1, limit=11, step=9, elapsed=00:00:00.001, v=10
+ep=2, limit=11, step=99, elapsed=00:00:00.006, v=100
+ep=3, limit=11, step=999, elapsed=00:00:00.026, v=1000
+ep=4, limit=11, step=9999, elapsed=00:00:00.134, v=10000
+ep=5, limit=11, step=99999, elapsed=00:00:00.930, v=100000
+ep=6, limit=11, step=999999, elapsed=00:00:08.209, v=1000000
+ep=7, limit=11, step=9999999, elapsed=00:01:18.499, v=10000000
+found 99542969, elapsed=00:12:50.285
+
+-- stepSplit seems a little better than brute split
+stepSplit 6338314443305765558137 at 10/02/2022 21:16:42
+ep=1, elapsed=00:00:00.001, steps=16, d2=704257160367307284237
+ep=2, elapsed=00:00:00.006, steps=196, d2=64023378215209753112
+ep=3, elapsed=00:00:00.022, steps=1996, d2=6344659102408173731
+ep=4, elapsed=00:00:00.148, steps=19996, d2=633894833813957951
+ep=5, elapsed=00:00:00.847, steps=199996, d2=63383778270840363
+ep=6, elapsed=00:00:06.982, steps=1999996, d2=6338320781626547
+ep=7, elapsed=00:00:57.495, steps=19999996, d2=633831507713727
+return=99542969, elapsed=00:08:13.455, steps=199085935
 
 
 
-
-
-(what's 14197493 ? = 2473 * 5741)
-
-bruteSplit:
-split 6367415506067116157
-ep=1, limit=10, time=16/10/2021 14:13:41
-found 29
-ep=2, limit=10, time=16/10/2021 14:13:41
-found 841
-ep=3, limit=10, time=16/10/2021 14:13:41
-found 2473
-found 5741
-ep=4, limit=10, time=16/10/2021 14:13:41
-found 71717
-ep=5, limit=10, time=16/10/2021 14:13:42
-found 166489
-ep=6, limit=10, time=16/10/2021 14:13:50
-found 2079793
-found 4828181
-ep=7, limit=10, time=16/10/2021 14:14:58
-found 14197493
-ep=8, limit=10, time=16/10/2021 14:26:01

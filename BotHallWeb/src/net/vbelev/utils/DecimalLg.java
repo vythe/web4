@@ -222,4 +222,139 @@ public class DecimalLg
 		}
 		return res;
 	}
+	
+	/**
+	 * A simpler version to use until we have power()
+	 */
+	public Decimal sqrt(Decimal d)
+	{
+		Decimal d1 = d.isPositive()? d : d.minus();
+		int divideExtraDigits = numDigits - d1.getEPower();
+		Decimal res = d1.divide(Decimal.TWO, divideExtraDigits).quotient;
+		char[] mant = res.getMantissa();
+		// the gap is roughly d1 * 10^(-numDigits)
+		Decimal gap = new Decimal(new char[]{1}, d1.getEPower() - numDigits, true).minus();
+		
+		System.out.println("sqrt, d=" + d.toStringF() + ", gap=" + gap.toStringF());
+		// starting value
+		res = new Decimal(mant, res.getEPower() / 2 - mant.length + 1, true);
+		Decimal prevRes = d1;
+		int stepCount = 0;
+		// newton's: x[k + 1] = (x[k] + d1 / x[k]) / 2
+		while ((prevRes.add(gap).compareTest(res) > 0 || res.add(gap).compareTest(prevRes) > 0) && stepCount++ < numDigits * 10)
+		{
+			System.out.println("step " + stepCount + ", res=" + res.toStringF());
+			prevRes = res;
+			res = d1.divide(res, divideExtraDigits).quotient.add(res).divide(Decimal.TWO, divideExtraDigits).quotient;
+		}
+		
+		System.out.println("sqrt returns " + res.toStringF() + ", reverse=" + res.multiply(res).toStringF());
+		return res;
+	}
+	
+	/**
+	 * When calculating gcd(d1, d2), observe integer x1, x2 such that
+	 * d1 * x1 + d2 * x2 = gcd(d1, d2). 
+	 * Note that one of them is probably negative
+	 */
+	private static class gcdInternalData
+	{
+		public Decimal res;
+//		public Decimal d2;
+		public Decimal x1;
+		public Decimal x2;
+	}
+	
+	private static gcdInternalData gcdInternal(Decimal d1, Decimal d2)
+	{
+		gcdInternalData res = new gcdInternalData();
+		if (d1.isZero()) 
+		{
+			res.res = d2;
+			//res.d2 = d2;
+			res.x1 = Decimal.ZERO;
+			res.x2 = Decimal.ONE;
+		}
+		else
+		{
+			Decimal.Division dev = d2.divide(d1);
+			gcdInternalData res2 = gcdInternal(dev.remainder, d1);
+			res.res = res2.res;
+			res.x2 = res2.x1; 
+			res.x1 = res2.x2.add(dev.quotient.multiply(res2.x1).minus());
+		}
+		System.out.println("gdcInternal, d1=" + d1 + ", d2=" + d2);
+		System.out.println("d1*x1 + d2 * x2=" + (d1.multiply(res.x1).add(d2.multiply(res.x2))));
+		System.out.println("gdcInternal-d returns x1=" + res.x1 + ", x2=" + res.x2 + ", val=" + res.res);
+		return res;
+	}
+	
+	/**
+	 * Greatest common divisor (with extended) as taken from https://e-maxx.ru/algo/extended_euclid_algorithm
+	 */
+	public static Decimal gcd(Decimal d1, Decimal d2)
+	{
+		if (d1.isZero() || d2.isZero()) return Decimal.ZERO;
+		if (!d1.isPositive()) return gcd(d1.minus(), d2);
+		if (!d2.isPositive()) return gcd(d1, d2.minus());
+		
+		gcdInternalData res = gcdInternal(d1, d2);
+		
+		return res.res;
+	}
+		
+	/**
+	 * returns x such that (x * d) mod m = 1 (or (x * d) % m = 1).
+	 * it's the gcd(m, d) algorithm with some extras.
+	 * 
+	 * Inverse of d for mod m exists only if gcd(d, m) = 1.
+	 */
+	public static Decimal inverseModOne(Decimal d, Decimal m)
+	{
+		gcdInternalData res = gcdInternal(d, m);
+		Decimal g = res.res; //gcd(d, m);
+		//System.out.println("inverse mod, d=" + d + ", m=" + m + ", gcd=" + g);
+		if (!g.equals(Decimal.ONE))
+		{
+			//System.out.println("gcd = " + g + ", returning zero");
+			return Decimal.ZERO;
+		}
+
+		if (res.x1.isPositive())
+			return res.x1;
+		else
+			return res.x1.add(m);
+	}
+	
+	/**
+	 * In RSA:
+	 * p: a prime number;
+	 * q: another prime number;
+	 * n: modulus, n = p * q
+	 * r aka phi(n): r = (p - 1) * (q - 1)
+	 * e: public exponent, another (small) prime number. It's prime vs (p-1)(q-1), but basically a prime, and usualls 65537
+	 * d: private exponent, calculated here, so that d*e mod r = 1.
+	 * --
+	 * public key includes e and n; private key includes d and n. 
+	 */
+	public static Decimal rsaPrivateExponent(Decimal p, Decimal q, Decimal e)
+	{
+		/*
+		 * Calculate n = p × q
+
+Calculate ϕ(n) = (p – 1) × (q – 1)
+
+Select integer e with gcd(ϕ(n), e) = 1; 1 < e < ϕ(n)
+
+Calculate d where (d × e) mod ϕ(n) = 1
+
+The the public key file should have: {e, n} and the private key file should haveL {d, n} 
+		 */
+		Decimal n = p.multiply(q);
+		Decimal r = p.addSmall(-1).multiply(q.addSmall(-1));
+		//Decimal e = new Decimal("65537");
+		Decimal d = DecimalLg.inverseModOne(e, r);
+		return d;
+	}
+
 }

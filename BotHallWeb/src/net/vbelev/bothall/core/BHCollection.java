@@ -17,7 +17,7 @@ import net.vbelev.bothall.client.*;
  */
 public class BHCollection
 {
-	public enum EntityTypeEnum
+	public enum MessageTargetEnum
 	{
 		@Utils.EnumElement(code=0)
 		GLOBAL,

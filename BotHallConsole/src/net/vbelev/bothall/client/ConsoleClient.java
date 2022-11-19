@@ -11,7 +11,7 @@ import net.vbelev.utils.*;
 public class ConsoleClient
 {
 	private Socket s = null;
-	public StreamClient client = null;
+	public StreamClient<PacmanClient> client = null;
 	
 	public void connect(String host, int port) throws IOException
 	{
@@ -20,7 +20,7 @@ public class ConsoleClient
 		s.setSoTimeout(1000);
 		s.connect(new InetSocketAddress(host, port));
 		//s = new Socket(host, port);
-		client = new StreamClient(s.getInputStream(), s.getOutputStream());
+		client = new StreamClient<PacmanClient>(s.getInputStream(), s.getOutputStream(), new PacmanClient());
 	}
 
 	public static void main(String[] args)
@@ -45,7 +45,7 @@ public class ConsoleClient
 							// TODO Auto-generated method stub
 							// TODO Auto-generated method stub
 							BHClient.IElement queuedElem = null;
-							while ((queuedElem = cc.client.elementQueue.poll()) != null)
+							while ((queuedElem = (BHClient.IElement)cc.client.elementQueue.poll()) != null)
 							{
 								System.out.println("queue: " + queuedElem.toString());
 							}
@@ -54,8 +54,8 @@ public class ConsoleClient
 							String summary = Utils.formatDateTime(new Date()) + " timecode: ";
 							if (cc.client == null) summary += " no client";
 							else if (cc.client.collection == null) summary += " no collection";
-							else if (cc.client.collection.status == null) summary += " no status";
-							else summary += cc.client.collection.status.timecode;
+							else if (cc.client.collection.getStatus() == null) summary += " no status";
+							else summary += cc.client.collection.getStatus().timecode;
 							System.out.println(summary);
 							
 						}

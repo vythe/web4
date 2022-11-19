@@ -4,11 +4,13 @@ package net.vbelev.utils.test;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import junit.framework.Assert;
 import net.vbelev.utils.*;
 
 class DecimalTest
 {
-	//@Test
+	@Test
 	void convertRadix()
 	{
 		String orig = "1234000";
@@ -765,31 +767,52 @@ class DecimalTest
 	
 	Decimal bruteSplit(Decimal d)
 	{
-		System.out.println("split " + d.toStringF());
+		System.out.println("brute split " + d.toStringF() + " at " + Utils.formatDateTime(new java.util.Date()));
 		Decimal v = new Decimal(2);
+		//Decimal v = new Decimal("9953296"); // 99542969
 		int limit = d.getEPower() / 2 + 1;
 		int ep = 0;
 		int prevEp = 0;
+		long countStep = 0;
+		long countStepNext = (long)1e7;
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
 		while ((ep = v.getEPower()) < limit)
 		{
-			if (prevEp != ep)
+			countStep++;
+			if (prevEp != ep) // || countStep > countStepNext)
 			{
-				System.out.println("ep=" + ep + ", limit=" + limit + ", time=" + Utils.formatDateTime(new java.util.Date()));
+				System.out.println("ep=" + ep + ", limit=" + limit + ", step=" + countStep + ", elapsed=" + sw + ", v=" + v.toString());
 				prevEp = ep;
+				if (countStep > countStepNext)
+				{
+					countStepNext += 1e6;
+				}
 			}
 			Decimal.Division test = d.divide(v, 0);
+			//if (v.toLong() > 1.2e7) //(99542969 - 10))// && v.toLong() < (99542969 + 10))
+			//{
+			//System.out.println("v=" + v.toString() + ", remainder=" + test.remainder.toString());
+			//}
 			if (test.remainder.isZero())
 			{
-				System.out.println("found " + v.toStringF());
+				System.out.println("found " + v.toStringF()+ ", elapsed=" + sw);
+				return v;
 			}
-			v = v.addSmall(1);
+			//v = v.addSmall(1);
+			v = v.addOne();
+			if (v.toLong() > 99542969 + 1)
+			{
+				System.out.println("missed!");
+				return Decimal.ZERO;
+			}
 		}
 		return v;
 	}
 
 	Decimal counterSplit(Decimal d)
 	{
-		System.out.println("counter split " + d.toStringF());
+		System.out.println("counter split " + d.toStringF() + " at " + Utils.formatDateTime(new java.util.Date()));
 		int maxCounter = 100;
 		int counterPos = 0;
 		long[] counterBins = new long[maxCounter];
@@ -809,8 +832,8 @@ class DecimalTest
 		{
 			if (prevEp != ep)
 			{
-				java.util.Date swd = sw.getElapsedTime();
-				System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
+				//java.util.Date swd = sw.getElapsedTime();
+				//System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
 				System.out.println("ep=" + ep + ", limit=" + limit + ", elapsed=" + sw);
 				prevEp = ep;
 			}
@@ -839,6 +862,7 @@ class DecimalTest
 				if (test.remainder.isZero())
 				{
 					System.out.println("found " + v.toStringF() + ", counterPos=" + counterPos + ", tests=" + countTest + ", elapsed=" + sw);
+					return v;
 				}
 			}
 			//v = v.addSmall(1);
@@ -851,12 +875,550 @@ class DecimalTest
 		return v;
 	}
 	
+	Decimal counterSplit2(Decimal d)
+	{
+		System.out.println("counter split2 " + d.toStringF() + " at " + Utils.formatDateTime(new java.util.Date()));
+		int maxCounter = 100;
+		int counterPos = 0;
+		long[] counterBins = new long[maxCounter];
+		long[] counterVals = new long[maxCounter]; 
+		
+		Decimal v = new Decimal(2);
+		int limit = d.getEPower() / 2 + 1;
+		int ep = 0;
+		int prevEp = 0;
+		int countTest = 0;
+		boolean skipIt = false;
+		long counterB = 0;
+		//Decimal.Division test;
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
+		while ((ep = v.getEPower()) < limit)
+		{
+			if (prevEp != ep)
+			{
+				//java.util.Date swd = sw.getElapsedTime();
+				//System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
+				System.out.println("ep=" + ep + ", limit=" + limit + ", elapsed=" + sw);
+				prevEp = ep;
+			}
+			// advance counters
+			skipIt = false;
+			for (int c = 0; c < counterPos; c++)
+			{
+				if (--counterBins[c] == 0) 
+				{
+					counterBins[c] = counterVals[c];
+					skipIt = true;
+				}
+			}
+			if (skipIt) 
+			{
+				//System.out.println("skip v=" + v);
+			}
+			else
+			{
+				if (counterPos < maxCounter)
+				{
+					long val = v.toLong();
+					counterVals[counterPos] = val;
+					counterBins[counterPos++] = val;
+				}
+				countTest++;
+				//System.out.println("test " + countTest + " for " + v.toLong());
+				Decimal.Division test = d.divide(v, 0);
+				if (test.remainder.isZero())
+				{
+					System.out.println("found " + v.toStringF() + ", counterPos=" + counterPos + ", tests=" + countTest + ", elapsed=" + sw);
+					return v;
+				}
+			}
+			//v = v.addSmall(1);
+			v = v.addOne();
+		}
+		sw.stop();
+		System.out.println("total tests " + countTest + " , last v=" + v.toStringF());
+		System.out.println("end at " + Utils.formatDateTime(sw.getStopTime()));
+		System.out.println("total elapsed=" + sw);
+		return v;
+	}
+
+	/**
+	 * This split uses diff.divide() to reduce the number of cycles, and it is slow
+	 */
+	Decimal stepSplit(Decimal d)
+	{
+		System.out.println("stepSplit " + d + " at " + Utils.formatDateTime(new java.util.Date())); 
+		if (d.isZero()) return Decimal.ZERO;
+		Decimal d0 = d.isPositive()? d : d.minus();
+		Decimal dMinus = d.isPositive()? d.minus() : d;
+		
+		Decimal d1 = Decimal.TWO;
+		Decimal d2 = d0.divide(d1, 0).quotient; // d2 is always greater than d1
+		Decimal mult = d1.multiply(d2);
+		Decimal mOne = Decimal.ONE.minus();
+		
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
+		int ep = d1.getEPower();
+		int prevEp = ep;
+		long stepCount = 0;
+		do
+		{
+			stepCount++;
+			ep = d1.getEPower();
+			Decimal diff = mult.add(dMinus);
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", diff=" + diff);
+			if (prevEp != ep)
+			{
+				java.util.Date swd = sw.getElapsedTime();
+				//System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
+				//System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", divSteps=" + stepDivCount + ", share=" + Utils.round((double)stepDivCount / (double)stepCount, 2));
+				System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", d2=" + d2.toStringF());
+				//System.out.println("ep=" + ep + ", limit=" + limit + ", elapsed=" + sw);
+				prevEp = ep;
+			}
+			
+			//int comp = mult.compareTest(d0);			
+			if (diff.isZero())
+			{
+				System.out.println("return=" + d1 + ", elapsed=" + sw + ", steps=" + stepCount);
+				return d1;
+			}
+			if (d1.compareTest(d2) >= 0) return Decimal.ZERO;
+			
+			if (diff.isPositive())
+			{
+				Decimal.Division divdiv = diff.divide(d1, 0);
+				if (divdiv.quotient.isZero())
+				{
+					d2 = d2.add(mOne);
+					mult = mult.add(d1.minus());
+				}
+				else
+				{
+					d2 = d2.add(divdiv.quotient.minus()); //.add(mOne)
+					// this is the same as 
+					// mult = mult.add(d1.multiply(divdiv.quotient).minus()).add(d1.minus());
+					mult = mult.add(diff.minus());
+					if (!divdiv.remainder.isZero())
+					{
+						mult = mult.add(divdiv.remainder).add(d1.minus());
+						d2 = d2.add(mOne);
+					}
+					// mult = mult.add(diff.minus()).add(divdiv.remainder); // .add(d1.minus());
+				}
+			}
+			else
+			{
+				d1 = d1.addOne();
+				mult = mult.add(d2);
+			}
+			if (d1.toLong() > 99542969 + 1)
+			{
+				System.out.println("missed! d=" + d0);
+				return Decimal.ZERO;
+			}
+		} while (true);
+		
+		//return Decimal.ZERO;
+	}
+	
+	/** This step split always advances by ones, no dividing. 
+	 * For larger numbers it never ends
+	 * */
+	Decimal stepSplitOne(Decimal d)
+	{
+		System.out.println("stepSplitOne " + d + " at " + Utils.formatDateTime(new java.util.Date())); 
+		if (d.isZero()) return Decimal.ZERO;
+		Decimal d0 = d.isPositive()? d : d.minus();
+		
+		Decimal d1 = Decimal.TWO;
+		Decimal d2 = d0.divide(Decimal.TWO, 0).quotient; // d2 is always greater than d1
+		Decimal mult = d1.multiply(d2);
+		Decimal mOne = Decimal.ONE.minus();
+
+		int ep = d1.getEPower();
+		int prevEp = ep;
+		long stepCount = 0;
+		long stepCountNext = 100000000;
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
+
+		do
+		{
+			ep = d1.getEPower();
+			stepCount++;
+			if (prevEp != ep || stepCount > stepCountNext)
+			{
+				java.util.Date swd = sw.getElapsedTime();
+				//System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
+				//System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", divSteps=" + stepDivCount + ", share=" + Utils.round((double)stepDivCount / (double)stepCount, 2));
+				System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", d2=" + d2.toStringF());
+				//System.out.println("ep=" + ep + ", limit=" + limit + ", elapsed=" + sw);
+				prevEp = ep;
+				if (stepCount > stepCountNext)
+				{
+					stepCountNext += 100000000;
+				}
+			}
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", true mult=" + d1.multiply(d2));
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", diff=" + d0.add(mult.minus()));
+			int comp = mult.compareTest(d0);
+			if (comp == 0)
+			{
+				System.out.println("return=" + d1 + ", elapsed=" + sw + ", steps=" + stepCount);
+				return d1;
+			}
+			if (d1.compareTest(d2) >= 0) 
+			{
+				System.out.println("returning, " + d0 + " is a prime");
+				return Decimal.ZERO;
+			}
+			
+			if (comp > 0)
+			{
+				d2 = d2.add(mOne);
+				mult = mult.add(d1.minus());
+			}
+			else
+			{
+				d1 = d1.addOne();
+				mult = mult.add(d2);
+			}
+			if (d1.toLong() > 99542969 + 1)
+			{
+				System.out.println("missed! d=" + d0);
+				return Decimal.ZERO;
+			}
+		} while (true);
+		
+		//return Decimal.ZERO;
+	}
+	
+	/** the same as stepSplitOne, but starting from the middle, from sqrt(d) */
+	Decimal stepSplitOneMid(Decimal d)
+	{
+		System.out.println("stepSplitOne " + d + " at " + Utils.formatDateTime(new java.util.Date())); 
+		if (d.isZero()) return Decimal.ZERO;
+		Decimal d0 = d.isPositive()? d : d.minus();
+		
+		Decimal d1 = new DecimalLg(d.getPrecision()).sqrt(d);
+		d1 = d1.floor(); //d1 always goes up
+		Decimal d2 = d1; //d0.divide(Decimal.TWO, 0).quotient; // d2 always goes down 
+		// d1 is always greater than d
+		Decimal mult = d1.multiply(d2);
+		Decimal mOne = Decimal.ONE.minus();
+
+		int ep = d1.getEPower();
+		int prevEp = ep;
+		long stepCount = 0;
+		long stepCountNext = 100000000;
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
+
+		do
+		{
+			ep = d1.getEPower();
+			stepCount++;
+			if (prevEp != ep || stepCount > stepCountNext)
+			{
+				java.util.Date swd = sw.getElapsedTime();
+				//System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
+				//System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", divSteps=" + stepDivCount + ", share=" + Utils.round((double)stepDivCount / (double)stepCount, 2));
+				System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", d1=" + d1 + ", d2=" + d2.toStringF());
+				//System.out.println("ep=" + ep + ", limit=" + limit + ", elapsed=" + sw);
+				prevEp = ep;
+				if (stepCount > stepCountNext)
+				{
+					stepCountNext += 100000000;
+				}
+			}
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", true mult=" + d1.multiply(d2));
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", diff=" + d0.add(mult.minus()));
+			int comp = mult.compareTest(d0);
+			if (comp == 0)
+			{
+				System.out.println("return=" + d1 + ", elapsed=" + sw + ", steps=" + stepCount);
+				return d1;
+			}
+			if (d2.getEPower() <= 0) 
+			{
+				System.out.println("returning, " + d0 + " is a prime");
+				return Decimal.ZERO;
+			}
+			
+			if (comp > 0)
+			{
+				d2 = d2.add(mOne);
+				mult = mult.add(d1.minus());
+			}
+			else
+			{
+				d1 = d1.addOne();
+				mult = mult.add(d2);
+			}
+			/*
+			if (d1.toLong() > 99542969 + 1)
+			{
+				System.out.println("missed! d=" + d0);
+				return Decimal.ZERO;
+			}
+			*/
+		} while (true);
+		
+		//return Decimal.ZERO;
+	}
+
+	Decimal stepSplitLab(Decimal d)
+	{
+		System.out.println("stepSplit " + d + " at " + Utils.formatDateTime(new java.util.Date())); 
+		if (d.isZero()) return Decimal.ZERO;
+		Decimal d0 = d.isPositive()? d : d.minus();
+		
+		Decimal d1 = Decimal.TWO;
+		Decimal d2 = d0.divide(Decimal.TWO, 0).quotient; // d2 is always greater than d1
+		Decimal mult = d1.multiply(d2);
+		Decimal mOne = Decimal.ONE.minus();
+
+		int ep = d1.getEPower();
+		int prevEp = ep;
+		long stepCount = 0;
+		long stepCountNext = 100000000;
+		int stepDivCount = 0;
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
+
+		do
+		{
+			ep = d1.getEPower();
+			stepCount++;
+			if (prevEp != ep || stepCount > stepCountNext)
+			{
+				java.util.Date swd = sw.getElapsedTime();
+				//System.out.println(Utils.formatDateTime(new java.util.Date()) + " / " + Utils.formatDateTime(swd));
+				//System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", divSteps=" + stepDivCount + ", share=" + Utils.round((double)stepDivCount / (double)stepCount, 2));
+				System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", d2=" + d2.toStringF());
+				//System.out.println("ep=" + ep + ", limit=" + limit + ", elapsed=" + sw);
+				prevEp = ep;
+				if (stepCount > stepCountNext)
+				{
+					stepCountNext += 100000000;
+				}
+			}
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", true mult=" + d1.multiply(d2));
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", diff=" + d0.add(mult.minus()));
+			int comp = mult.compareTest(d0);
+			//if (diff.isZero())
+			if (comp == 0)
+			{
+				System.out.println("return=" + d1 + ", elapsed=" + sw + ", steps=" + stepCount + ", divSteps=" + stepDivCount + ", share=" + Utils.round((double)stepDivCount / (double)stepCount, 2));
+				return d1;
+			}
+			if (d1.compareTest(d2) >= 0) return Decimal.ZERO;
+			
+			if (comp > 0)
+			{
+				d2 = d2.add(mOne);
+				mult = mult.add(d1.minus());
+				//d1 = d1.addOne();
+				//mult = mult.add(d2);
+			}
+			/*if (comp > 0)
+			//if (diff.isPositive()) 
+			{
+				Decimal diff = mult.add(d0.minus());
+				
+				if (diff.getEPower() > d1.getEPower())
+				{
+					int divdigits = 3 - diff.getEPower() + d1.getEPower();
+					Decimal div1 = diff.divide(d1,0).quotient.minus();
+					Decimal div = diff.divide(d1, divdigits > 0? 0 : divdigits).quotient.minus();
+					if (d1.toLong() > (99542969 - 10))
+					{
+						System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", diff=" + d0.add(mult.minus()));
+						System.out.println("reduce d2: diff=" + diff.toStringE() + ", div=" + div.toStringE() + ", div1=" + div1.toStringE());
+					}
+					if (div.isZero())
+					{
+						System.out.println("reduce error, dif=0! d2: diff=" + diff.toStringE() + ", div=" + div.toStringE()); // + ", div1=" + div1.toStringE());
+						return Decimal.ZERO;
+					}
+					d2 = d2.add(div);
+					mult = mult.add(d1.multiply(div));
+					stepDivCount++;
+				}
+				else
+				{
+					d2 = d2.add(mOne);
+					mult = mult.add(d1.minus());
+				}			
+			}*/
+			else
+			{
+				d1 = d1.addOne();
+				mult = mult.add(d2);
+			}
+			if (d1.toLong() > 99542969 + 1)
+			{
+				System.out.println("missed! d=" + d0);
+				return Decimal.ZERO;
+			}
+		} while (true);
+		
+		//return Decimal.ZERO;
+	}
+
+	/** step split + counter */
+	Decimal stepSplitCombo(Decimal d)
+	{
+		System.out.println("stepSplitCombo " + d + " at " + Utils.formatDateTime(new java.util.Date())); 
+		if (d.isZero()) return Decimal.ZERO;
+		Decimal d0 = d.isPositive()? d : d.minus();
+		Decimal dMinus = d.isPositive()? d.minus() : d;
+		
+		Decimal d1 = Decimal.TWO;
+		Decimal d2 = d0.divide(d1, 0).quotient; // d2 is always greater than d1
+		Decimal mult = d1.multiply(d2);
+		Decimal mOne = Decimal.ONE.minus();
+		
+		int maxCounter = 100;
+		int counterPos = 0;
+		long[] counterBins = new long[maxCounter];
+		long[] counterVals = new long[maxCounter]; 
+		
+		counterVals[counterPos] = d1.toLong();
+		counterBins[counterPos++] = d1.toLong();
+		Utils.StopWatch sw = new Utils.StopWatch();
+		sw.start();
+		int ep = d1.getEPower();
+		int prevEp = ep;
+		long stepCount = 0;
+		do
+		{
+			stepCount++;
+			ep = d1.getEPower();
+			Decimal diff = mult.add(dMinus);
+			//System.out.println("d1=" + d1.toString() + ", d2=" + d2.toString() + ", mult=" + mult.toString() + ", diff=" + diff);
+			if (prevEp != ep)
+			{
+				java.util.Date swd = sw.getElapsedTime();
+				System.out.println("ep=" + ep + ", elapsed=" + sw + ", steps=" + stepCount + ", d2=" + d2.toStringF());
+				prevEp = ep;
+			}
+			
+			if (diff.isZero())
+			{
+				System.out.println("return=" + d1 + ", elapsed=" + sw + ", steps=" + stepCount);
+				return d1;
+			}
+			if (d1.compareTest(d2) >= 0) return Decimal.ZERO;
+			
+			if (diff.isPositive())
+			{
+				Decimal.Division divdiv = diff.divide(d1, 0);
+				if (divdiv.quotient.isZero())
+				{
+					d2 = d2.add(mOne);
+					mult = mult.add(d1.minus());
+				}
+				else
+				{
+					d2 = d2.add(divdiv.quotient.minus()); //.add(mOne)
+					// this is the same as 
+					// mult = mult.add(d1.multiply(divdiv.quotient).minus()).add(d1.minus());
+					mult = mult.add(diff.minus());
+					if (!divdiv.remainder.isZero())
+					{
+						mult = mult.add(divdiv.remainder).add(d1.minus());
+						d2 = d2.add(mOne);
+					}
+					// mult = mult.add(diff.minus()).add(divdiv.remainder); // .add(d1.minus());
+				}
+			}
+			else // advance d1
+			{
+				// advance counters
+				boolean skipIt = false;
+				do
+				{
+					skipIt = false;
+					d1 = d1.addOne();
+					mult = mult.add(d2);
+					for (int c = 0; c < counterPos; c++)
+					{
+						if (--counterBins[c] == 0) 
+						{
+							counterBins[c] = counterVals[c];
+							skipIt = true;
+						}
+					}
+					if (skipIt) 
+					{
+						//System.out.println("skipped d1=" + d1);
+					}
+					else
+					{
+					}
+				} while (skipIt);
+				if (counterPos < maxCounter)
+				{
+					long val = d1.toLong();
+					counterBins[counterPos] = val;
+					counterVals[counterPos++] = val;
+				}
+			}
+			/*
+			if (d1.toLong() > 147226901 + 1)
+			{
+				System.out.println("missed! d=" + d0);
+				return Decimal.ZERO;
+			}*/
+		} while (true);
+		
+		//return Decimal.ZERO;
+	}
+	
+	@Test
+	void testFloor()
+	{
+		Decimal d;
+		d = new Decimal("123456");
+		System.out.println("floor of " + d.toStringF() + " is " + d.floor());
+		d = new Decimal("123.456");
+		System.out.println("floor of " + d.toStringF() + " is " + d.floor());
+		d = new Decimal("123456e8");
+		System.out.println("floor of " + d.toStringF() + " is " + d.floor());
+		d = new Decimal("123456e-10");
+		System.out.println("floor of " + d.toStringF() + " is " + d.floor());
+		Assertions.assertEquals(d.toLong(), 17);
+	}
 	//@Test
 	void testSplit()
 	{
 		//bruteSplit(new Decimal("6367415506067116157")); //Utils.random.nextLong()));
-		//counterSplit(new Decimal("6367415506067116157"));
-		counterSplit(new Decimal("63674155060671161576367415506067116157"));
+		//counterSplit(new Decimal("63674155060671"));		
+		//counterSplit(new Decimal("63674155060673"));		
+		//counterSplit(new Decimal("6367415506067116157"));		
+		//counterSplit(new Decimal("63674155060671161576367415506067116157"));
+		
+		Decimal d1 = new Decimal("63674155060673");
+		//d1 = d1.multiply(new Decimal("231241"));
+		//d1 = d1.multiply(new Decimal("7814381")); // step: 45 sec, counter: 6 sec		
+		//d1 = d1.multiply(new Decimal("99542969")); // step: 546 sec, counter: 81 sec
+		//d1 = new Decimal("17").multiplySmall(19); // step: 546 sec, counter: 81 sec
+		//d1 = new Decimal("99542969").multiply(new Decimal("147226901")); // length 9
+		//d1 = d1.multiply(new Decimal("147226901")); // length 9
+		//d1 = d1.multiply(new Decimal("6764430599")); // length 10		
+		d1 = d1.multiply(new Decimal("32066729531")); // length 11
+		//Decimal res = stepSplit(d1); // + (17 *41))); //1.778 sec
+		//System.out.println("stepSplit: " + res);
+		//stepSplitCombo(d1);
+		//counterSplit2(d1);
+		stepSplitOneMid(d1);
+		//stepSplitOne(new Decimal("" + (17 * 43)));
+		//stepSplitOne(d1);
+		//bruteSplit(d1);
 		
 		//counterSplit(new Decimal(Utils.random.nextLong()));
 		//counterSplit(new Decimal((593987) + ""));
@@ -865,6 +1427,15 @@ class DecimalTest
 		
 		// test 2565438975860849476 (2e18) - not finished
 		// next try 308363006597831213 (3e17) - completed in 5900 sec (1h 40 min)
+	}
+	
+	//@Test
+	void testSqrt()
+	{
+		Decimal d1 = new Decimal("3.23456e9");
+		DecimalLg lg = new DecimalLg(23);
+		Decimal v1 = lg.sqrt(d1);
+		System.out.println("testSqrt: from " + d1.toStringF() + ", true=" + Math.sqrt(d1.toDouble()));
 	}
 	
 	//@Test

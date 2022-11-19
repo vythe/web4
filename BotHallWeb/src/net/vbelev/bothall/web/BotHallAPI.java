@@ -221,7 +221,7 @@ public class BotHallAPI
 		cmd.command = BHSession.COMMAND.CYCLE;
 		cmd.stringArgs[0] = sessionKey;
 		cmd.stringArgs[1] = run;
-		BHClient.IElement res = BHSession.processCommand("", cmd);
+		BHClient.IElement res = PacmanSession.processCommand("", cmd);
 
 		return Utils.encodeJSON(res.toString());
 	}

@@ -1,5 +1,6 @@
 package net.vbelev.utils;
 
+import java.math.BigInteger;
 import java.util.*;
 import java.util.regex.*;
 
@@ -46,6 +47,9 @@ public class Decimal implements Comparable<Object>
 	public final static Decimal ZERO = new Decimal();
 	
 	public final static Decimal ONE = new Decimal(1);
+
+	public final static Decimal TWO = new Decimal(2);
+	
 //==== Constructors ====
 	
 	private void buildEmpty()
@@ -435,6 +439,9 @@ public class Decimal implements Comparable<Object>
 		*/
 	}
 	
+	/** 
+	 * Simplified compareTo() that works for both positive this and to)
+	 */
 	public int compareTest(Decimal to)
 	{
 		return CharMath.compareArrays(this.mantissa, to.mantissa, (this.power) - (to.power));
@@ -592,6 +599,45 @@ public class Decimal implements Comparable<Object>
 		}
 	}
 	
+	private static BigInteger[] bigIntegerDigits = null;
+	public BigInteger toBigInteger()
+	{
+		if (this.isZero()) return BigInteger.ZERO;
+		BigInteger res = BigInteger.ONE;
+		
+		if (bigIntegerDigits == null)
+		{
+			BigInteger[] bid = new BigInteger[10];
+			bid[0] = BigInteger.ZERO;
+			for (int i = 1; i < 10; i++)
+				bid[i] = bid[i - 1].add(BigInteger.ONE);
+			
+			bigIntegerDigits = bid;
+		}
+		
+		for (int i = mantissa.length - 1; i >= 0; i--)
+		{
+			res = res.multiply(BigInteger.TEN).add(bigIntegerDigits[mantissa[i]]);
+		}
+		if (power < 0)
+		{
+			throw new IllegalArgumentException("Not a valid long: " + toString());
+		}
+		for (int i = 0; i < power; i++)
+		{
+			res = res.multiply(BigInteger.TEN);
+		}
+		
+		if (sign)
+		{
+			return res;
+		}
+		else
+		{
+			return res.negate();
+		}
+	}
+	
 	public double toDouble()
 	{
 		double res = 0;
@@ -719,6 +765,10 @@ public class Decimal implements Comparable<Object>
 	}
 	
 	
+	public Decimal floor()
+	{
+		return floor(this.mantissaLength + this.power);
+	}
 	/**
 	 * floor() trims the mantissa to the given number of digits without rounding,
 	 * ignoring the sign: round(13.45) to 3 digits -> 13.4 and round(-13.4) -> -13.4.
@@ -726,6 +776,7 @@ public class Decimal implements Comparable<Object>
 	 */
 	public Decimal floor(int maxdigits)
 	{
+		if (maxdigits <= 0) return Decimal.ZERO;
 		if (this.mantissa.length <= maxdigits) return new Decimal(this);
 		
 		Decimal res = new Decimal();
@@ -814,6 +865,12 @@ public class Decimal implements Comparable<Object>
 		{
 			this.quotient = quotient == null? ZERO : quotient;
 			this.remainder = remainder == null? ZERO : remainder;
+		}
+		
+		@Override
+		public String toString()
+		{
+			return quotient + " rem " + remainder;
 		}
 	}
 
@@ -921,6 +978,14 @@ public class Decimal implements Comparable<Object>
 		return res;
 	}
 
+	public Division divide (Decimal divisor) 
+	{
+		return divide(divisor, 0);
+	}
+	/** extraDigits == 0 means the returned quotient will be integer (power >= 0)
+	 * extraDigits > 0 means the returned quotient will have "extgraDigits" decimal places (power == precision - extraDigits)
+	 * extraDigits < 0 means the returned quotient will be rounded off, with extraDigits zeroes at the end (power == (-extraDigits))
+	*/
 	public Division divide(Decimal divisor, int extraDigits)
 	{
 		if (this.isZero()) 

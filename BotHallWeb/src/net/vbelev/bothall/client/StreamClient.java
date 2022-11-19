@@ -16,7 +16,7 @@ import net.vbelev.utils.*;
  * Once the connection is terminated, the client cannot be reconnected again - 
  * you'll need to create a new StreamClient instance with the new connection.
  */
-public class StreamClient<BHC extends BHClient.Client>
+public class StreamClient<BHC extends PacmanClient> //BHClient.Client>
 {
 	/** We keep onUpdate() as a delegate
 	 * to decouple the client creation, which is a networking operation, 
@@ -27,6 +27,16 @@ public class StreamClient<BHC extends BHClient.Client>
 	{
 		void onUpdate();
 	}
+	
+	/** 
+	 * For reasons similar to OnUpdate, this callback is a delegate.
+	 * Commands from the server to the client are technical, so they can be processed out of cycle.
+	 */
+	public interface OnCommand
+	{
+		void onCommand(BHClient.Command cmd);
+	}
+	
 	/* updateEvent is triggered after a successful update from the server. It runs synchronously 
 	public final EventBox.Event<EventBox.EventArgs> updateEvent = new EventBox.Event<EventBox.EventArgs>(false);	
 	 */
@@ -43,6 +53,7 @@ public class StreamClient<BHC extends BHClient.Client>
 	private final DryCereal.Reader dryReader; //= new DryCereal.Reader();
 	private Thread runningThread = null;
 	private OnUpdate onUpdate = null;
+	private OnCommand onCommand = null;
 	
 	private final Socket s;
 	public StreamClient(InputStream in, OutputStream out, BHC collection)
@@ -192,6 +203,15 @@ public class StreamClient<BHC extends BHClient.Client>
 					throw r;
 				}
 
+			}
+			else if (typeCode == BHClient.ElementCode.COMMAND)
+			{
+				BHClient.Command cmd = new BHClient.Command();
+				cmd.fromCereal(dryReader);
+				if (this.onCommand != null)
+				{
+					this.onCommand.onCommand(cmd);
+				}
 			}
 			else
 			{

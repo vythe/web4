@@ -8,7 +8,7 @@ public class DecimalLog10Test
 {
 	
 	
-	@Test
+	//@Test
 	public void testLog()
 	{
 		double lg1 = 0;
@@ -42,7 +42,7 @@ public class DecimalLog10Test
 		return grid[pos] * (1 - frac) + grid[pos + 1] * frac;
 	}
 
-	@Test
+	//@Test
 	public void testLog2()
 	{
 		double[] grid = new double[901];
@@ -131,7 +131,7 @@ public class DecimalLog10Test
 		}		
 	}
 
-	@Test
+	//@Test
 	public void testLog3()
 	{
 		GridLog g = new GridLog(9000);
@@ -197,4 +197,37 @@ public class DecimalLog10Test
 		System.out.println("last log-4: " + lg1);				
 	}	
 
+	@Test
+	public void rsaTestD() 
+	{
+		try
+		{
+			int keySize = 512;
+		java.security.KeyPairGenerator kg = java.security.KeyPairGenerator.getInstance("RSA");
+		kg.initialize(keySize);
+		java.security.KeyPair key = kg.generateKeyPair();
+		
+		//sun.security.rsa.RSAPublicKeyImpl publicKey = (sun.security.rsa.RSAPublicKeyImpl)key.getPublic();
+		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)key.getPrivate();
+		
+		Decimal p = new Decimal(privateKey.getPrimeP().toString());
+		Decimal q = new Decimal(privateKey.getPrimeQ().toString());
+		Decimal e = new Decimal(privateKey.getPublicExponent().toString());
+		Decimal d = DecimalLg.rsaPrivateExponent(p, q, e);
+		Decimal keyD = new Decimal(privateKey.getPrivateExponent().toString());
+		System.out.println("p=" + p);
+		System.out.println("q=" + q);
+		System.out.println("n len=" + p.multiply(q).toString().length());
+		System.out.println("key D=" + privateKey.getPrivateExponent().toString());
+		System.out.println("clc D=" + d.toString());
+
+		//System.out.println("publicKey64=" + Utils.encodeBytes64(publicKey.encode()));
+		//System.out.println("privateKey64=" + Utils.encodeBytes64(privateKey.encode()));
+		}
+		catch (Exception x)
+		{
+			System.out.println("crypto failed: " + x.getMessage());
+		}
+		
+	}	
 }

@@ -12,17 +12,27 @@ public class PacmanClient extends BHClient.Client
 	public static class PacmanStatus extends BHClient.Status
 	{
 		public int pacmanStage;
+		/** how many coins left on the field */
+		public int stageGold;
+		public int sessionScore;
+		public int sessionLives;
 		
 		public void toCereal(DryCereal to) throws IOException
 		{
 			super.toCereal(to);
-			to.addInt(pacmanStage);
+			to.addShort(pacmanStage);
+			to.addInt(stageGold);
+			to.addInt(sessionScore);
+			to.addShort(sessionLives);
 		}
 
 		public void fromCereal(DryCereal.Reader from)
 		{
 			super.fromCereal(from);
-			pacmanStage = (int)from.next().getInteger();
+			pacmanStage = (int)from.next().getShort();
+			stageGold = (int)from.next().getInteger();
+			sessionScore = (int)from.next().getInteger();
+			sessionLives = (int)from.next().getShort();
 		}		
 	}
 	
