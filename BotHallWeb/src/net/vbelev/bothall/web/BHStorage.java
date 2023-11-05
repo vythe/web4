@@ -266,7 +266,7 @@ public class BHStorage
 		Math.sqrt(-1);
 		String s = null;
 		s.toLowerCase();
-		
+		is.close();
 		}
 		catch (NullPointerException x)
 		{
@@ -275,6 +275,9 @@ public class BHStorage
 		catch (java.io.FileNotFoundException x)
 		{
 			return "No File!";
+		}
+		catch (java.io.IOException iex)
+		{
 		}
 		
 		return "";

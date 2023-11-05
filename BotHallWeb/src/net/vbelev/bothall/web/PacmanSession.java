@@ -389,6 +389,7 @@ public class PacmanSession extends BHSession
 						item.setX(x);
 						item.setY(y);
 						item.setZ(z);
+						res.stageGold++;
 					}
 					else if (c == '*')
 					{
@@ -397,7 +398,7 @@ public class PacmanSession extends BHSession
 						item.setX(x);
 						item.setY(y);
 						item.setZ(z);
-						res.stageGold++;
+						//res.stageGold++;
 					}
 					else if (c == '=')
 					{

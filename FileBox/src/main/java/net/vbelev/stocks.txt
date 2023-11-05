@@ -1,0 +1,9 @@
+
+we want to mimic  a working stock exchange (as opposed to investment)
+* the goal: to build a kinematic model of the stock market that reacts to events, plus the events model itself
+* work process:
+* * the front end displays the stocks (securities): last known price, volumes, outstanding orders, maybe some analytics
+* * every few seconds a "hand of the market" robot decides if the price should move and issues a correcting order
+	this is not a trader bot, it does not  
+* the player experience:
+* * short 

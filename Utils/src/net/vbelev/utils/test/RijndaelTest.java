@@ -1,6 +1,9 @@
 package net.vbelev.utils.test;
 
 import java.nio.charset.StandardCharsets;
+import java.security.*;
+import java.security.spec.RSAPublicKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 
 //import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,7 +30,7 @@ class RijndaelTest
 		Assertions.assertEquals(val1, decrypted);
 	}
 
-	//@Test
+	@Test
 	void crypto()
 	{
 		try
@@ -37,14 +40,18 @@ class RijndaelTest
 		kg.initialize(512);
 		java.security.KeyPair key = kg.generateKeyPair();
 		
-		sun.security.rsa.RSAPublicKeyImpl publicKey = (sun.security.rsa.RSAPublicKeyImpl)key.getPublic();
-		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)key.getPrivate();
-		
-		System.out.println("key=" + privateKey.toString());
 		
 
-		System.out.println("publicKey64=" + Utils.encodeBytes64(publicKey.encode()));
-		System.out.println("privateKey64=" + Utils.encodeBytes64(privateKey.encode()));
+		//sun.security.rsa.RSAPublicKeyImpl publicKey = (sun.security.rsa.RSAPublicKeyImpl)key.getPublic();
+		//System.out.println("publicKey64=" + Utils.encodeBytes64(publicKey.encode()));
+		PublicKey publicKey = key.getPublic();
+		System.out.println("publicKey64=" + Utils.encodeBytes64(publicKey.getEncoded()));
+		
+		//sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)key.getPrivate();
+		//System.out.println("privateKey64=" + Utils.encodeBytes64(privateKey.encode()));
+		PrivateKey privateKey = key.getPrivate();
+		System.out.println("key=" + privateKey.toString());
+		System.out.println("privateKey64=" + Utils.encodeBytes64(privateKey.getEncoded()));
 		}
 		catch (Exception x)
 		{
@@ -225,6 +232,13 @@ The the public key file should have: {e, n} and the private key file should have
 		return d;
 	}
 	
+	/**
+	 * Imitate constructing our own RSA key: 
+	 * 1) get a working RSA key from somewhere (from Java)
+	 * 2) get the two primes P and Q from its private key
+	 * 3) calculate our own d from the two primes and the e  from the public key, then construct our own private key
+	 * 4) encode a piece of text with the known public key from (1) and decode it with the new private key from (3)
+	 */
 	@Test
 	void crypto2()
 	{
@@ -233,26 +247,30 @@ The the public key file should have: {e, n} and the private key file should have
 		String publicKey64 = "MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAJT8rmnsVSdQiRh3p+ptE2qkA9K3r0DYywj1BIXQo5UoC9B112VlxQZLJPT32FwDqbndCDy6up7x3bdd91GO79MCAwEAAQ==";
 		String privateKey64 = "MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAlPyuaexVJ1CJGHen6m0TaqQD0revQNjLCPUEhdCjlSgL0HXXZWXFBksk9PfYXAOpud0IPLq6nvHdt133UY7v0wIDAQABAkAyqBN5amStoGFs00phl8KxUKEIJXJOHygxnHV0NjNYhCdnjVX975WwbCdVUpHq91075wPncJw25ph1fYipT4+BAiEAxZOC0CKsSIVKSqQsNVmvd8bDhMKv/ODl7gvYqKeSjBMCIQDBCvocTfoLg3+HVvFlnpTxRA6LUXVZATAk4lUz7o8FQQIhAJHoI7ytPmm39Ws13mfvuYNMx+rtE6Y+N88Z9IBob/L9AiAKD+BpiUb3QqtrCoUanuF0ke+QI3bSZNV1lraKNm0OAQIgHeqBX1+e/BjfaF4xPxB+/xWlo8PV6fLgtZcFyOAQZ+o=";
 		
-		sun.security.rsa.RSAPublicKeyImpl publicKey = new sun.security.rsa.RSAPublicKeyImpl(Utils.decodeBytes64(publicKey64));
-		
 		java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA"); 		
+
+		// 1) get the known public and private keys
+		X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(Utils.decodeBytes64(publicKey64));
+		java.security.interfaces.RSAPublicKey publicKey = (java.security.interfaces.RSAPublicKey)kf.generatePublic(pubKeySpec);		
+		
 		java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(Utils.decodeBytes64(privateKey64));
-//		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = kf.
-		//java.security.PrivateKey privateKey = kf.generatePrivate(keySpec);
-		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)kf.generatePrivate(keySpec);
+		PrivateKey pKey1 = kf.generatePrivate(keySpec);
+		java.security.interfaces.RSAPrivateCrtKey privateKey = (java.security.interfaces.RSAPrivateCrtKey)pKey1;
 		System.out.println("publicKey=" + publicKey.toString());
 		System.out.println("privateKey=" + privateKey.toString());
-		
-		//Decimal mod = new Decimal(publicKey.getModulus().toString());
-		//System.out.println("mod1=" + mod.toStringF());
-		
+
+		// 1) print the known modulus
 		Decimal privateMod = new Decimal(privateKey.getModulus().toString());
 		System.out.println("mod2=" + privateMod.toStringF()); // len=154 + ", len=" + privateMod.toStringF().length());
 
+		// 2) get P and Q from the known key
 		Decimal privateP = new Decimal(privateKey.getPrimeP().toString());
-		Decimal privateQ = new Decimal(privateKey.getPrimeQ().toString());		
+		Decimal privateQ = new Decimal(privateKey.getPrimeQ().toString());
+		// 2a) print the modulus from P * Q, just in case
 		System.out.println("mult=" + privateP.multiply(privateQ).toStringF());
-		Decimal e = new Decimal(privateKey.getPublicExponent().toString());
+		
+		// 3) calculate private exponent d from P, Q and the known public exponent e
+		Decimal e = new Decimal(publicKey.getPublicExponent().toString());
 		Decimal d = this.rsaFindD(privateP, privateQ, e);
 		System.out.println("calculated d=" + d);
 		System.out.println("key D=" + privateKey.getPrivateExponent().toString());
@@ -260,23 +278,23 @@ The the public key file should have: {e, n} and the private key file should have
 		javax.crypto.Cipher encryptCipher = javax.crypto.Cipher.getInstance("RSA");
 		encryptCipher.init(javax.crypto.Cipher.ENCRYPT_MODE, publicKey);
 		
-		//new java.math.BigInteger(d.toString());
-//		java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(Utils.decodeBytes64(privateKey64));
-		//java.security.spec.RSAPrivateKeySpec keySpec2 = new java.security.spec.RSAPrivateKeySpec(new java.math.BigInteger(d.toString()), new java.math.BigInteger(e.toString()));
 		java.security.spec.RSAPrivateKeySpec keySpec2 = new java.security.spec.RSAPrivateKeySpec(new java.math.BigInteger(privateMod.toString()), new java.math.BigInteger(d.toString()));
-		sun.security.rsa.RSAPrivateKeyImpl privateKey2 = (sun.security.rsa.RSAPrivateKeyImpl)kf.generatePrivate(keySpec2);
-		
-		
+		//java.security.interfaces.RSAPrivateCrtKey privateKey2 = (java.security.interfaces.RSAPrivateCrtKey)kf.generatePrivate(keySpec2);
+		PrivateKey testPrivateKey = kf.generatePrivate(keySpec2);
+		java.security.interfaces.RSAPrivateKey privateKey2 = (java.security.interfaces.RSAPrivateKey)testPrivateKey;
+
+		// 4) encode with the known public key
 		String testStr = "Hello, world";
 		//String encodedMessage = java.util.Base64.getEncoder().encodeToString(testStr.getBytes(StandardCharsets.UTF_8));
 		byte[] encryptedBytes = encryptCipher.doFinal(testStr.getBytes(StandardCharsets.UTF_8));
 		String encodedMessage = Utils.encodeBytes64(encryptedBytes);
 		System.out.println("encoded: "+ encodedMessage);
+		// 4a) decode with the test private key
 		javax.crypto.Cipher decryptCipher = javax.crypto.Cipher.getInstance("RSA");
-		decryptCipher.init(javax.crypto.Cipher.DECRYPT_MODE, privateKey2);
+		decryptCipher.init(javax.crypto.Cipher.DECRYPT_MODE, testPrivateKey);
 		
 		//Utils.decodeBytes64();
-		String detestStr = new String(//
+		String detestStr = new String(
 			decryptCipher.doFinal(
 				java.util.Base64.getDecoder().decode(
 					encodedMessage.getBytes(StandardCharsets.UTF_8)
@@ -284,7 +302,6 @@ The the public key file should have: {e, n} and the private key file should have
 			)
 		);//, StandardCharsets.UTF_8);
 
-		
 
 		System.out.println("decoded: " + detestStr);
 		}
