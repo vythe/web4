@@ -37,14 +37,14 @@ class RijndaelTest
 		kg.initialize(512);
 		java.security.KeyPair key = kg.generateKeyPair();
 		
-		sun.security.rsa.RSAPublicKeyImpl publicKey = (sun.security.rsa.RSAPublicKeyImpl)key.getPublic();
-		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)key.getPrivate();
+		java.security.interfaces.RSAPublicKey publicKey = (java.security.interfaces.RSAPublicKey)key.getPublic();
+		java.security.interfaces.RSAPrivateCrtKey privateKey = (java.security.interfaces.RSAPrivateCrtKey)key.getPrivate();
 		
 		System.out.println("key=" + privateKey.toString());
 		
 
-		System.out.println("publicKey64=" + Utils.encodeBytes64(publicKey.encode()));
-		System.out.println("privateKey64=" + Utils.encodeBytes64(privateKey.encode()));
+		System.out.println("publicKey64=" + Utils.encodeBytes64(publicKey.getEncoded()));
+		System.out.println("privateKey64=" + Utils.encodeBytes64(privateKey.getEncoded()));
 		}
 		catch (Exception x)
 		{
@@ -233,13 +233,14 @@ The the public key file should have: {e, n} and the private key file should have
 		String publicKey64 = "MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAJT8rmnsVSdQiRh3p+ptE2qkA9K3r0DYywj1BIXQo5UoC9B112VlxQZLJPT32FwDqbndCDy6up7x3bdd91GO79MCAwEAAQ==";
 		String privateKey64 = "MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAlPyuaexVJ1CJGHen6m0TaqQD0revQNjLCPUEhdCjlSgL0HXXZWXFBksk9PfYXAOpud0IPLq6nvHdt133UY7v0wIDAQABAkAyqBN5amStoGFs00phl8KxUKEIJXJOHygxnHV0NjNYhCdnjVX975WwbCdVUpHq91075wPncJw25ph1fYipT4+BAiEAxZOC0CKsSIVKSqQsNVmvd8bDhMKv/ODl7gvYqKeSjBMCIQDBCvocTfoLg3+HVvFlnpTxRA6LUXVZATAk4lUz7o8FQQIhAJHoI7ytPmm39Ws13mfvuYNMx+rtE6Y+N88Z9IBob/L9AiAKD+BpiUb3QqtrCoUanuF0ke+QI3bSZNV1lraKNm0OAQIgHeqBX1+e/BjfaF4xPxB+/xWlo8PV6fLgtZcFyOAQZ+o=";
 		
-		sun.security.rsa.RSAPublicKeyImpl publicKey = new sun.security.rsa.RSAPublicKeyImpl(Utils.decodeBytes64(publicKey64));
+		//java.security.interfaces.RSAPublicKey publicKey = new sun.security.rsa.RSAPublicKeyImpl(Utils.decodeBytes64(publicKey64));
 		
-		java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA"); 		
+		java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+		java.security.interfaces.RSAPublicKey publicKey = (java.security.interfaces.RSAPublicKey)kf.generatePublic(new java.security.spec.X509EncodedKeySpec(Utils.decodeBytes64(publicKey64)));
 		java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(Utils.decodeBytes64(privateKey64));
 //		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = kf.
 		//java.security.PrivateKey privateKey = kf.generatePrivate(keySpec);
-		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)kf.generatePrivate(keySpec);
+		java.security.interfaces.RSAPrivateCrtKey privateKey = (java.security.interfaces.RSAPrivateCrtKey)kf.generatePrivate(keySpec);
 		System.out.println("publicKey=" + publicKey.toString());
 		System.out.println("privateKey=" + privateKey.toString());
 		
@@ -264,7 +265,7 @@ The the public key file should have: {e, n} and the private key file should have
 //		java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(Utils.decodeBytes64(privateKey64));
 		//java.security.spec.RSAPrivateKeySpec keySpec2 = new java.security.spec.RSAPrivateKeySpec(new java.math.BigInteger(d.toString()), new java.math.BigInteger(e.toString()));
 		java.security.spec.RSAPrivateKeySpec keySpec2 = new java.security.spec.RSAPrivateKeySpec(new java.math.BigInteger(privateMod.toString()), new java.math.BigInteger(d.toString()));
-		sun.security.rsa.RSAPrivateKeyImpl privateKey2 = (sun.security.rsa.RSAPrivateKeyImpl)kf.generatePrivate(keySpec2);
+		java.security.interfaces.RSAPrivateCrtKey privateKey2 = (java.security.interfaces.RSAPrivateCrtKey)kf.generatePrivate(keySpec2);
 		
 		
 		String testStr = "Hello, world";

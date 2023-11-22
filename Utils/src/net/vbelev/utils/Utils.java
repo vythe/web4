@@ -322,6 +322,14 @@ public class Utils
 		return new String(res);
 	}
 	
+	public static String randomString64(int length)
+	{
+		if (length < 4) length = 4;
+		byte[] res = new byte[length];
+		random.nextBytes(res);
+		return encodeBytes64(res).substring(0, length - 1);
+	}
+	
 	public static <T extends Comparable<T>>T Max(Enumeration<T> vals)
 	{
 		T res = null;

@@ -7,3 +7,40 @@ we want to mimic  a working stock exchange (as opposed to investment)
 	this is not a trader bot, it does not  
 * the player experience:
 * * short 
+
+* Outer layer:
+* * Server, database
+
+SSO without cookies:
+(ATS = authentication server; AMS = amenities server/service)
+The goal: you go to the ATS website and enter your login/password. You are authenticated in the SSO environment.
+You go to an amenities website (different browser, no cookies from ATS).
+AMS uses the usual session cookies or auth tokens to maintain your login, that's as usual, but they need to auth you.
+AMS gets a pair of tokens from ATS: the ATS session token and a single-use login token.
+AMS sends you to the ATK website with the login token to authenticate.
+on the ATK website, you are authenticated in some way.
+  - since you are already logged it, it may remember your login session
+  - or it may ask for your login and password again
+if there is a notification endpoint registed for the AMS with the ATS, 
+	then the notification endpoint is called with the login token (not the ATS token!) and the authenticated user id.
+	Any response 200 is okay, any other response means authentication failed
+if there is any return URL for the AMS is registered with ATS, the user is redirected to it;
+	if there is no return URL, a message "please go back" is displayed (we are still on the ATS website)
+at any time, AMS can call an endpoint in ATS, ask for the status of the ATS session token
+	and get back some public user info or a non-authenticated or a logged-out status.
+
+
+A login sharing: suppose we have an application A that authenticated a user (with a password or something)
+	and wants to start an application B with the same user authentication. 
+	The apps A and B use some internal ID to identify the user, and the user may not exist in the ATS database.
+	- the app A either knows the user's ATS ID or creates a temp user record in ATS. 
+	- it gets a "prepaid" login token for this user from ATS, optionally locked for the app B only.
+	- the app B gets the prepaid login token and calls ATS as usual, getting back an ATS session token and a blank login token.	
+	- that ATS session is already authenticated, so the app B is ready to go. It checks the session status 
+		and retrieves the internal ID set by the app A.
+		
+
+
+* the authentication token is passed either as a cookie (yes) or an auth header in every call
+* the authentication server (ATS) accepts the user, via a password or something - we trust this server.
+* an amenities server authenticates with the ATS

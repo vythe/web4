@@ -208,7 +208,8 @@ public class DecimalLog10Test
 		java.security.KeyPair key = kg.generateKeyPair();
 		
 		//sun.security.rsa.RSAPublicKeyImpl publicKey = (sun.security.rsa.RSAPublicKeyImpl)key.getPublic();
-		sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)key.getPrivate();
+		//sun.security.rsa.RSAPrivateCrtKeyImpl privateKey = (sun.security.rsa.RSAPrivateCrtKeyImpl)key.getPrivate();
+		java.security.interfaces.RSAPrivateCrtKey  privateKey = (java.security.interfaces.RSAPrivateCrtKey)key.getPrivate();
 		
 		Decimal p = new Decimal(privateKey.getPrimeP().toString());
 		Decimal q = new Decimal(privateKey.getPrimeQ().toString());

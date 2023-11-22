@@ -3,7 +3,7 @@ package net.vbelev.bothall.web;
 import java.io.IOException;
 import java.util.*;
 
-import org.apache.tomcat.jni.File;
+//import org.apache.tomcat.jni.File;
 
 import net.vbelev.utils.*;
 import net.vbelev.utils.DryCereal.Reader;
