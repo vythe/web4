@@ -31,31 +31,32 @@ public class DemoServlet extends HttpServlet {
     }
 
 	/**
-	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
-	 */
-	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		// TODO Auto-generated method stub
-		if (request.getRequestURI().toLowerCase().endsWith("/hello"))
-		{
-			String[] names = request.getParameterMap().get("name");
-			String name;
-			if (names == null || names.length == 0)
-				name = "(noname)";
-			else
-				name = String.join(", ", names);
-			
-		RequestDispatcher dispatcher = request.getRequestDispatcher("/hello.jsp");
-		request.setAttribute("name", name);
-		dispatcher.forward(request, response);
-		}
-		else		
-		{
-			String msg = "Served at: " + request.getContextPath() + " for " + request.getRequestURI();
-			//response.getWriter().append("Served at: ").append(request.getContextPath());
-			response.getWriter().append(msg);
-		}
-		
-	}
+     * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
+     */
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
+    {
+        // TODO Auto-generated method stub
+        if (request.getRequestURI().toLowerCase().endsWith("/hello"))
+        {
+            String[] names = request.getParameterMap().get("name");
+            String name;
+            if (names == null || names.length == 0)
+                name = "(noname)";
+            else
+                name = String.join(", ", names);
+
+            // Embetted Jetty doesn't want to find the JSP in a separate WebAppContext. Normal Tomcat is okay 
+            RequestDispatcher dispatcher = request.getRequestDispatcher("/hello.jsp");
+            request.setAttribute("name", name);
+            dispatcher.forward(request, response);
+        } else
+        {
+            String msg = "Served at: " + request.getContextPath() + " for " + request.getRequestURI();
+            //response.getWriter().append("Served at: ").append(request.getContextPath());
+            response.getWriter().append(msg);
+        }
+
+    }
 
 	/**
 	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)

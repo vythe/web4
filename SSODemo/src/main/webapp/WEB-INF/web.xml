@@ -9,6 +9,7 @@
     <welcome-file>default.jsp</welcome-file>
     <welcome-file>default.htm</welcome-file>
   </welcome-file-list>
+  <!-- 
   <servlet>
     <description></description>
     <display-name>Jersey API</display-name>
@@ -28,5 +29,16 @@
   <servlet-mapping>
     <servlet-name>JerseyAPI</servlet-name>
     <url-pattern>/jersey/*</url-pattern>
+  </servlet-mapping>
+  -->
+  <servlet>
+    <description></description>
+    <display-name>AuthServlet</display-name>
+    <servlet-name>AuthServlet</servlet-name>
+    <servlet-class>net.vbelev.sso.web.AuthServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>AuthServlet</servlet-name>
+    <url-pattern>/AuthServlet</url-pattern>
   </servlet-mapping>
 </web-app>

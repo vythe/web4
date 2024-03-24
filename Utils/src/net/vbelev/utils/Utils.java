@@ -42,6 +42,20 @@ public class Utils
 		return null;
 	}
 
+	public static Integer parseInt(String arg)
+	{
+	    if (arg == null || arg.length() == 0 || arg.equals("null"))
+	        return null;
+	    return Integer.parseInt(arg);	                
+	}
+	
+    public static Long parseLong(String arg)
+    {
+        if (arg == null || arg.length() == 0 || arg.equals("null"))
+            return null;
+        return Long.parseLong(arg);                   
+    }
+    
 	public static <T extends Enum<T>>T parseEnum(Class<T> c, String val)
 	{
 		//,c.ise
@@ -145,10 +159,21 @@ public class Utils
 		return Arrays.copyOf(args, args.length);
 	}
 	
-	public static boolean IsEmpty(String arg)
+	public static boolean isEmpty(String arg)
+	{
+		return (arg == null || arg.length() == 0);
+	}
+	
+	public static boolean isBlank(String arg)
 	{
 		if (arg == null || arg.length() == 0) return true;
 		return arg.trim().length() == 0;
+	}
+	
+	public static String stringOrEmpty(Object val)
+	{
+	    if (val == null) return "";
+	    return val.toString();
 	}
 	
 	public static String encodeHTML(String src)
@@ -242,6 +267,22 @@ public class Utils
 		return new String(bytes64, StandardCharsets.UTF_8);
 	}
 
+	public static String encodeBytes64(byte[] bytes, boolean trimEnd)
+	{
+		if (bytes == null || bytes.length == 0) return "";
+		String res = encodeBytes64(bytes);
+		if (trimEnd)
+		{
+			int len = res.length();
+			while (len > 0 && res.startsWith("=", len - 1))
+			{
+				res = res.substring(0, len - 1);
+				len--;
+			}
+		}
+		return res;		
+	}
+	
 	private static java.util.Base64.Decoder decodeBytes64Decoder = null;
 
 	public static byte[] decodeBytes64(String str)
@@ -327,7 +368,7 @@ public class Utils
 		if (length < 4) length = 4;
 		byte[] res = new byte[length];
 		random.nextBytes(res);
-		return encodeBytes64(res).substring(0, length - 1);
+		return encodeBytes64(res).substring(0, length);
 	}
 	
 	public static <T extends Comparable<T>>T Max(Enumeration<T> vals)
@@ -592,5 +633,5 @@ public class Utils
 			}
 			return new Date(elp / 1000000);
 		}
-	}
+	}	
 }

@@ -101,7 +101,7 @@ public class SessionBag
 	
 	public static boolean isValid(String bag)
 	{
-		if (Utils.IsEmpty(bag)) return false;
+		if (Utils.isBlank(bag)) return false;
 		SessionBag b = getByKey(bag);
 		if (b == null) return false;
 

@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
 
 import net.vbelev.utils.*;
 /**
@@ -14,91 +15,128 @@ import net.vbelev.utils.*;
 public class SSOPasswordService 
 {
 	private static final int SALT_LENGTH = 8;
-	
+	private static final int KEY_LENGTH = 512;
 	/**
 	 * For easier handling of passwords, they are grouped in this structure
 	 */
 	public static class PasswordInfo
 	{
-		public String salt;
-		public String password;
-		public long passwordKeyId;
-		
-		public PasswordInfo() {}
+		private String _salt;
+		private String _password;
+		private long _passwordKeyId;
 		
 		public PasswordInfo(String salt, String password, long passwordKeyId)
 		{
-			this.salt = salt;
-			this.password = password;
-			this.passwordKeyId = passwordKeyId;
+			_salt = salt;
+			_password = password;
+			_passwordKeyId = passwordKeyId;
 		}
+		
+		public String getSalt() { return _salt;}
+		public String getPassword() { return _password; }
+		public long getPasswordKeyId() { return _passwordKeyId; } 
 	}
 	
+	/**
+	 * The class needs to be public to support saving and loading from storage. Keep it simple.
+	 */
 	public static class PasswordKeyInfo
 	{
-		public long keyId;
-		public long generationTime;
-		//java.security.interfaces.RSAPublicKey key;
-		private java.security.Key key;
+		private long _keyId;
+		private long _generationTime;
+		private java.security.Key _key;
 		
 		private javax.crypto.Cipher encryptCipher;
 		
-		public synchronized void setKey(java.security.Key key)
+		public long getKeyId() { return _keyId;}
+		public long getGenerationTime() { return _generationTime; }
+		public Date getGenerationDateTime() { return new Date(_generationTime); }
+		
+		public PasswordKeyInfo(long keyId, long generationTime, java.security.Key key)
 		{
-			this.key = key;
-			encryptCipher = null;
+			_keyId = keyId;
+			_generationTime = generationTime;
+			_key = key;
 		}
 		
-		public synchronized void setKey(String keyEncoded, boolean isPublic)
+		public PasswordKeyInfo(long keyId, long generationTime, String keyEncoded, boolean isPublic) throws GeneralSecurityException
+		{
+			_keyId = keyId;
+			_generationTime = generationTime;
+			setKey(keyEncoded, isPublic);
+		}
+		
+		private synchronized void setKey(String keyEncoded, boolean isPublic) throws GeneralSecurityException
 		{
 			if (keyEncoded == null || keyEncoded.length() == 0)
 			{
-				key = null;
+				_key = null;
 				encryptCipher = null;
 				return;
 			}
 
-			try
+			java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
+			byte[] keyBytes = Utils.decodeBytes64(keyEncoded);
+			if (isPublic)
 			{
-				java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
-				byte[] keyBytes = Utils.decodeBytes64(keyEncoded);
-				if (isPublic)
-				{
-					key = (java.security.interfaces.RSAPublicKey)kf.generatePublic(new java.security.spec.X509EncodedKeySpec(keyBytes));					
-				}
-				else
-				{
-					java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(keyBytes);
-					//java.security.interfaces.RSAPrivateCrtKey privateKey 
-					key = (java.security.interfaces.RSAPrivateCrtKey)kf.generatePrivate(keySpec);				
-				}
+				//java.security.interfaces.RSAPublicKey
+				_key = kf.generatePublic(new java.security.spec.X509EncodedKeySpec(keyBytes));					
 			}
-			catch (Exception x)
+			else
 			{
-				key = null;
+				java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(keyBytes);
+				//java.security.interfaces.RSAPrivateCrtKey 
+				_key = kf.generatePrivate(keySpec);				
 			}
 			encryptCipher = null;
 		}
 		
 		public synchronized String getKeyString()
 		{
-			if (key == null) return "";
-			return Utils.encodeBytes64(key.getEncoded());
+			if (_key == null) return "";
+			return Utils.encodeBytes64(_key.getEncoded());
 		}
 		
+		/**
+		 * Converts {@code txt} into an undecryptable(?) string.
+		 * Note that salting and padding is the responsibility of the consumer, not of this method.
+		 * @throws GeneralSecurityException
+		 */
 		public synchronized String encrypt(String txt) throws GeneralSecurityException
 		{
 			if (txt == null || txt.length() == 0)
 				throw new IllegalArgumentException("Encrypting empty strings is not allowed");
 			if (encryptCipher == null)
 			{
-				encryptCipher = javax.crypto.Cipher.getInstance("RSA");
-				encryptCipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+				encryptCipher = javax.crypto.Cipher.getInstance("RSA/ECB/NoPadding");
+				encryptCipher.init(javax.crypto.Cipher.ENCRYPT_MODE, _key);
 			}
-			byte[] encryptedBytes = encryptCipher.doFinal(txt.getBytes(StandardCharsets.UTF_8));
-			String encrypted = Utils.encodeBytes64(encryptedBytes);
-			
+			try
+			{
+				byte[] txtBytes = txt.getBytes(StandardCharsets.UTF_8);
+				int blocksize = KEY_LENGTH / 8;
+				int offset = 0;
+				String encrypted = "";
+				for (; offset + blocksize < txtBytes.length; offset += blocksize)
+				{
+					encrypted += Utils.encodeBytes64(encryptCipher.doFinal(txtBytes, offset, blocksize), true);
+				}
+				encrypted += Utils.encodeBytes64(encryptCipher.doFinal(txtBytes, offset, txtBytes.length - offset), true);
+/*
+			encryptCipher = javax.crypto.Cipher.getInstance("RSA/ECB/NoPadding");
+			encryptCipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+			String encrypted2 = Utils.encodeBytes64(encryptCipher.doFinal(txt.getBytes(StandardCharsets.UTF_8)));
+			encryptCipher = javax.crypto.Cipher.getInstance("RSA/ECB/NoPadding");
+			encryptCipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key);
+			String encrypted3 = Utils.encodeBytes64(encryptCipher.doFinal(txt.getBytes(StandardCharsets.UTF_8)));
+	*/		
 			return encrypted;
+			}
+			catch (Exception x)
+			{
+				System.out.println(x);
+			}
+			return "";
 		}
 	}
 	
@@ -111,41 +149,57 @@ public class SSOPasswordService
 	 */
 	public long generateKeyInfo()
 	{
-		synchronized (_keyInfoTable)
+		java.security.Key key;
+		try
+		{
+			java.security.KeyPairGenerator kg = java.security.KeyPairGenerator.getInstance("RSA");
+			
+			kg.initialize(KEY_LENGTH);
+			java.security.KeyPair keyPair = kg.generateKeyPair();
+			
+			java.security.interfaces.RSAPublicKey publicKey = (java.security.interfaces.RSAPublicKey)keyPair.getPublic();
+			key = publicKey;
+		}
+		catch (java.security.NoSuchAlgorithmException x)
+		{
+			throw new UnsupportedOperationException(x);
+		}		
+
+		synchronized (this)
 		{
 			long maxKey = 0;
 			for (Enumeration<Long> keyEnum = _keyInfoTable.keys(); keyEnum.hasMoreElements();)
 			{
-				long key = keyEnum.nextElement();
-				if (key > maxKey) maxKey = key;
+				long keyId = keyEnum.nextElement();
+				if (keyId > maxKey) maxKey = keyId;
 			}
 			maxKey++;
-			PasswordKeyInfo info = new PasswordKeyInfo();
-			info.keyId = maxKey;
-			try
-			{
-				java.security.KeyPairGenerator kg = java.security.KeyPairGenerator.getInstance("RSA");
-				
-				kg.initialize(512);
-				java.security.KeyPair key = kg.generateKeyPair();
-				
-				java.security.interfaces.RSAPublicKey publicKey = (java.security.interfaces.RSAPublicKey)key.getPublic();
-				info.key = publicKey;
-			}
-			catch (java.security.NoSuchAlgorithmException x)
-			{
-				throw new UnsupportedOperationException(x);
-			}
-			info.generationTime = new Date().getTime();
-			_keyInfoTable.put(info.keyId, info);
+			
+			PasswordKeyInfo info = new PasswordKeyInfo(maxKey, new Date().getTime(), key);
+		
+			_keyInfoTable.put(info.getKeyId(), info);
 			_currentKeyInfo = info;
-			return maxKey;
+			return info.getKeyId();
 		}
 	}
-
-	public synchronized PasswordInfo bakePassword(String password, long keyId) throws GeneralSecurityException
+	
+	public synchronized void setPasswordKeyInfo(PasswordKeyInfo info)
 	{
-		PasswordKeyInfo keyInfo = _keyInfoTable.get(keyId);
+		if (_keyInfoTable.contains(info.getKeyId()))
+			throw new IllegalArgumentException("Info with this keyId already exists: " + info.getKeyId());
+		_keyInfoTable.put(info.getKeyId(), info);
+		if (_currentKeyInfo == null || _currentKeyInfo.getKeyId() < info.getKeyId())
+			_currentKeyInfo = info;
+	}
+	
+	public synchronized PasswordKeyInfo getPasswordKeyInfo(long keyId)
+	{
+		return _keyInfoTable.get(keyId);
+	}
+
+	public PasswordInfo bakePassword(String password, long keyId) throws GeneralSecurityException
+	{
+		PasswordKeyInfo keyInfo = getPasswordKeyInfo(keyId); 
 		if (keyInfo == null)
 			throw new IllegalArgumentException("keyId not found: " + keyId);
 		
@@ -154,23 +208,32 @@ public class SSOPasswordService
 	
 	public synchronized PasswordInfo bakePassword(String password) throws GeneralSecurityException
 	{
-		if (_currentKeyInfo == null)
+		PasswordKeyInfo keyInfo = _currentKeyInfo;
+		if (keyInfo == null)
 			generateKeyInfo();
-		return bakePassword(password, _currentKeyInfo);
+		return bakePassword(password, keyInfo);
 	}
 	
 	private synchronized PasswordInfo bakePassword(String password, PasswordKeyInfo keyInfo) throws GeneralSecurityException
 	{
-		PasswordInfo res = new PasswordInfo();
-		res.passwordKeyId = keyInfo.keyId;
-		res.salt = Utils.randomString64(SALT_LENGTH);
-		res.password = keyInfo.encrypt(res.salt + password);
+		String salt = Utils.randomString64(SALT_LENGTH);
+		String encrypted = keyInfo.encrypt(salt + password);
 
-		//javax.crypto.Cipher encryptCipher = javax.crypto.Cipher.getInstance("RSA");
+		//javax.crypto.Cipher encryptCipher = javax.crypto.Cipher.getInstance("RSA/ECB/NoPadding");
 		//encryptCipher.init(javax.crypto.Cipher.ENCRYPT_MODE, keyInfo.key);
 		//byte[] encryptedBytes = encryptCipher.doFinal((res.salt + password).getBytes(StandardCharsets.UTF_8));
 		//res.password = Utils.encodeBytes64(encryptedBytes);
 		
-		return res;
+		return new PasswordInfo(salt, encrypted, keyInfo._keyId);
+	}
+	
+	public boolean testPassword(String test, PasswordInfo pwd) throws GeneralSecurityException
+	{
+		PasswordKeyInfo keyInfo = _keyInfoTable.get(pwd.getPasswordKeyId());
+		if (keyInfo == null)
+			return false;
+		
+		String encryptedTest = keyInfo.encrypt(pwd.getSalt() + test);
+		return encryptedTest.equals(pwd.getPassword());
 	}
 }
