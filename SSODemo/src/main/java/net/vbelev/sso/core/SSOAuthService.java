@@ -553,17 +553,17 @@ public class SSOAuthService
 	
 	/**
 	 * This is the entry point: the application registered as {@code requestingIdentityId}
-	 * wants to get an authenticated user or to confirm that the user {@code identityId} is himself.
+	 * wants to get an authenticated user or to confirm that the user {@code requestedIID} is himself.
 	 * If the requesting Id is null, they will not be notified of the results, but they can still
 	 * use the request token to check.
 	 * @param requestingIdentityId IID of the application requesting an auth
-	 * @param authIdendityId IID of the application that should perform the auth (normally, null)
-	 * @param identityId when not null, the auth will be restricted to this user
+	 * @param authenticatorIID IID of the application that should perform the auth (normally, null)
+	 * @param requestedIID when not null, the auth will be restricted to this user
 	 */
-	public AuthResponse requestAuth(Long requestingIdentityId, Long authIdentityId, Long identityId)
+	public AuthResponse requestAuth(Long requestingIdentityId, Long authenticatorIID, Long requestedIID)
 	{
-		AuthInfo auth = generateAuth(authIdentityId);
-		AuthRequestInfo request = generateRequest(requestingIdentityId, auth.token, authIdentityId, identityId); 
+		AuthInfo auth = generateAuth(authenticatorIID);
+		AuthRequestInfo request = generateRequest(requestingIdentityId, auth.token, authenticatorIID, requestedIID); 
 		
 		if (request == null)
 			return AuthResponse.NOTFOUND();
@@ -580,12 +580,12 @@ public class SSOAuthService
 	
 	/**
 	 * This is called by an auth application to set the request status to INPROGRESS, complete the auth or cancel the request 
-	 * @param authIdentityId
+	 * @param authenticatorIID
 	 * @param requestToken
 	 * @param identityId - if it is null, the status is set to NOTREADY; otherwise to ACTIVE
 	 * @return
 	 */
-	public AuthRequestResponse updateRequestStatus(Long authIdentityId, String requestToken, Long identityId)
+	public AuthRequestResponse updateRequestStatus(Long authenticatorIID, String requestToken, Long identityId)
 	{
 		try
 		{
@@ -593,9 +593,11 @@ public class SSOAuthService
 			
 			AuthRequestInfo requestInfo = getRequestInfo(requestToken);
 			if (requestInfo == null 
-				|| (requestInfo.authenticatorIID != null && requestInfo.authenticatorIID != authIdentityId)
+				|| (requestInfo.authenticatorIID != null && requestInfo.authenticatorIID != authenticatorIID)
 			)
+			{
 				return AuthRequestResponse.NOTFOUND();
+			}
 		
 			_authLock.writeLock().lock();
 			AuthInfo authInfo = getAuth(requestInfo.authToken);
@@ -824,13 +826,13 @@ public class SSOAuthService
 		}
 	}
 	
-	private AuthInfo generateAuth(Long signingIdentityId)
+	private AuthInfo generateAuth(Long authenticatorIID)
 	{
 		AuthInfo res = new AuthInfo();
 		res.token = Utils.randomString(8);
 		res.IID = null;//identityId;
 		res.status = AuthStatus.NEW;
-		res.authenticatorIID = signingIdentityId;
+		res.authenticatorIID = authenticatorIID;
 		res.expiryTime = new Date().getTime() + REQUEST_EXPIRY_SEC * 1000;
 		
 		try

@@ -267,6 +267,12 @@ public class Utils
 		return new String(bytes64, StandardCharsets.UTF_8);
 	}
 
+    public static String encode64(String str)
+    {
+        if (Utils.isEmpty(str)) return "";
+        return encodeBytes64(StandardCharsets.UTF_8.encode(str).array());
+    }
+    
 	public static String encodeBytes64(byte[] bytes, boolean trimEnd)
 	{
 		if (bytes == null || bytes.length == 0) return "";
@@ -298,8 +304,13 @@ public class Utils
 		byte[] bytes = decodeBytes64Decoder.decode(bytes64);
 		return bytes;
 	}
-	
-	
+    public static String decode64(String encoded)
+    {
+        if (Utils.isEmpty(encoded)) return "";
+        
+        byte[] bytes = decodeBytes64(encoded);
+        return new String(bytes, StandardCharsets.UTF_8);
+    }	
 	
 	public static String formatDate(Date d)
 	{
