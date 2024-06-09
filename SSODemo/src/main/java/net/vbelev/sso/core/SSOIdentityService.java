@@ -2,6 +2,7 @@ package net.vbelev.sso.core;
 
 /**
  * SSO Identity is everything we need to know about the user or application that we will authenticate.
+ * Currently not in use.
  */
 public class SSOIdentityService 
 {	

@@ -1,0 +1,73 @@
+SSO without cookies:
+(ATS = authentication server; AMS = amenities server/service)
+The goal: you go to the ATS website and enter your login/password. You are authenticated in the SSO environment.
+You go to an amenities website (different browser, no cookies from ATS).
+AMS uses the usual session cookies or auth tokens to maintain your login, that's as usual, but they need to auth you.
+AMS gets a pair of tokens from ATS: the ATS session token and a single-use login token.
+AMS sends you to the ATK website with the login token to authenticate.
+on the ATK website, you are authenticated in some way.
+  - since you are already logged it, it may remember your login session
+  - or it may ask for your login and password again
+if there is a notification endpoint registed for the AMS with the ATS, 
+	then the notification endpoint is called with the login token (not the ATS token!) and the authenticated user id.
+	Any response 200 is okay, any other response means authentication failed
+if there is any return URL for the AMS is registered with ATS, the user is redirected to it;
+	if there is no return URL, a message "please go back" is displayed (we are still on the ATS website)
+at any time, AMS can call an endpoint in ATS, ask for the status of the ATS session token
+	and get back some public user info or a non-authenticated or a logged-out status.
+
+
+A login sharing: suppose we have an application A that authenticated a user (with a password or something)
+	and wants to start an application B with the same user authentication. 
+	The apps A and B use some internal ID to identify the user, and the user may not exist in the ATS database.
+	- the app A either knows the user's ATS ID or creates a temp user record in ATS. 
+	- it gets a "prepaid" login token for this user from ATS, optionally locked for the app B only.
+	- the app B gets the prepaid login token and calls ATS as usual, getting back an ATS session token and a blank login token.	
+	- that ATS session is already authenticated, so the app B is ready to go. It checks the session status 
+		and retrieves the internal ID set by the app A.
+		
+
+
+* the authentication token is passed either as a cookie (yes) or an auth header in every call
+* the authentication server (ATS) accepts the user, via a password or something - we trust this server.
+* an amenities server authenticates with the ATS
+
+
+App 1: the client. It uses the system to admit an authenticated user.
+* doesn't need to be a web app (for now)
+1) get an unsigned auth Id from SSO;
+2) start an auth request with SSO, get a request token;
+3) get the public token from App 2;
+4) send the request token to App 2 (get a pseudo-cookie and store it for later);
+5) poll SSO for the result - get the authenticated user's name and code provided App 2;
+6) once successful, print the obtained user's name and code. Verify that the authenticator Id for him matches App 2.
+-- 
+7) for a repeat auth, start a new auth request and send it to App 2 with the pseudo-cookie from earlier.
+* the response from App 2 should be "repeat auth"; the rest is the same as above. 
+* "repeat auth" is when the login app remembers the previous authentication from the same client 
+* (via its own cookie, if it's a web app, or a pseudo-cookie). 
+* If the response from App 2 does not provide a login page url - it means that App 2 will complete the request silently.  
+
+App 2: the login. It should be a web app or a web service.
+1) get an unsigned auth Id from SSO;
+2) get a public token from SSO;
+3) provide an endpoint to give the public token;
+4) provide an endpoint to process a request token;
+* this method returns 1) a url in App 2 with the login page (if not auto-auth); 2) a pseudo-cookie for repeat auth; 3) status (declined, in-process, repeat auth).
+5.1) auto-auth: from inside step (4), complete the auth request with SSO, providing it with some user name and code;
+5.2) provide a login page and an action endpoint for the login
+* the action endpoint (login form submitted) completes the auth request with SSO; 
+* let's not worry about security of the login app at this stage.
+-- 
+* for the repeat auth: the endpoint in (4) should accept a pseudo-cookie. If it is found and recognized, the app completes the request as auto-auth.
+* the same endpoint should accept a parameter to ignore or discard the remembered auth, so that the client app be able to force a new login.
+
+
+== to test the auth transfer (not really needed) ==
+App 3: the master. It uses the system to pass an authenticated user to a client app.
+* it can be combined with the App 2(the login)
+1) start with some user name and code for your user;
+2) get an unsigned auth Id from SSO;
+3) get an auth transfer request from SSO;
+4) call SSO as anonymous to retrieve the user name, code and authenticator Id
+5) check that the name, code and authenticator Id match the steps 1 and 2.

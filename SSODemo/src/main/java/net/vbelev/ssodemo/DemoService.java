@@ -23,7 +23,7 @@ import net.vbelev.utils.Utils;
 //@WebServlet("/") // if a class extends HttpServlet, it can be marked with @WebsServlet instead of web.xml registration
 public class DemoService {
 
-    private static final SSOAuthService _authService;
+    private static final SSOAuthProvider _authService;
     
     static 
     {
@@ -76,26 +76,26 @@ public class DemoService {
         {
             failoverPath =java.nio.file.Path.of(homeFolder, failoverPath).toString(); 
         }
-        SSOAuthService auth;
+        SSOAuthProvider auth;
         if (Utils.isBlank(failoverPath))
         {
-            auth = new SSOAuthService();
+            auth = new SSOAuthProvider();
         }
         else
         {
             try
             {
-                auth = new SSOAuthService(failoverPath);
+                auth = new SSOAuthProvider(failoverPath);
             }
             catch (IOException x)
             {
-                auth = new SSOAuthService();
+                auth = new SSOAuthProvider();
             }
         }
         _authService = auth;
     }
     
-    static SSOAuthService getAuthService()
+    static SSOAuthProvider getAuthService()
     {
         return _authService;
     }

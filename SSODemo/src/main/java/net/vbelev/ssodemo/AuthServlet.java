@@ -1,4 +1,4 @@
-package net.vbelev.sso.web;
+package net.vbelev.ssodemo;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;

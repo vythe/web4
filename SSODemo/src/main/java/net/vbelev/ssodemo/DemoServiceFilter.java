@@ -3,13 +3,13 @@ package net.vbelev.ssodemo;
 import java.io.*;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
-import net.vbelev.sso.core.SSOAuthService;
+import net.vbelev.sso.core.SSOAuthProvider;
 import net.vbelev.utils.Utils;
 
 public class DemoServiceFilter extends HttpFilter
 {
 
-    private static SSOAuthService _authService;
+    private static SSOAuthProvider _authService;
     
     static 
     {
@@ -46,8 +46,8 @@ public class DemoServiceFilter extends HttpFilter
             //return false;
             return true;
         }
-        SSOAuthService.AuthResponse check = _authService.testAuthentication(null, authHeader);
-        if (check.status != SSOAuthService.AuthStatus.ACTIVE.name())
+        SSOAuthProvider.AuthResponse check = _authService.testAuthentication(null, authHeader);
+        if (check.status != SSOAuthProvider.AuthStatus.ACTIVE.name())
         {
             response.sendError(401);
             return false;
